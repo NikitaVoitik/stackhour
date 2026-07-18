@@ -2,11 +2,12 @@
   "server": {
     "port": 4040,
     "host": "0.0.0.0",
-    "token": "generate-a-long-random-string"
+    "tokens": { "linux-server": "generate-a-long-random-string" }
   },
   "agent": {
     "serverUrl": "http://your-linux-server:4040",
     "token": "generate-a-long-random-string",
+    "machine": "linux-server",
     "intervalSeconds": 20,
     "projectRoots": ["~/dev", "~/client"],
     "watch": { "files": true, "claude": true, "codex": true, "macApps": true },

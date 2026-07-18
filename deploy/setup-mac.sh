@@ -28,15 +28,9 @@ fi
 if [ -f "$CONFIG" ]; then
   echo "config exists at $CONFIG — leaving it alone"
 else
-  mkdir -p "$CONFIG_DIR"
-  CONFIG_TMP="$CONFIG.tmp"
-  rm -f "$CONFIG_TMP"
-  "$NODE_BIN" -e 'const [serverUrl, token, ...projectRoots] = process.argv.slice(1);
-    process.stdout.write(JSON.stringify({ agent: { serverUrl, token, projectRoots } }, null, 2) + "\n")' \
-    "$SERVER_URL" "$TOKEN" "${ROOTS[@]}" > "$CONFIG_TMP"
-  chmod 600 "$CONFIG_TMP"
-  mv "$CONFIG_TMP" "$CONFIG"
-  echo "wrote $CONFIG"
+  INIT_ARGS=(init agent "--server-url=$SERVER_URL" "--token=$TOKEN")
+  for project_root in "${ROOTS[@]}"; do INIT_ARGS+=("--project-root=$project_root"); done
+  "$REPO/bin/stackhour" "${INIT_ARGS[@]}"
 fi
 
 # --- launchd ----------------------------------------------------------------

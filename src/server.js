@@ -1,12 +1,14 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { openDb, insertHeartbeats, listAgentStatus, upsertAgentStatus } from './db.js';
 import { computeCredits, totalsBy, dayBuckets, buildSegments } from './summarize.js';
 import { VERSION } from './version.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const GROUP_FIELDS = ['project', 'source', 'machine', 'category', 'language', 'entity', 'actor', 'branch'];
 
 function readBody(req, limit = 5 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
@@ -55,19 +57,40 @@ function json(res, status, obj) {
   res.end(body);
 }
 
-function authOk(req, url, token) {
-  if (!token) return true; // no token configured -> open (use on trusted networks only)
+function safeEqual(left, right) {
+  const a = Buffer.from(String(left));
+  const b = Buffer.from(String(right));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function requestToken(req, url) {
   const header = req.headers.authorization || '';
-  if (header === `Bearer ${token}`) return true;
+  if (header.startsWith('Bearer ')) return header.slice(7);
   // wakatime plugins send: Basic base64(api_key)
   if (header.startsWith('Basic ')) {
     try {
       const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
-      if (decoded === token || decoded === `${token}:`) return true;
+      return decoded.endsWith(':') ? decoded.slice(0, -1) : decoded;
     } catch { /* fall through */ }
   }
-  if (url.searchParams.get('api_key') === token) return true;
-  return false;
+  return url.searchParams.get('api_key') || '';
+}
+
+export function authenticate(req, url, serverConfig) {
+  const tokens = serverConfig.tokens && typeof serverConfig.tokens === 'object' && !Array.isArray(serverConfig.tokens)
+    ? serverConfig.tokens : {};
+  const legacy = serverConfig.token || '';
+  if (!legacy && Object.keys(tokens).length === 0) return { kind: 'open' };
+  const supplied = requestToken(req, url);
+  if (legacy && safeEqual(supplied, legacy)) return { kind: 'global' };
+  for (const [machine, token] of Object.entries(tokens)) {
+    if (token && safeEqual(supplied, token)) return { kind: 'machine', machine };
+  }
+  return null;
+}
+
+function allowsMachine(principal, machine) {
+  return principal?.kind !== 'machine' || String(machine || 'unknown') === principal.machine;
 }
 
 // Map a wakatime-protocol heartbeat (from official editor plugins) to our schema.
@@ -142,6 +165,9 @@ function reattributedRange(db, from, to, windowSeconds) {
 }
 
 export function startServer(cfg) {
+  if (fs.existsSync(`${cfg.server.db}.maintenance.lock`)) {
+    throw new Error(`database maintenance is in progress: ${cfg.server.db}`);
+  }
   const db = openDb(cfg.server.db);
   const dashboardPath = path.join(__dirname, 'dashboard.html');
 
@@ -159,24 +185,33 @@ export function startServer(cfg) {
         return;
       }
       if (req.method === 'GET' && p === '/api/auth-check') {
-        if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
-        return json(res, 200, { ok: true, version: VERSION });
+        const principal = authenticate(req, url, cfg.server);
+        if (!principal) return json(res, 401, { error: 'unauthorized' });
+        return json(res, 200, { ok: true, version: VERSION, machine: principal.machine || null });
       }
 
       // ---- ingest (Stackhour agents) ----
       if (req.method === 'POST' && p === '/api/ingest') {
-        if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
+        const principal = authenticate(req, url, cfg.server);
+        if (!principal) return json(res, 401, { error: 'unauthorized' });
         const rows = await readJson(req);
         if (!Array.isArray(rows)) return json(res, 400, { error: 'expected array' });
+        if (rows.some((row) => !allowsMachine(principal, row?.machine))) {
+          return json(res, 403, { error: `token is restricted to machine ${principal.machine}` });
+        }
         const inserted = insertHeartbeats(db, rows);
         return json(res, 200, { inserted, received: rows.length });
       }
 
       if (req.method === 'POST' && p === '/api/agent-status') {
-        if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
+        const principal = authenticate(req, url, cfg.server);
+        if (!principal) return json(res, 401, { error: 'unauthorized' });
         const status = await readJson(req);
         if (!status || typeof status !== 'object' || Array.isArray(status)) {
           return json(res, 400, { error: 'expected object' });
+        }
+        if (!allowsMachine(principal, status.machine)) {
+          return json(res, 403, { error: `token is restricted to machine ${principal.machine}` });
         }
         try { return json(res, 200, upsertAgentStatus(db, status)); }
         catch (err) { return json(res, 400, { error: err.message }); }
@@ -187,10 +222,14 @@ export function startServer(cfg) {
         || p === '/api/v1/users/current/heartbeats.bulk'
         || p === '/users/current/heartbeats'
         || p === '/users/current/heartbeats.bulk')) {
-        if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
+        const principal = authenticate(req, url, cfg.server);
+        if (!principal) return json(res, 401, { error: 'unauthorized' });
         const body = await readJson(req);
         const items = Array.isArray(body) ? body : [body];
         const machine = req.headers['x-machine-name'] || 'unknown';
+        if (!allowsMachine(principal, machine)) {
+          return json(res, 403, { error: `token is restricted to machine ${principal.machine}` });
+        }
         const rows = items.map((h) => fromWakatime(h, req.headers['user-agent'], machine));
         insertHeartbeats(db, rows);
         // official API returns 201/202 with a responses array for bulk
@@ -209,7 +248,7 @@ export function startServer(cfg) {
         const to = numberParam(url, 'to', Date.now() / 1000);
         const from = numberParam(url, 'from', to - days * 86400);
         const groupBy = (url.searchParams.get('groupBy') || 'project')
-          .split(',').filter((k) => ['project', 'source', 'machine', 'category', 'language', 'entity', 'actor'].includes(k));
+          .split(',').filter((k) => GROUP_FIELDS.includes(k));
         const tz = numberParam(url, 'tz', 0, { min: -1440, max: 1440 });
         const rows = reattributedRange(db, from, to, cfg.summary.reattributeWindowSeconds);
         const credited = computeCredits(rows, cfg.summary);
@@ -222,6 +261,41 @@ export function startServer(cfg) {
           totalCost, totalTokens,
           totals: totalsBy(credited, groupBy.length ? groupBy : ['project']),
           days: dayBuckets(credited, groupBy.length ? groupBy : ['project'], tz),
+        });
+      }
+
+      if (req.method === 'GET' && p === '/api/detail') {
+        const days = numberParam(url, 'days', 7, { min: 1, max: 366 });
+        const to = numberParam(url, 'to', Date.now() / 1000);
+        const from = numberParam(url, 'from', to - days * 86400);
+        const dimension = url.searchParams.get('dimension') || '';
+        const value = url.searchParams.get('value');
+        if (!GROUP_FIELDS.includes(dimension) || value === null) {
+          return json(res, 400, { error: 'dimension and value are required' });
+        }
+        const rows = reattributedRange(db, from, to, cfg.summary.reattributeWindowSeconds);
+        const credited = computeCredits(rows, cfg.summary);
+        // Empty is the explicit API representation for SQL null. The visible
+        // "unknown" label selects that same bucket when clicked in the UI.
+        const matches = (row) => value === ''
+          ? row[dimension] == null
+          : String(row[dimension] ?? 'unknown') === value;
+        const selectedRows = rows.filter(matches);
+        const selectedCredits = credited.filter(matches);
+        const total = Math.round(selectedCredits.reduce((sum, row) => sum + row.credit, 0));
+        const humanTotal = Math.round(selectedCredits.filter((row) => row.actor !== 'agent')
+          .reduce((sum, row) => sum + row.credit, 0));
+        const breakdowns = {};
+        for (const field of GROUP_FIELDS) {
+          if (field !== dimension) breakdowns[field] = totalsBy(selectedCredits, [field]).slice(0, 20);
+        }
+        return json(res, 200, {
+          from, to, dimension, value, total, humanTotal, agentTotal: total - humanTotal,
+          totalCost: Math.round(selectedRows.reduce((sum, row) => sum + (row.cost || 0), 0) * 100) / 100,
+          totalTokens: selectedRows.reduce((sum, row) => sum + (row.tokens_in || 0) + (row.tokens_out || 0), 0),
+          breakdowns,
+          segments: buildSegments(selectedCredits, cfg.summary),
+          recent: selectedRows.sort((a, b) => b.time - a.time).slice(0, 50),
         });
       }
 
@@ -282,7 +356,9 @@ export function startServer(cfg) {
 
   server.listen(cfg.server.port, cfg.server.host, () => {
     console.log(`[stackhour] server listening on http://${cfg.server.host}:${cfg.server.port} (db: ${cfg.server.db})`);
-    if (!cfg.server.token) console.log('[stackhour] WARNING: no server.token configured — ingest is open to anyone who can reach this port');
+    if (!cfg.server.token && Object.keys(cfg.server.tokens || {}).length === 0) {
+      console.log('[stackhour] WARNING: no server tokens configured — ingest is open to anyone who can reach this port');
+    }
   });
   return server;
 }

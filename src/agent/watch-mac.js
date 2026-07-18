@@ -6,6 +6,7 @@
 // app-level attribution when the title is unavailable or unparseable.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { resolveProject } from '../project.js';
 
 const exec = promisify(execFile);
 
@@ -61,7 +62,7 @@ export async function watchMacApps(cfg, state) {
   return [{
     time: Date.now() / 1000,
     source: mapped.source,
-    project: project || mapped.source, // no parseable project -> attribute to the app
+    project: resolveProject(project || mapped.source, cfg.agent, project || mapped.source),
     entity: title || app,
     entity_type: 'app',
     category: mapped.category || 'coding',

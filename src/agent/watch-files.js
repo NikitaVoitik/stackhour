@@ -3,6 +3,7 @@
 // remote saves (the remote host sees the writes) with zero editor plugins.
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveProject } from '../project.js';
 
 const LANG_BY_EXT = {
   '.ts': 'TypeScript', '.tsx': 'TypeScript', '.js': 'JavaScript', '.jsx': 'JavaScript',
@@ -65,12 +66,11 @@ export async function watchFiles(cfg, state) {
       const rel = path.relative(root, file);
       const top = rel.split(path.sep)[0];
       const inSubdir = rel.includes(path.sep);
-      const project = inSubdir ? top : path.basename(root);
       const projectDir = inSubdir ? path.join(root, top) : root;
       rows.push({
         time: mtime,
         source: 'editor-files',
-        project,
+        project: resolveProject(projectDir, cfg.agent),
         entity: file,
         entity_type: 'file',
         category: 'coding',

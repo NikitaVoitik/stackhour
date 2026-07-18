@@ -5,6 +5,22 @@ const cmd = process.argv[2];
 if (cmd === 'doctor') {
   const { runDoctor } = await import('./doctor.js');
   process.exitCode = await runDoctor({ json: process.argv.includes('--json') });
+} else if (cmd === 'init') {
+  const { runInit } = await import('./setup.js');
+  try { runInit(process.argv.slice(3)); }
+  catch (err) { console.error(`stackhour init: ${err.message}`); process.exitCode = 1; }
+} else if (cmd === 'token') {
+  const { runToken } = await import('./tokens.js');
+  try { runToken(process.argv.slice(3)); }
+  catch (err) { console.error(`stackhour token: ${err.message}`); process.exitCode = 1; }
+} else if (cmd === 'data') {
+  const { runData } = await import('./data.js');
+  try { runData(process.argv.slice(3)); }
+  catch (err) { console.error(`stackhour data: ${err.message}`); process.exitCode = 1; }
+} else if (cmd === 'backup') {
+  const { runBackup } = await import('./backup.js');
+  try { await runBackup(process.argv.slice(3)); }
+  catch (err) { console.error(`stackhour backup: ${err.message}`); process.exitCode = 1; }
 } else {
   const cfg = loadConfig();
 
@@ -44,6 +60,23 @@ usage: stackhour <command>
   import-wakatime [--days=365]   backfill history from wakatime.com
   status            print today's totals from the server
   doctor [--json]   check config, inputs, database, server, and services
+  init server [--host=0.0.0.0] [--port=4040] [--machine=NAME]
+                    create server + local-agent config and a secure token
+  init agent --server-url=URL --token=TOKEN [--machine=NAME]
+             [--project-root=PATH ...] [--force]
+                    create config for an agent machine
+  token create MACHINE [--force]   create or rotate a machine token
+  token list                       list enrolled machines (never secrets)
+  token revoke MACHINE             revoke a machine token
+  data stats [--json]              inspect local database size and coverage
+  data export --output=FILE [--from=TIME] [--to=TIME] [--force]
+                                   atomically export JSONL
+  data prune --before=TIME [--confirm]
+                                   preview or confirm retention pruning
+  backup create [--output=FILE] [--force]
+                                   create and verify a consistent snapshot
+  backup verify FILE               integrity-check a backup
+  backup restore FILE [--confirm]  preview or restore, preserving old DB
 
 config: ${CONFIG_PATH}`);
   }

@@ -51,6 +51,14 @@
   .pill { border-radius:10px; padding:2px 7px; font-size:11px; background:#232735; }
   .pill.ok { color:#9ece6a; } .pill.warn { color:#e0af68; }
   .pill.bad { color:#f7768e; } .pill.off { color:var(--dim); }
+  button.row { width:100%; border:0; padding:0; color:inherit; background:transparent; font:inherit; cursor:pointer; text-align:left; }
+  button.row:hover .name { color:var(--accent); }
+  .detail-head { display:flex; align-items:center; gap:10px; }
+  .detail-head h2 { margin-right:auto; }
+  .close { border:1px solid #2a2f3d; border-radius:6px; background:transparent; color:var(--dim); cursor:pointer; padding:3px 8px; }
+  .detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:18px; margin:14px 0; }
+  .detail-grid h3 { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+  .detail-stat { font-size:20px; margin-right:14px; }
 </style>
 </head>
 <body>
@@ -58,7 +66,7 @@
 <p class="sub" id="updated">loading…</p>
 <div class="controls">
   range <select id="range"><option value="1">today</option><option value="7" selected>7 days</option><option value="14">14 days</option><option value="30">30 days</option><option value="90">90 days</option></select>
-  split by <select id="groupBy"><option value="project" selected>project</option><option value="source">source</option><option value="machine">machine</option><option value="actor">actor</option><option value="category">category</option><option value="language">language</option></select>
+  split by <select id="groupBy"><option value="project" selected>project</option><option value="source">source</option><option value="machine">machine</option><option value="actor">actor</option><option value="category">category</option><option value="language">language</option><option value="branch">branch</option></select>
 </div>
 <div class="grid">
   <div class="card"><h2>Total</h2><div class="big" id="total">–</div>
@@ -67,6 +75,10 @@
   <div class="card"><h2>Now</h2><div id="now" class="sub">–</div></div>
   <div class="card" style="grid-column:1/-1"><h2>Agent health</h2><div id="agentHealth" class="sub">–</div></div>
   <div class="card"><h2 id="splitTitle">By project</h2><div id="totals"></div></div>
+  <div class="card" id="detailCard" style="grid-column:1/-1;display:none">
+    <div class="detail-head"><h2 id="detailTitle">Details</h2><button class="close" id="detailClose">close</button></div>
+    <div id="detail"></div>
+  </div>
   <div class="card" style="grid-column:1/-1"><h2>Timeline (last 24h) — bright = you, dim = agents</h2>
     <div id="timeline"></div></div>
   <div class="card" style="grid-column:1/-1"><h2>Per day</h2><div class="days" id="days"></div><div class="days-labels" id="dayLabels"></div><div class="legend" id="legend"></div></div>
@@ -79,6 +91,7 @@ const age = s => s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s/60)}m
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
   '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
 })[c]);
+let activeDetail = null;
 
 async function getJson(url) {
   const res = await fetch(url);
@@ -161,10 +174,10 @@ async function load() {
   const color = Object.create(null);
   totals.forEach((t, i) => color[t[groupBy]] = COLORS[i % COLORS.length]);
   document.getElementById('totals').innerHTML = totals.map(t =>
-    `<div class="row"><div class="name" title="${esc(t[groupBy])}">${esc(t[groupBy])}</div>
+    `<button class="row" data-detail-dimension="${esc(groupBy)}" data-detail-value="${esc(t[groupBy])}"><div class="name" title="${esc(t[groupBy])}">${esc(t[groupBy])}</div>
      <div class="bar"><i style="width:${100*t.seconds/max}%;background:${color[t[groupBy]]}"></i></div>
      <div class="val">${fmt(t.seconds)}</div>
-     <div class="cost">${t.cost >= 0.01 ? '$'+t.cost.toFixed(2) : ''}</div></div>`).join('');
+     <div class="cost">${t.cost >= 0.01 ? '$'+t.cost.toFixed(2) : ''}</div></button>`).join('');
 
   // per-day stacked columns
   const byDate = Object.create(null);
@@ -189,7 +202,39 @@ async function load() {
   document.getElementById('recent').innerHTML = recent.map(r =>
     `<tr><td>${new Date(r.time*1000).toLocaleTimeString()}</td><td>${esc(r.machine)}</td><td>${esc(r.source)}</td>
      <td>${esc(r.project)}</td><td title="${esc(r.entity)}">${esc(r.entity.split('/').pop())}</td><td>${esc(r.category)}</td></tr>`).join('');
+  if (activeDetail) await openDetail(activeDetail.dimension, activeDetail.value);
 }
+function detailRows(rows, field) {
+  return (rows || []).slice(0, 8).map(row =>
+    `<div class="row"><div class="name" title="${esc(row[field])}">${esc(row[field] || 'unknown')}</div>` +
+    `<div class="bar"><i style="width:${Math.max(2, 100*row.seconds/((rows || [])[0]?.seconds || 1))}%;background:#7aa2f7"></i></div>` +
+    `<div class="val">${fmt(row.seconds)}</div></div>`).join('') || '<div class="sub">none</div>';
+}
+async function openDetail(dimension, value) {
+  activeDetail = { dimension, value };
+  const days = document.getElementById('range').value;
+  const params = new URLSearchParams({ days, dimension, value });
+  const data = await getJson(`/api/detail?${params}`);
+  const card = document.getElementById('detailCard');
+  card.style.display = '';
+  document.getElementById('detailTitle').textContent = `${dimension}: ${value || 'unknown'}`;
+  const fields = ['project','source','machine','actor','category','language','branch','entity'].filter(field => field !== dimension);
+  document.getElementById('detail').innerHTML =
+    `<div><span class="detail-stat">${fmt(data.total)}</span><span class="you">you ${fmt(data.humanTotal)}</span> · ` +
+    `<span class="agents">agents ${fmt(data.agentTotal)}</span>${data.totalCost ? ` · <span class="cost">$${data.totalCost.toFixed(2)} api-equiv</span>` : ''}</div>` +
+    `<div class="detail-grid">${fields.map(field => `<div><h3>By ${esc(field)}</h3>${detailRows(data.breakdowns[field], field)}</div>`).join('')}</div>` +
+    `<h3>Recent matching heartbeats</h3><table>${data.recent.slice(0,20).map(row =>
+      `<tr><td>${new Date(row.time*1000).toLocaleString()}</td><td>${esc(row.machine)}</td><td>${esc(row.source)}</td>` +
+      `<td>${esc(row.project)}</td><td title="${esc(row.entity)}">${esc(row.entity.split('/').pop())}</td><td>${esc(row.actor)}</td></tr>`).join('')}</table>`;
+}
+document.getElementById('totals').onclick = event => {
+  const row = event.target.closest('[data-detail-dimension]');
+  if (row) openDetail(row.dataset.detailDimension, row.dataset.detailValue).catch(showError);
+};
+document.getElementById('detailClose').onclick = () => {
+  activeDetail = null;
+  document.getElementById('detailCard').style.display = 'none';
+};
 document.getElementById('range').onchange = () => load().catch(showError);
 document.getElementById('groupBy').onchange = () => load().catch(showError);
 load().catch(showError);

@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readFirstJsonLine, readNewLines, pruneOffsets } from './tail.js';
 import { costOf } from '../pricing.js';
+import { resolveProject } from '../project.js';
 
 const CODEX_SESSIONS = path.join(os.homedir(), '.codex', 'sessions');
 const RECENT_WINDOW_S = 3600;
@@ -82,7 +83,7 @@ export async function watchCodex(cfg, state, options = {}) {
       const base = {
         time: ts,
         source: meta.source || 'codex-cli',
-        project: path.basename(cwd),
+        project: resolveProject(cwd, cfg.agent || {}),
         category: 'ai coding',
       };
       // per-turn token usage rides on token_count events

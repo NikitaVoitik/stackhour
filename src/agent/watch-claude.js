@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readNewLines, pruneOffsets } from './tail.js';
 import { costOf } from '../pricing.js';
+import { resolveProject } from '../project.js';
 
 const CLAUDE_PROJECTS = path.join(os.homedir(), '.claude', 'projects');
 const RECENT_WINDOW_S = 3600; // ignore replayed/old lines beyond this age
@@ -48,7 +49,7 @@ export async function watchClaude(cfg, state, options = {}) {
       const base = {
         time: ts,
         source,
-        project: path.basename(cwd),
+        project: resolveProject(cwd, cfg.agent || {}),
         category: 'ai coding',
         branch: line.gitBranch || null,
       };

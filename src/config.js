@@ -29,6 +29,7 @@ const DEFAULTS = {
     host: '0.0.0.0',
     db: STORAGE.dbPath,
     token: '',
+    tokens: {},
   },
   agent: {
     serverUrl: 'http://127.0.0.1:4040',
@@ -36,6 +37,9 @@ const DEFAULTS = {
     machine: os.hostname(),
     intervalSeconds: 20,
     projectRoots: [],
+    // Map absolute repository paths, normalized remotes, or project labels to
+    // one canonical display name shared by every machine.
+    projectAliases: {},
     watch: { files: true, claude: true, codex: true, macApps: true, ssh: true, zed: true },
     // frontmost-app tracking (macOS only): process name -> source, or {source, category}
     apps: {

@@ -37,10 +37,10 @@ api_key = <your server token>
 ## Setup
 
 ```sh
-# both machines
+# server
 git clone <this repo> ~/stackhour
-mkdir -p ~/.config/stackhour && cp ~/stackhour/config.example.json ~/.config/stackhour/config.json
-$EDITOR ~/.config/stackhour/config.json   # set token, serverUrl, projectRoots
+~/stackhour/bin/stackhour init server
+# Save the printed agent token; the config is written mode 0600.
 
 # Linux server
 cp ~/stackhour/deploy/stackhour-server.service ~/.config/systemd/user/
@@ -52,6 +52,24 @@ systemctl --user daemon-reload && systemctl --user enable --now stackhour-server
 git clone <this repo> ~/stackhour
 ~/stackhour/deploy/setup-mac.sh http://your-server:4040 <token> ~/dev ~/client
 ```
+
+For another Linux agent, run:
+
+```sh
+# On the server; prints the new secret once.
+stackhour token create my-linux
+# On the agent, use that machine-specific secret.
+stackhour init agent --server-url=http://your-server:4040 --token=<token> \
+  --machine=my-linux --project-root=~/dev
+```
+
+Both init commands preserve the other role in a shared config and refuse to
+replace an existing role unless `--force` is supplied.
+
+Each agent has its own credential. `stackhour token list` shows enrolled
+machine names without secrets; `stackhour token create NAME --force` rotates
+one credential and `stackhour token revoke NAME` removes it. The server rejects
+heartbeats or health reports whose machine does not match the presented token.
 
 Dashboard: `http://your-server:4040/`. CLI: `stackhour status`.
 
@@ -91,6 +109,32 @@ Backfill history from wakatime.com (key in config or `WAKATIME_API_KEY`):
 stackhour import-wakatime --days=365
 ```
 
+Inspect, export, or prune the local database:
+
+```sh
+stackhour data stats
+stackhour data export --output=stackhour.jsonl --from=2026-01-01
+stackhour data prune --before=2025-01-01          # preview only
+stackhour data prune --before=2025-01-01 --confirm
+```
+
+Exports are atomic mode-0600 JSONL files and never overwrite without
+`--force`. Pruning is a transaction and remains a dry run without `--confirm`.
+
+Create, verify, and restore database backups (config secrets are excluded):
+
+```sh
+stackhour backup create
+stackhour backup verify ~/.local/share/stackhour/backups/stackhour-....db
+systemctl --user stop stackhour-server
+stackhour backup restore /path/to/backup.db                 # preview
+stackhour backup restore /path/to/backup.db --confirm
+systemctl --user start stackhour-server
+```
+
+A confirmed restore verifies the input and replacement, refuses a busy
+database, and retains the previous DB beside it as `*.pre-restore-*`.
+
 ## Tuning
 
 Everything lives in `~/.config/stackhour/config.json` (defaults in `src/config.js`):
@@ -98,6 +142,8 @@ Everything lives in `~/.config/stackhour/config.json` (defaults in `src/config.j
 - `summary.capSeconds` — max seconds one heartbeat can earn (default 120).
   Raise for more generous totals, lower for stricter ones.
 - `agent.intervalSeconds` — tick rate (default 20s).
+- `agent.projectAliases` — canonical names keyed by repository path, normalized
+  Git remote (`github.com/owner/repo`), or detected label.
 - `agent.apps` — which macOS apps to track and how to label them.
 - `agent.ignoreDirs` / `maxScanDepth` — file-scan noise control.
 

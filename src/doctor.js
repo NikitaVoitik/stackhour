@@ -68,7 +68,9 @@ export async function diagnose(options = {}) {
   } else add('offline-queue', 'ok', 'empty');
 
   if (cfg) {
-    if (cfg.server.token || cfg.agent.token) add('token', 'ok', 'configured (value hidden)');
+    if (cfg.server.token || Object.keys(cfg.server.tokens || {}).length || cfg.agent.token) {
+      add('token', 'ok', 'configured (value hidden)');
+    }
     else add('token', 'warn', 'no ingest token configured');
 
     const roots = cfg.agent.projectRoots || [];

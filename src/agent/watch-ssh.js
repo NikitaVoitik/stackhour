@@ -4,21 +4,11 @@
 // attribute the time to a project. This makes "typing over SSH" count as
 // human time even when no file was saved and no agent was involved.
 import fs from 'node:fs';
-import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { resolveProject } from '../project.js';
 
 const exec = promisify(execFile);
-
-function projectFor(cwd, roots) {
-  for (const root of roots) {
-    if (cwd === root) return path.basename(root);
-    if (cwd.startsWith(root + path.sep)) {
-      return cwd.slice(root.length + 1).split(path.sep)[0];
-    }
-  }
-  return path.basename(cwd);
-}
 
 async function foregroundCwd(pts) {
   // pick the foreground process ('+' in stat) on this tty, else the newest
@@ -49,7 +39,7 @@ export async function watchSsh(cfg, state) {
     rows.push({
       time: now,
       source: 'ssh',
-      project: projectFor(cwd, cfg.agent.projectRoots),
+      project: resolveProject(cwd, cfg.agent),
       entity: cwd,
       entity_type: 'app',
       category: 'coding',
