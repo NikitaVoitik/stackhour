@@ -20,7 +20,8 @@ const tempDirs = [];
 const cliPath = path.resolve('src/cli.js');
 
 function tempDir() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stackhour-setup-test-'));
+  // realpath: on macOS os.tmpdir() is a symlink (/var -> /private/var)
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'stackhour-setup-test-')));
   tempDirs.push(dir);
   return dir;
 }

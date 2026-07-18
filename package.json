@@ -1,0 +1,16 @@
+{
+  "name": "stackhour",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted coding time tracker with a built-in Telegram bridge for Claude Code and Codex.",
+  "type": "module",
+  "bin": {
+    "stackhour": "bin/stackhour"
+  },
+  "scripts": {
+    "test": "node --experimental-sqlite --no-warnings --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

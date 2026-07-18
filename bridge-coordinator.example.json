@@ -1,0 +1,25 @@
+{
+  "token": "YOUR_TELEGRAM_BOT_TOKEN",
+  "chatId": 123456789,
+  "defaultTarget": "gcp",
+  "maxMediaBytes": 536870912,
+  "elevenLabsApiKey": "",
+  "targets": {
+    "gcp": {
+      "label": "GCP",
+      "type": "local",
+      "cwd": "/home/you/workspace",
+      "claudeBin": "/home/you/.local/bin/claude",
+      "codexBin": "/home/you/.local/bin/codex",
+      "extraPath": "/home/you/.local/bin:/usr/local/bin:/usr/bin:/bin",
+      "permissionMode": "default",
+      "model": null,
+      "codexModel": null
+    },
+    "mac": {
+      "label": "Mac",
+      "type": "remote",
+      "permissionMode": "default"
+    }
+  }
+}

@@ -25,6 +25,9 @@ if (cmd === 'doctor') {
   const { runInstall } = await import('./install.js');
   try { runInstall(process.argv.slice(3)); }
   catch (err) { console.error(`stackhour install: ${err.message}`); process.exitCode = 1; }
+} else if (cmd === 'bridge') {
+  const { runBridgeCli } = await import('./bridge/cli.mjs');
+  await runBridgeCli(process.argv.slice(3));
 } else {
   const cfg = loadConfig();
 
@@ -82,6 +85,10 @@ usage: stackhour <command>
   backup verify FILE               integrity-check a backup
   backup restore FILE [--confirm]  preview or restore, preserving old DB
   install <server|agent>           install and start user service(s)
+  bridge install <coordinator|worker> [--reconfigure] [--no-start]
+                                   set up the Telegram Claude/Codex bridge
+  bridge doctor|status|restart <coordinator|worker>
+                                   operate the bridge service
 
 config: ${CONFIG_PATH}`);
   }

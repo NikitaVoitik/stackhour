@@ -387,6 +387,22 @@ WAKATIME_API_KEY=waka_xxx ./bin/stackhour import-wakatime --days=365
 Imported rows currently live in `wakatime_days`; they are exportable and
 prunable but are not yet merged into dashboard charts.
 
+## Telegram bridge
+
+Stackhour also ships a private Telegram control plane for Claude Code and
+Codex: a coordinator on the always-on Linux machine owns the Telegram
+connection, and a Mac worker polls it over outbound SSH — no open ports on the
+Mac, jobs queue while it sleeps.
+
+```sh
+./bin/stackhour bridge install coordinator   # on the Linux machine
+./bin/stackhour bridge install worker        # on the Mac
+stackhour bridge doctor coordinator|worker   # end-to-end health check
+```
+
+See [docs/bridge.md](docs/bridge.md) for the full guide and
+[SECURITY.md](SECURITY.md) for the security model.
+
 ## Updating and testing
 
 ```sh
