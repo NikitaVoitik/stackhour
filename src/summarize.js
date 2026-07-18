@@ -2,14 +2,20 @@
 //
 // Credit model (WakaTime-ish, simplified so it's easy to tune):
 // sort a stream of heartbeats by time; each one earns min(gap-to-next, capSeconds);
-// the last one in a run earns lastEventCreditSeconds. Streams are split per
-// (machine, source) so two tools active at once both earn time — that's a
-// deliberate choice (change groupStreams below for strict wall-clock).
+// the last one in a run earns lastEventCreditSeconds.
+//
+// Stream splitting encodes who can parallelize:
+// - human streams split per (machine, source): your attention is single-
+//   threaded, so rapid switching between projects in one tool never
+//   double-counts — it shows up as switches, not overlap.
+// - agent streams additionally split per project: three Claude sessions
+//   grinding on three projects at once each accrue real agent-hours.
 
 function groupStreams(rows) {
   const streams = new Map();
   for (const r of rows) {
-    const key = JSON.stringify([r.machine, r.source]);
+    const key = JSON.stringify([r.machine, r.source, r.actor,
+      r.actor === 'agent' ? r.project : '']);
     let s = streams.get(key);
     if (!s) streams.set(key, (s = []));
     s.push(r);
@@ -51,6 +57,37 @@ export function totalsBy(creditedRows, keys) {
       return obj;
     })
     .sort((a, b) => b.seconds - a.seconds);
+}
+
+export function buildSegments(creditedRows, { joinGapSeconds = 300 } = {}) {
+  // contiguous work segments per (project, actor) for the timeline lanes —
+  // this is what makes project switches and parallel agent work visible
+  const groups = new Map();
+  for (const r of creditedRows) {
+    const key = JSON.stringify([r.project, r.actor]);
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = []));
+    g.push(r);
+  }
+  const segments = [];
+  for (const [key, rows] of groups) {
+    const [project, actor] = JSON.parse(key);
+    rows.sort((a, b) => a.time - b.time);
+    let seg = null;
+    for (const r of rows) {
+      if (seg && r.time - seg.end <= joinGapSeconds) {
+        seg.end = r.time;
+        seg.seconds += r.credit;
+        seg.sources.add(r.source);
+      } else {
+        if (seg) segments.push({ ...seg, sources: [...seg.sources] });
+        seg = { project, actor, start: r.time, end: r.time, seconds: r.credit, sources: new Set([r.source]) };
+      }
+    }
+    if (seg) segments.push({ ...seg, sources: [...seg.sources] });
+  }
+  return segments.sort((a, b) => a.start - b.start)
+    .map((s) => ({ ...s, seconds: Math.round(s.seconds) }));
 }
 
 export function dayBuckets(creditedRows, keys, tzOffsetMinutes = 0) {

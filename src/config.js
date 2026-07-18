@@ -42,7 +42,9 @@ const DEFAULTS = {
     maxScanDepth: 8,
   },
   // credit model: each heartbeat earns time until the next one, capped.
-  summary: { capSeconds: 120, lastEventCreditSeconds: 60 },
+  // reattributeWindowSeconds: file saves matching an agent edit within this
+  // window count as agent work. joinGapSeconds: timeline segment merging.
+  summary: { capSeconds: 120, lastEventCreditSeconds: 60, reattributeWindowSeconds: 120, joinGapSeconds: 300 },
   wakatime: { apiKey: '' },
 };
 

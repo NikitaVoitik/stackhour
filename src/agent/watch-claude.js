@@ -46,20 +46,32 @@ export async function watchClaude(cfg, state) {
         project: path.basename(cwd),
         category: 'ai coding',
       };
-      // prefer concrete file entities from tool_use blocks
-      let emitted = false;
       const content = line.message?.content;
+      // a genuine human prompt is a user line that is not a tool_result relay
+      // and not inside a subagent sidechain
+      const isHumanPrompt = line.type === 'user' && !line.isSidechain
+        && (typeof content === 'string'
+          || (Array.isArray(content) && content.some((b) => b?.type === 'text')
+              && !content.some((b) => b?.type === 'tool_result')));
+
+      if (isHumanPrompt) {
+        rows.push({ ...base, actor: 'human', entity: cwd, entity_type: 'app', is_write: 0 });
+        continue;
+      }
+      // everything else (assistant output, tool use, tool results, sidechains)
+      // is the agent working — it accrues even when Nikita walked away
+      let emitted = false;
       if (Array.isArray(content)) {
         for (const block of content) {
           const fp = block?.type === 'tool_use' && block.input?.file_path;
           if (fp) {
-            rows.push({ ...base, entity: fp, entity_type: 'file', is_write: /edit|write/i.test(block.name || '') ? 1 : 0 });
+            rows.push({ ...base, actor: 'agent', entity: fp, entity_type: 'file', is_write: /edit|write/i.test(block.name || '') ? 1 : 0 });
             emitted = true;
           }
         }
       }
       if (!emitted && (line.type === 'user' || line.type === 'assistant')) {
-        rows.push({ ...base, entity: cwd, entity_type: 'app', is_write: 0 });
+        rows.push({ ...base, actor: 'agent', entity: cwd, entity_type: 'app', is_write: 0 });
       }
     }
   }

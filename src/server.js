@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, insertHeartbeats } from './db.js';
-import { computeCredits, totalsBy, dayBuckets } from './summarize.js';
+import { computeCredits, totalsBy, dayBuckets, buildSegments } from './summarize.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -58,7 +58,24 @@ function fromWakatime(h, userAgent, machineHeader) {
     language: h.language || null,
     branch: h.branch || null,
     is_write: h.is_write ? 1 : 0,
+    // editor plugins are keystroke-driven (human), unless the plugin itself
+    // reports AI activity (e.g. wakatime-cli --sync-ai-activity)
+    actor: String(h.category || '').includes('ai') ? 'agent' : 'human',
   };
+}
+
+// A file save observed by the generic file watcher may actually be an agent's
+// edit (Claude/Codex writing files triggers mtime changes too). If an agent
+// reported touching the same file within the window, hand the save to it.
+function reattributeFileSaves(rows, windowSeconds = 120) {
+  const agentEdits = rows.filter((r) => r.actor === 'agent' && r.entity_type === 'file');
+  if (!agentEdits.length) return rows;
+  return rows.map((r) => {
+    if (r.source !== 'editor-files') return r;
+    const match = agentEdits.find((a) => a.entity === r.entity
+      && Math.abs(a.time - r.time) <= windowSeconds);
+    return match ? { ...r, actor: 'agent', source: match.source } : r;
+  });
 }
 
 export function startServer(cfg) {
@@ -111,16 +128,28 @@ export function startServer(cfg) {
         const to = Number(url.searchParams.get('to') || Date.now() / 1000);
         const from = Number(url.searchParams.get('from') || to - days * 86400);
         const groupBy = (url.searchParams.get('groupBy') || 'project')
-          .split(',').filter((k) => ['project', 'source', 'machine', 'category', 'language', 'entity'].includes(k));
+          .split(',').filter((k) => ['project', 'source', 'machine', 'category', 'language', 'entity', 'actor'].includes(k));
         const tz = Number(url.searchParams.get('tz') || 0);
-        const rows = db.prepare('SELECT * FROM heartbeats WHERE time >= ? AND time <= ?').all(from, to);
+        const raw = db.prepare('SELECT * FROM heartbeats WHERE time >= ? AND time <= ?').all(from, to);
+        const rows = reattributeFileSaves(raw, cfg.summary.reattributeWindowSeconds);
         const credited = computeCredits(rows, cfg.summary);
         const total = Math.round(credited.reduce((a, r) => a + r.credit, 0));
+        const humanTotal = Math.round(credited.filter((r) => r.actor !== 'agent').reduce((a, r) => a + r.credit, 0));
         return json(res, 200, {
-          from, to, total,
+          from, to, total, humanTotal, agentTotal: total - humanTotal,
           totals: totalsBy(credited, groupBy.length ? groupBy : ['project']),
           days: dayBuckets(credited, groupBy.length ? groupBy : ['project'], tz),
         });
+      }
+
+      if (req.method === 'GET' && p === '/api/timeline') {
+        const hours = Math.min(Number(url.searchParams.get('hours') || 24), 24 * 14);
+        const to = Number(url.searchParams.get('to') || Date.now() / 1000);
+        const from = to - hours * 3600;
+        const raw = db.prepare('SELECT * FROM heartbeats WHERE time >= ? AND time <= ?').all(from, to);
+        const rows = reattributeFileSaves(raw, cfg.summary.reattributeWindowSeconds);
+        const credited = computeCredits(rows, cfg.summary);
+        return json(res, 200, { from, to, segments: buildSegments(credited, cfg.summary) });
       }
 
       if (req.method === 'GET' && p === '/api/recent') {

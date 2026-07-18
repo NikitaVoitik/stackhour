@@ -78,14 +78,16 @@ export async function watchCodex(cfg, state) {
         project: path.basename(cwd),
         category: 'ai coding',
       };
+      // a user_message event is Nikita typing a prompt; everything else is the agent
+      const isHumanPrompt = line.type === 'event_msg' && payload?.type === 'user_message';
       // file-level entities from patch events when present
       const changes = payload?.changes || payload?.patch?.changes;
       if (changes && typeof changes === 'object' && !Array.isArray(changes)) {
         for (const fp of Object.keys(changes)) {
-          rows.push({ ...base, entity: fp, entity_type: 'file', is_write: 1 });
+          rows.push({ ...base, actor: 'agent', entity: fp, entity_type: 'file', is_write: 1 });
         }
       } else {
-        rows.push({ ...base, entity: cwd, entity_type: 'app', is_write: 0 });
+        rows.push({ ...base, actor: isHumanPrompt ? 'human' : 'agent', entity: cwd, entity_type: 'app', is_write: 0 });
       }
     }
   }
