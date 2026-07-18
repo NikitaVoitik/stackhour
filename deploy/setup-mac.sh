@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-shot tempo setup for macOS. Run from anywhere inside the cloned repo:
+# One-shot Stackhour setup for macOS. Run from anywhere inside the cloned repo:
 #   ./deploy/setup-mac.sh http://your-server:4040 <token> [projectRoot ...]
 set -euo pipefail
 umask 077
@@ -10,9 +10,9 @@ shift 2
 ROOTS=("$@")
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG_DIR="$HOME/.config/tempo"
+CONFIG_DIR="$HOME/.config/stackhour"
 CONFIG="$CONFIG_DIR/config.json"
-PLIST="$HOME/Library/LaunchAgents/com.nikita.tempo-agent.plist"
+PLIST="$HOME/Library/LaunchAgents/com.nikita.stackhour-agent.plist"
 
 # --- node check -------------------------------------------------------------
 if ! command -v node >/dev/null; then
@@ -50,7 +50,7 @@ cat > "$PLIST_TMP" <<EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.nikita.tempo-agent</string>
+  <key>Label</key><string>com.nikita.stackhour-agent</string>
   <key>ProgramArguments</key>
   <array>
     <string>$NODE_BIN_XML</string>
@@ -61,8 +61,8 @@ cat > "$PLIST_TMP" <<EOF
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/tempo-agent.log</string>
-  <key>StandardErrorPath</key><string>/tmp/tempo-agent.log</string>
+  <key>StandardOutPath</key><string>/tmp/stackhour-agent.log</string>
+  <key>StandardErrorPath</key><string>/tmp/stackhour-agent.log</string>
 </dict>
 </plist>
 EOF
@@ -74,8 +74,8 @@ echo "running one tick to trigger the Automation permission prompt (allow it)...
 "$NODE_BIN" --experimental-sqlite --no-warnings "$REPO/src/cli.js" agent --once || true
 
 launchctl load "$PLIST"
-echo "agent loaded (logs: /tmp/tempo-agent.log)"
+echo "agent loaded (logs: /tmp/stackhour-agent.log)"
 
 echo
-echo "done. check: $REPO/bin/tempo status"
+echo "done. check: $REPO/bin/stackhour status"
 echo "for window-title project detection, also grant Accessibility to node/terminal in System Settings > Privacy & Security."

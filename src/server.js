@@ -158,7 +158,7 @@ export function startServer(cfg) {
         return;
       }
 
-      // ---- ingest (tempo agents) ----
+      // ---- ingest (Stackhour agents) ----
       if (req.method === 'POST' && p === '/api/ingest') {
         if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
         const rows = await readJson(req);
@@ -262,8 +262,8 @@ export function startServer(cfg) {
   });
 
   server.listen(cfg.server.port, cfg.server.host, () => {
-    console.log(`[tempo] server listening on http://${cfg.server.host}:${cfg.server.port} (db: ${cfg.server.db})`);
-    if (!cfg.server.token) console.log('[tempo] WARNING: no server.token configured — ingest is open to anyone who can reach this port');
+    console.log(`[stackhour] server listening on http://${cfg.server.host}:${cfg.server.port} (db: ${cfg.server.db})`);
+    if (!cfg.server.token) console.log('[stackhour] WARNING: no server.token configured — ingest is open to anyone who can reach this port');
   });
   return server;
 }

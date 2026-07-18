@@ -16,11 +16,12 @@ import { watchZed } from '../src/agent/watch-zed.js';
 import { reattributeFileSaves, startServer } from '../src/server.js';
 import { buildSegments, computeCredits, dayBuckets, totalsBy } from '../src/summarize.js';
 import { insertHeartbeats, openDb } from '../src/db.js';
+import { resolveStoragePaths } from '../src/config.js';
 
 const tempDirs = [];
 
 function tempDir() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tempo-test-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stackhour-test-'));
   tempDirs.push(dir);
   return dir;
 }
@@ -70,6 +71,21 @@ test('tail offset pruning removes only stale files after the size threshold', ()
   assert.deepEqual(offsets, { live: 1 });
 });
 
+test('Stackhour storage paths use the new defaults and honor overrides', () => {
+  const home = tempDir();
+  const newPaths = resolveStoragePaths({}, home);
+  assert.equal(newPaths.configPath, path.join(home, '.config', 'stackhour', 'config.json'));
+  assert.equal(newPaths.dataDir, path.join(home, '.local', 'share', 'stackhour'));
+  assert.equal(newPaths.dbPath, path.join(newPaths.dataDir, 'stackhour.db'));
+
+  const overridden = resolveStoragePaths({
+    STACKHOUR_CONFIG: '/new/config.json', STACKHOUR_DATA: '/new/data',
+  }, home);
+  assert.equal(overridden.configPath, '/new/config.json');
+  assert.equal(overridden.dataDir, '/new/data');
+  assert.equal(overridden.dbPath, '/new/data/stackhour.db');
+});
+
 test('branch detection handles normal repositories, worktrees, and detached HEADs', () => {
   const dir = tempDir();
   const normal = path.join(dir, 'normal');
@@ -117,8 +133,8 @@ test('file watcher emits worktree branch metadata and recovers from a backward c
 });
 
 test('macOS title parsing keeps configured and default project extraction stable', () => {
-  assert.equal(projectFromTitle('WebStorm', 'tempo – src/server.js', {}), 'tempo');
-  assert.equal(projectFromTitle('Zed', 'server.js — tempo', {}), 'tempo');
+  assert.equal(projectFromTitle('WebStorm', 'stackhour – src/server.js', {}), 'stackhour');
+  assert.equal(projectFromTitle('Zed', 'server.js — stackhour', {}), 'stackhour');
   assert.equal(projectFromTitle('Custom', '[client] editing', { projectFromTitle: '^\\[([^\\]]+)\\]' }), 'client');
   assert.equal(projectFromTitle('Zed', '', {}), null);
 });
@@ -201,7 +217,7 @@ test('Codex watcher learns metadata then classifies prompts, token events, and p
   const line = (value) => `${JSON.stringify(value)}\n`;
   fs.writeFileSync(file, line({
     type: 'session_meta', timestamp: '2026-07-18T11:00:00Z',
-    payload: { cwd: '/work/tempo', originator: 'Codex Desktop', padding: 'x'.repeat(70 * 1024) },
+    payload: { cwd: '/work/stackhour', originator: 'Codex Desktop', padding: 'x'.repeat(70 * 1024) },
   }));
   const state = {};
   const cfg = {};
@@ -209,7 +225,7 @@ test('Codex watcher learns metadata then classifies prompts, token events, and p
   assert.equal(state.codexMeta[file].source, 'codex-desktop');
 
   fs.appendFileSync(file,
-    line({ type: 'turn_context', timestamp: '2026-07-18T11:59:48Z', payload: { cwd: '/work/tempo', model: 'gpt-5.6-sol' } })
+    line({ type: 'turn_context', timestamp: '2026-07-18T11:59:48Z', payload: { cwd: '/work/stackhour', model: 'gpt-5.6-sol' } })
     + line({ type: 'event_msg', timestamp: '2026-07-18T11:59:49Z', payload: { type: 'user_message', message: 'prompt' } })
     + line({
       type: 'event_msg', timestamp: '2026-07-18T11:59:50Z',
@@ -217,7 +233,7 @@ test('Codex watcher learns metadata then classifies prompts, token events, and p
     })
     + line({
       type: 'event_msg', timestamp: '2026-07-18T11:59:51Z',
-      payload: { type: 'patch_apply_end', changes: { '/work/tempo/a.js': { kind: 'update' }, '/work/tempo/b.js': { kind: 'add' } } },
+      payload: { type: 'patch_apply_end', changes: { '/work/stackhour/a.js': { kind: 'update' }, '/work/stackhour/b.js': { kind: 'add' } } },
     }));
 
   const rows = await watchCodex(cfg, state, { sessionsDir, now });
@@ -228,7 +244,7 @@ test('Codex watcher learns metadata then classifies prompts, token events, and p
   assert.equal(rows[1].tokens_in, 1000);
   assert.equal(rows[1].tokens_out, 60);
   assert.ok(rows[1].cost > 0);
-  assert.deepEqual(rows.slice(2).map((r) => r.entity).sort(), ['/work/tempo/a.js', '/work/tempo/b.js']);
+  assert.deepEqual(rows.slice(2).map((r) => r.entity).sort(), ['/work/stackhour/a.js', '/work/stackhour/b.js']);
   assert.ok(rows.slice(2).every((r) => r.is_write === 1 && r.actor === 'agent'));
   assert.deepEqual(await watchCodex(cfg, state, { sessionsDir, now }), []);
 });
@@ -414,7 +430,7 @@ test('dedupe identity preserves actor separation and keeps token data on the fir
 test('Zed watcher sees WAL updates, skips history, and avoids duplicate emissions', async () => {
   const dir = tempDir();
   const dbPath = path.join(dir, 'threads.db');
-  const dataDir = path.join(dir, 'tempo-data');
+  const dataDir = path.join(dir, 'stackhour-data');
   const writer = new DatabaseSync(dbPath);
   writer.exec(`
     PRAGMA journal_mode = WAL;
@@ -458,7 +474,7 @@ test('Zed watcher sees WAL updates, skips history, and avoids duplicate emission
 test('HTTP queries reattribute with lookaround context and recent agrees with summary', async () => {
   const dir = tempDir();
   const cfg = {
-    server: { db: path.join(dir, 'tempo.db'), host: '127.0.0.1', port: 0, token: 'scratch-token' },
+    server: { db: path.join(dir, 'stackhour.db'), host: '127.0.0.1', port: 0, token: 'scratch-token' },
     summary: { capSeconds: 120, lastEventCreditSeconds: 60, reattributeWindowSeconds: 120, joinGapSeconds: 300 },
   };
   const server = startServer(cfg);

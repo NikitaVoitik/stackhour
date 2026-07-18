@@ -2,11 +2,21 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const CONFIG_PATH = process.env.TEMPO_CONFIG
-  || path.join(os.homedir(), '.config', 'tempo', 'config.json');
+export function resolveStoragePaths(env = process.env, home = os.homedir()) {
+  const configPath = env.STACKHOUR_CONFIG
+    || path.join(home, '.config', 'stackhour', 'config.json');
+  const dataDir = env.STACKHOUR_DATA
+    || path.join(home, '.local', 'share', 'stackhour');
+  return {
+    configPath,
+    dataDir,
+    dbPath: path.join(dataDir, 'stackhour.db'),
+  };
+}
 
-export const DATA_DIR = process.env.TEMPO_DATA
-  || path.join(os.homedir(), '.local', 'share', 'tempo');
+const STORAGE = resolveStoragePaths();
+export const CONFIG_PATH = STORAGE.configPath;
+export const DATA_DIR = STORAGE.dataDir;
 
 export function expandHome(p) {
   if (!p) return p;
@@ -17,7 +27,7 @@ const DEFAULTS = {
   server: {
     port: 4040,
     host: '0.0.0.0',
-    db: path.join(DATA_DIR, 'tempo.db'),
+    db: STORAGE.dbPath,
     token: '',
   },
   agent: {

@@ -1,9 +1,9 @@
 [Unit]
-Description=tempo time-tracking agent
+Description=Stackhour coding time-tracking agent
 After=network.target
 
 [Service]
-ExecStart=%h/tempo/bin/tempo agent
+ExecStart=%h/stackhour/bin/stackhour agent
 Restart=always
 RestartSec=10
 

@@ -72,7 +72,7 @@ export async function watchZed(cfg, state, options = {}) {
       db = new DatabaseSync(dbPath, { readOnly: true });
     }
   } catch (err) {
-    console.error('[tempo] zed watcher: cannot open threads.db:', err.message);
+    console.error('[stackhour] zed watcher: cannot open threads.db:', err.message);
     return [];
   }
 
@@ -129,7 +129,7 @@ export async function watchZed(cfg, state, options = {}) {
     state.zedDbSignature = signature;
     delete state.zedDbMtime;
   } catch (err) {
-    console.error('[tempo] zed watcher:', err.message);
+    console.error('[stackhour] zed watcher:', err.message);
   } finally {
     try { db.close(); } catch { /* ignore */ }
     if (copiedPath) {

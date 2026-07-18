@@ -1,9 +1,9 @@
-# tempo
+# Stackhour
 
 Self-hosted coding time tracker. One Node app, two roles:
 
-- **`tempo serve`** — runs on the Linux server: ingest API + SQLite + web dashboard.
-- **`tempo agent`** — runs on every machine (Mac + Linux): watches activity and ships heartbeats to the server. Offline-safe (disk queue, retries).
+- **`stackhour serve`** — runs on the Linux server: ingest API + SQLite + web dashboard.
+- **`stackhour agent`** — runs on every machine (Mac + Linux): watches activity and ships heartbeats to the server. Offline-safe (disk queue, retries).
 
 No npm dependencies. Requires Node ≥ 22.
 
@@ -38,22 +38,22 @@ api_key = <your server token>
 
 ```sh
 # both machines
-git clone <this repo> ~/tempo
-mkdir -p ~/.config/tempo && cp ~/tempo/config.example.json ~/.config/tempo/config.json
-$EDITOR ~/.config/tempo/config.json   # set token, serverUrl, projectRoots
+git clone <this repo> ~/stackhour
+mkdir -p ~/.config/stackhour && cp ~/stackhour/config.example.json ~/.config/stackhour/config.json
+$EDITOR ~/.config/stackhour/config.json   # set token, serverUrl, projectRoots
 
 # Linux server
-cp ~/tempo/deploy/tempo-server.service ~/.config/systemd/user/
-cp ~/tempo/deploy/tempo-agent.service ~/.config/systemd/user/
-systemctl --user daemon-reload && systemctl --user enable --now tempo-server tempo-agent
+cp ~/stackhour/deploy/stackhour-server.service ~/.config/systemd/user/
+cp ~/stackhour/deploy/stackhour-agent.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now stackhour-server stackhour-agent
 
 # Mac — one-shot installer (writes config, loads launchd agent, triggers the
 # Automation permission prompt; grant Accessibility too for window titles)
-git clone <this repo> ~/tempo
-~/tempo/deploy/setup-mac.sh http://your-server:4040 <token> ~/dev ~/client
+git clone <this repo> ~/stackhour
+~/stackhour/deploy/setup-mac.sh http://your-server:4040 <token> ~/dev ~/client
 ```
 
-Dashboard: `http://your-server:4040/`. CLI: `tempo status`.
+Dashboard: `http://your-server:4040/`. CLI: `stackhour status`.
 
 Run the dependency-free reliability suite:
 
@@ -62,18 +62,18 @@ node --experimental-sqlite --no-warnings --test test/*.test.mjs
 ```
 
 The suite uses temporary databases, state, queues, watcher fixtures, and an
-ephemeral localhost port; it never reads the live Tempo config or writes the
+ephemeral localhost port; it never reads the live Stackhour config or writes the
 live database.
 
 Backfill history from wakatime.com (key in config or `WAKATIME_API_KEY`):
 
 ```sh
-tempo import-wakatime --days=365
+stackhour import-wakatime --days=365
 ```
 
 ## Tuning
 
-Everything lives in `~/.config/tempo/config.json` (defaults in `src/config.js`):
+Everything lives in `~/.config/stackhour/config.json` (defaults in `src/config.js`):
 
 - `summary.capSeconds` — max seconds one heartbeat can earn (default 120).
   Raise for more generous totals, lower for stricter ones.

@@ -120,7 +120,7 @@ export function acquireAgentLock(lockPath = LOCK_PATH) {
         try { process.kill(owner, 0); }
         catch (killErr) { if (killErr.code === 'ESRCH') alive = false; }
       }
-      if (alive) throw new Error(`tempo agent already running (pid ${owner})`);
+      if (alive) throw new Error(`stackhour agent already running (pid ${owner})`);
       fs.rmSync(lockPath, { force: true });
       return tryOpen();
     }
@@ -146,7 +146,7 @@ export async function runAgent(cfg, {
 } = {}) {
   const releaseLock = acquireAgentLock(lockPath);
   const machine = cfg.agent.machine;
-  console.log(`[tempo] agent starting on ${machine} -> ${cfg.agent.serverUrl} (every ${cfg.agent.intervalSeconds}s)`);
+  console.log(`[stackhour] agent starting on ${machine} -> ${cfg.agent.serverUrl} (every ${cfg.agent.intervalSeconds}s)`);
 
   const tick = async () => {
     const state = loadState(statePath);
@@ -155,7 +155,7 @@ export async function runAgent(cfg, {
     const run = async (enabled, name, fn) => {
       if (!enabled) return;
       try { batches.push(await fn(cfg, state)); }
-      catch (err) { console.error(`[tempo] watcher ${name} failed:`, err.message); }
+      catch (err) { console.error(`[stackhour] watcher ${name} failed:`, err.message); }
     };
     await run(w.files && cfg.agent.projectRoots.length, 'files', watchFiles);
     await run(w.claude, 'claude', watchClaude);
@@ -178,9 +178,9 @@ export async function runAgent(cfg, {
       const result = await send(cfg, rows);
       const remaining = pending.slice(rows.length);
       saveQueue(remaining, queuePath);
-      console.log(`[tempo] sent ${rows.length} heartbeats (${result.inserted} new${remaining.length ? `, ${remaining.length} queued` : ''})`);
+      console.log(`[stackhour] sent ${rows.length} heartbeats (${result.inserted} new${remaining.length ? `, ${remaining.length} queued` : ''})`);
     } catch (err) {
-      console.error(`[tempo] server unreachable (${err.message}); queued ${pending.length}`);
+      console.error(`[stackhour] server unreachable (${err.message}); queued ${pending.length}`);
     }
   };
 
@@ -190,7 +190,7 @@ export async function runAgent(cfg, {
   process.once('exit', releaseLock);
   const schedule = () => setTimeout(async () => {
     try { await tick(); }
-    catch (e) { console.error('[tempo] tick error:', e); }
+    catch (e) { console.error('[stackhour] tick error:', e); }
     schedule();
   }, cfg.agent.intervalSeconds * 1000);
   schedule();

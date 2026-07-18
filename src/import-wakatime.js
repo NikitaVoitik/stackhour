@@ -13,7 +13,7 @@ async function fetchRetry(url, opts, tries = 4) {
       return await fetch(url, opts);
     } catch (err) {
       if (i >= tries) throw err;
-      console.log(`[tempo] fetch failed (${err.cause?.code || err.message}), retry ${i}/${tries - 1}`);
+      console.log(`[stackhour] fetch failed (${err.cause?.code || err.message}), retry ${i}/${tries - 1}`);
       await new Promise((r) => setTimeout(r, 1500 * i));
     }
   }
@@ -34,7 +34,7 @@ export async function importWakatime(cfg, { days = 365 } = {}) {
     const url = `${API}/users/current/summaries?start=${fmt(chunkStart)}&end=${fmt(chunkEnd)}`;
     const res = await fetchRetry(url, { headers: { authorization: auth } });
     if (res.status === 402) {
-      console.log(`[tempo] wakatime: range ${fmt(chunkStart)}..${fmt(chunkEnd)} needs a paid plan; stopping (imported what was available)`);
+      console.log(`[stackhour] wakatime: range ${fmt(chunkStart)}..${fmt(chunkEnd)} needs a paid plan; stopping (imported what was available)`);
       break;
     }
     if (!res.ok) throw new Error(`wakatime API ${res.status}: ${await res.text()}`);
@@ -47,7 +47,7 @@ export async function importWakatime(cfg, { days = 365 } = {}) {
         imported++;
       }
     }
-    console.log(`[tempo] imported ${fmt(chunkStart)}..${fmt(chunkEnd)}`);
+    console.log(`[stackhour] imported ${fmt(chunkStart)}..${fmt(chunkEnd)}`);
   }
-  console.log(`[tempo] done: ${imported} day-project rows in wakatime_days`);
+  console.log(`[stackhour] done: ${imported} day-project rows in wakatime_days`);
 }

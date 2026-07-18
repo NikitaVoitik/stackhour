@@ -30,9 +30,9 @@ switch (cmd) {
     break;
   }
   default:
-    console.log(`tempo — self-hosted coding time tracker
+    console.log(`stackhour — self-hosted coding time tracker
 
-usage: tempo <command>
+usage: stackhour <command>
 
   serve             run the server (ingest API + dashboard) on this machine
   agent [--once]    run the watcher agent (files, claude, codex, mac apps)

@@ -1,9 +1,9 @@
 [Unit]
-Description=tempo time-tracking server
+Description=Stackhour coding time-tracking server
 After=network.target
 
 [Service]
-ExecStart=%h/tempo/bin/tempo serve
+ExecStart=%h/stackhour/bin/stackhour serve
 Restart=always
 RestartSec=5
 
