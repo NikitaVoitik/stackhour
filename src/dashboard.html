@@ -42,6 +42,15 @@
   .lane .name { width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
   .lane .track { flex:1; position:relative; height:16px; background:#1c202b; border-radius:4px; }
   .lane .track i { position:absolute; top:0; height:100%; border-radius:3px; min-width:2px; }
+  .health-machine { border-top:1px solid #232735; padding:10px 0; }
+  .health-machine:first-child { border-top:0; padding-top:0; }
+  .health-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .health-head b { margin-right:auto; }
+  .health-meta { color:var(--dim); font-size:11px; }
+  .health-watchers { display:flex; flex-wrap:wrap; gap:6px; }
+  .pill { border-radius:10px; padding:2px 7px; font-size:11px; background:#232735; }
+  .pill.ok { color:#9ece6a; } .pill.warn { color:#e0af68; }
+  .pill.bad { color:#f7768e; } .pill.off { color:var(--dim); }
 </style>
 </head>
 <body>
@@ -56,6 +65,7 @@
     <div class="split"><span class="you" id="humanTotal">–</span><span class="agents" id="agentTotal">–</span><span class="cost" id="totalCost"></span></div>
     <div class="sub" id="totalNote"></div></div>
   <div class="card"><h2>Now</h2><div id="now" class="sub">–</div></div>
+  <div class="card" style="grid-column:1/-1"><h2>Agent health</h2><div id="agentHealth" class="sub">–</div></div>
   <div class="card"><h2 id="splitTitle">By project</h2><div id="totals"></div></div>
   <div class="card" style="grid-column:1/-1"><h2>Timeline (last 24h) — bright = you, dim = agents</h2>
     <div id="timeline"></div></div>
@@ -65,6 +75,7 @@
 <script>
 const COLORS = ['#7aa2f7','#9ece6a','#e0af68','#f7768e','#bb9af7','#7dcfff','#ff9e64','#73daca','#c0caf5','#565f89'];
 const fmt = s => s >= 3600 ? `${Math.floor(s/3600)}h ${Math.round(s%3600/60)}m` : `${Math.round(s/60)}m`;
+const age = s => s < 60 ? `${Math.round(s)}s` : s < 3600 ? `${Math.round(s/60)}m` : `${Math.round(s/3600)}h`;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
   '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
 })[c]);
@@ -83,11 +94,12 @@ async function load() {
   const days = document.getElementById('range').value;
   const groupBy = document.getElementById('groupBy').value;
   const tz = new Date().getTimezoneOffset();
-  const [s, recent, tl, now] = await Promise.all([
+  const [s, recent, tl, now, health] = await Promise.all([
     getJson(`/api/summary?days=${days}&groupBy=${groupBy}&tz=${tz}`),
     getJson('/api/recent?limit=30'),
     getJson('/api/timeline?hours=24'),
     getJson('/api/now'),
+    getJson('/api/agent-status'),
   ]);
 
   document.getElementById('updated').textContent = `updated ${new Date().toLocaleTimeString()}`;
@@ -101,6 +113,28 @@ async function load() {
       `<div class="now-line"><span class="dot" style="background:${n.actor==='agent'?'#bb9af7':'#9ece6a'}"></span>` +
       `${n.actor === 'agent' ? '🤖' : '🧑'} <b>${esc(n.project)}</b> · ${esc(n.source)} · ${esc(n.machine)}</div>`).join('')
     : 'nothing active';
+
+  document.getElementById('agentHealth').innerHTML = health.length ? health.map(machine => {
+    const serverNow = machine.receivedAt + machine.ageSeconds;
+    const staleAfter = Math.max(90, (machine.intervalSeconds || 20) * 3);
+    const machineBad = machine.ageSeconds > staleAfter;
+    const machineWarn = machine.queueDepth > 0 || Math.abs(machine.clockSkewSeconds) > 30;
+    const machineClass = machineBad ? 'bad' : machineWarn ? 'warn' : 'ok';
+    const queue = machine.queueDepth ? ` · ${machine.queueDepth} queued` : '';
+    const skew = Math.abs(machine.clockSkewSeconds) > 5 ? ` · clock ${Math.round(machine.clockSkewSeconds)}s` : '';
+    const watchers = Object.entries(machine.watchers || {}).map(([name, watcher]) => {
+      let level = 'ok';
+      let note = watcher.lastOk ? `${age(Math.max(0, serverNow - watcher.lastOk - machine.clockSkewSeconds))} ago` : 'never';
+      if (!watcher.enabled || !watcher.available) { level = 'off'; note = watcher.reason || 'disabled'; }
+      else if (watcher.error || (watcher.consecutiveErrors || 0) > 0) { level = 'bad'; note = watcher.error || 'failed'; }
+      else if (!watcher.lastOk || serverNow - watcher.lastOk - machine.clockSkewSeconds > staleAfter) level = 'bad';
+      else if ((watcher.unmatchedInputRuns || 0) >= 5) { level = 'warn'; note = `${watcher.unmatchedInputRuns} unmatched inputs`; }
+      return `<span class="pill ${level}" title="${esc(note)}">${esc(name)} · ${esc(note)}</span>`;
+    }).join('');
+    return `<div class="health-machine"><div class="health-head"><span class="pill ${machineClass}">${machineClass}</span>` +
+      `<b>${esc(machine.machine)}</b><span class="health-meta">report ${age(machine.ageSeconds)} ago · v${esc(machine.version)}${queue}${skew}</span></div>` +
+      `<div class="health-watchers">${watchers || '<span class="pill warn">no watcher details</span>'}</div></div>`;
+  }).join('') : 'no agent status reports yet';
 
   // timeline lanes: one row per project; bright segments = human, dim = agent
   const laneProjects = [...new Set(tl.segments.map(x => x.project))];

@@ -55,6 +55,26 @@ git clone <this repo> ~/stackhour
 
 Dashboard: `http://your-server:4040/`. CLI: `stackhour status`.
 
+## Health and diagnostics
+
+Each agent reports machine health separately from heartbeats: queue depth,
+clock skew, Stackhour/Node versions, and per-watcher poll time, input movement,
+last emitted event, duration, and errors. The dashboard flags stale agents,
+watcher failures, queued heartbeats, clock skew, and likely parser drift (five
+consecutive input changes that produced no heartbeat).
+
+Run the read-only diagnostic command on any machine:
+
+```sh
+stackhour doctor
+stackhour doctor --json
+```
+
+It checks Node and SQLite support, config parsing without printing secrets,
+storage permissions, project roots, Claude/Codex/Zed inputs, database integrity,
+server authentication, the local machine's latest watcher report, and user
+service state. Errors produce a non-zero exit code; warnings do not.
+
 Run the dependency-free reliability suite:
 
 ```sh

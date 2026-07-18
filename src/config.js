@@ -70,10 +70,10 @@ function deepMerge(base, extra) {
   return out;
 }
 
-export function loadConfig() {
+export function loadConfig(configPath = CONFIG_PATH) {
   let user = {};
-  if (fs.existsSync(CONFIG_PATH)) {
-    user = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+  if (fs.existsSync(configPath)) {
+    user = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   }
   const cfg = deepMerge(DEFAULTS, user);
   cfg.server.db = expandHome(cfg.server.db);

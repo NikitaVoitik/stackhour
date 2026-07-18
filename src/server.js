@@ -2,8 +2,9 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb, insertHeartbeats } from './db.js';
+import { openDb, insertHeartbeats, listAgentStatus, upsertAgentStatus } from './db.js';
 import { computeCredits, totalsBy, dayBuckets, buildSegments } from './summarize.js';
+import { VERSION } from './version.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -154,8 +155,12 @@ export function startServer(cfg) {
         return;
       }
       if (req.method === 'GET' && p === '/api/health') {
-        json(res, 200, { ok: true });
+        json(res, 200, { ok: true, version: VERSION });
         return;
+      }
+      if (req.method === 'GET' && p === '/api/auth-check') {
+        if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
+        return json(res, 200, { ok: true, version: VERSION });
       }
 
       // ---- ingest (Stackhour agents) ----
@@ -165,6 +170,16 @@ export function startServer(cfg) {
         if (!Array.isArray(rows)) return json(res, 400, { error: 'expected array' });
         const inserted = insertHeartbeats(db, rows);
         return json(res, 200, { inserted, received: rows.length });
+      }
+
+      if (req.method === 'POST' && p === '/api/agent-status') {
+        if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
+        const status = await readJson(req);
+        if (!status || typeof status !== 'object' || Array.isArray(status)) {
+          return json(res, 400, { error: 'expected object' });
+        }
+        try { return json(res, 200, upsertAgentStatus(db, status)); }
+        catch (err) { return json(res, 400, { error: err.message }); }
       }
 
       // ---- wakatime-protocol ingest (official editor plugins pointed at api_url) ----
@@ -185,6 +200,10 @@ export function startServer(cfg) {
       }
 
       // ---- queries ----
+      if (req.method === 'GET' && p === '/api/agent-status') {
+        return json(res, 200, listAgentStatus(db));
+      }
+
       if (req.method === 'GET' && p === '/api/summary') {
         const days = numberParam(url, 'days', 1, { min: 1, max: 366 });
         const to = numberParam(url, 'to', Date.now() / 1000);

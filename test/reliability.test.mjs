@@ -15,8 +15,9 @@ import { watchCodex } from '../src/agent/watch-codex.js';
 import { watchZed } from '../src/agent/watch-zed.js';
 import { reattributeFileSaves, startServer } from '../src/server.js';
 import { buildSegments, computeCredits, dayBuckets, totalsBy } from '../src/summarize.js';
-import { insertHeartbeats, openDb } from '../src/db.js';
+import { insertHeartbeats, listAgentStatus, openDb, upsertAgentStatus } from '../src/db.js';
 import { resolveStoragePaths } from '../src/config.js';
+import { diagnose, printDoctor } from '../src/doctor.js';
 
 const tempDirs = [];
 
@@ -84,6 +85,23 @@ test('Stackhour storage paths use the new defaults and honor overrides', () => {
   assert.equal(overridden.configPath, '/new/config.json');
   assert.equal(overridden.dataDir, '/new/data');
   assert.equal(overridden.dbPath, '/new/data/stackhour.db');
+});
+
+test('doctor reports malformed config without exposing its contents', async () => {
+  const dir = tempDir();
+  const configPath = path.join(dir, 'config.json');
+  fs.writeFileSync(configPath, '{"token":"do-not-print"');
+  fs.chmodSync(configPath, 0o600);
+  fs.writeFileSync(path.join(dir, 'queue.jsonl'), '{"queued":true}\n');
+  const report = await diagnose({ configPath, dataDir: dir, checkServices: false });
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.find((check) => check.name === 'config').status, 'error');
+  assert.equal(report.checks.find((check) => check.name === 'config-permissions').status, 'ok');
+  assert.equal(report.checks.find((check) => check.name === 'offline-queue').status, 'warn');
+  let output = '';
+  printDoctor(report, { stdout: { write: (value) => { output += value; } } });
+  assert.match(output, /config/);
+  assert.doesNotMatch(output, /do-not-print/);
 });
 
 test('branch detection handles normal repositories, worktrees, and detached HEADs', () => {
@@ -427,6 +445,27 @@ test('dedupe identity preserves actor separation and keeps token data on the fir
   }
 });
 
+test('agent status storage validates, replaces per-machine reports, and parses watcher health', () => {
+  const db = openDb(path.join(tempDir(), 'status.db'));
+  try {
+    assert.throws(() => upsertAgentStatus(db, { machine: '', time: 1 }), /invalid agent status/);
+    const first = upsertAgentStatus(db, {
+      machine: 'mac', time: 95, version: '0.1.0', nodeVersion: 'v22', intervalSeconds: 20,
+      queueDepth: 2, queueBytes: 100, watchers: { claude: { enabled: true, lastOk: 94 } },
+    }, 100);
+    assert.equal(first.clockSkewSeconds, 5);
+    assert.equal(listAgentStatus(db, 110)[0].watchers.claude.lastOk, 94);
+    upsertAgentStatus(db, {
+      machine: 'mac', time: 111, version: '0.1.0', nodeVersion: 'v22', intervalSeconds: 20,
+      queueDepth: 0, queueBytes: 0, watchers: { claude: { enabled: true, lastOk: 111 } },
+    }, 112);
+    const rows = listAgentStatus(db, 115);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].queueDepth, 0);
+    assert.equal(rows[0].ageSeconds, 3);
+  } finally { db.close(); }
+});
+
 test('Zed watcher sees WAL updates, skips history, and avoids duplicate emissions', async () => {
   const dir = tempDir();
   const dbPath = path.join(dir, 'threads.db');
@@ -488,16 +527,30 @@ test('HTTP queries reattribute with lookaround context and recent agrees with su
   ];
 
   try {
-    assert.equal((await fetch(`${base}/api/health`)).status, 200);
+    const healthResponse = await fetch(`${base}/api/health`);
+    assert.equal(healthResponse.status, 200);
+    assert.equal((await healthResponse.json()).version, '0.1.0');
+    assert.equal((await fetch(`${base}/api/auth-check`)).status, 401);
+    assert.equal((await fetch(`${base}/api/auth-check`, {
+      headers: { authorization: 'Bearer scratch-token' },
+    })).status, 200);
     const dashboard = await fetch(base);
     assert.equal(dashboard.status, 200);
-    assert.match(await dashboard.text(), /const esc =/);
+    assert.match(await dashboard.text(), /agentHealth/);
     assert.equal((await fetch(`${base}/missing`)).status, 404);
 
     const unauthorized = await fetch(`${base}/api/ingest`, {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: '[]',
     });
     assert.equal(unauthorized.status, 401);
+    assert.equal((await fetch(`${base}/api/agent-status`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+    })).status, 401);
+    assert.equal((await fetch(`${base}/api/agent-status`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'Bearer scratch-token' },
+      body: '{}',
+    })).status, 400);
     const malformed = await fetch(`${base}/api/ingest`, {
       method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer scratch-token' }, body: '{',
     });
@@ -547,6 +600,7 @@ test('HTTP queries reattribute with lookaround context and recent agrees with su
     const queuedRow = { ...common, time: 300, machine: 'scratch-agent', source: 'codex-cli', actor: 'agent', is_write: 1 };
     saveQueue([queuedRow], queuePath);
     const agentCfg = {
+      server: cfg.server,
       agent: {
         machine: 'scratch-agent', serverUrl: base, token: 'wrong-token', intervalSeconds: 20,
         projectRoots: [],
@@ -556,10 +610,72 @@ test('HTTP queries reattribute with lookaround context and recent agrees with su
     await runAgent(agentCfg, { once: true, statePath, queuePath, lockPath });
     assert.equal(readQueue(queuePath).length, 1);
     agentCfg.agent.token = 'scratch-token';
-    await runAgent(agentCfg, { once: true, statePath, queuePath, lockPath });
+    const disabledReport = await runAgent(agentCfg, { once: true, statePath, queuePath, lockPath });
     assert.equal(fs.existsSync(queuePath), false);
+    assert.equal(disabledReport.queueDepth, 0);
+    assert.equal(disabledReport.watchers.claude.enabled, false);
     const drained = await (await fetch(`${base}/api/recent?limit=10`)).json();
     assert.ok(drained.some((r) => r.machine === 'scratch-agent' && r.time === 300));
+
+    agentCfg.agent.watch.claude = true;
+    const healthyReport = await runAgent(agentCfg, {
+      once: true, statePath, queuePath, lockPath,
+      watcherFns: {
+        claude: async (watcherCfg, state) => {
+          state.claudeOffsets = { fixture: 10 };
+          return [{
+            time: 302, source: 'claude-code', project: 'p', entity: '/p',
+            entity_type: 'app', category: 'ai coding', actor: 'agent', is_write: 0,
+          }];
+        },
+      },
+    });
+    assert.equal(healthyReport.watchers.claude.lastCount, 1);
+    assert.equal(healthyReport.watchers.claude.unmatchedInputRuns, 0);
+    assert.equal(healthyReport.watchers.claude.error, null);
+    let statusRows = await (await fetch(`${base}/api/agent-status`)).json();
+    let scratchStatus = statusRows.find((status) => status.machine === 'scratch-agent');
+    assert.equal(scratchStatus.queueDepth, 0);
+    assert.equal(scratchStatus.watchers.claude.lastCount, 1);
+
+    const healthyDoctor = await diagnose({ cfg: agentCfg, dataDir: dir, home: dir, checkServices: false });
+    assert.equal(healthyDoctor.checks.find((check) => check.name === 'server-auth').status, 'ok');
+    assert.equal(healthyDoctor.checks.find((check) => check.name === 'watcher-claude').status, 'ok');
+    assert.equal(healthyDoctor.checks.find((check) => check.name === 'agent-queue').status, 'ok');
+    assert.equal(healthyDoctor.checks.find((check) => check.name === 'clock-skew').status, 'ok');
+    let doctorJson = '';
+    printDoctor(healthyDoctor, { json: true, stdout: { write: (value) => { doctorJson += value; } } });
+    assert.equal(JSON.parse(doctorJson).version, '0.1.0');
+
+    let unmatchedReport;
+    for (let i = 0; i < 5; i++) {
+      unmatchedReport = await runAgent(agentCfg, {
+        once: true, statePath, queuePath, lockPath,
+        watcherFns: {
+          claude: async (watcherCfg, state) => {
+            state.claudeOffsets.fixture += 1;
+            return [];
+          },
+        },
+      });
+    }
+    assert.equal(unmatchedReport.watchers.claude.unmatchedInputRuns, 5);
+    const silentDoctor = await diagnose({ cfg: agentCfg, dataDir: dir, home: dir, checkServices: false });
+    assert.equal(silentDoctor.ok, true);
+    assert.equal(silentDoctor.checks.find((check) => check.name === 'watcher-claude').status, 'warn');
+
+    const failedReport = await runAgent(agentCfg, {
+      once: true, statePath, queuePath, lockPath,
+      watcherFns: { claude: async () => { throw new Error('fixture schema drift'); } },
+    });
+    assert.equal(failedReport.watchers.claude.consecutiveErrors, 1);
+    assert.equal(failedReport.watchers.claude.error, 'fixture schema drift');
+    statusRows = await (await fetch(`${base}/api/agent-status`)).json();
+    scratchStatus = statusRows.find((status) => status.machine === 'scratch-agent');
+    assert.equal(scratchStatus.watchers.claude.error, 'fixture schema drift');
+    const failedDoctor = await diagnose({ cfg: agentCfg, dataDir: dir, home: dir, checkServices: false });
+    assert.equal(failedDoctor.ok, false);
+    assert.equal(failedDoctor.checks.find((check) => check.name === 'watcher-claude').status, 'error');
 
     const activeTime = Date.now() / 1000;
     const activeIngest = await fetch(`${base}/api/ingest`, {

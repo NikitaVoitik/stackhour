@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DATA_DIR } from '../config.js';
 
-const CANDIDATE_PATHS = [
+export const ZED_DB_PATHS = [
   path.join(os.homedir(), 'Library', 'Application Support', 'Zed', 'threads', 'threads.db'),
   path.join(os.homedir(), '.local', 'share', 'zed', 'threads', 'threads.db'),
 ];
@@ -50,7 +50,7 @@ function quoteIdent(name) {
 }
 
 export async function watchZed(cfg, state, options = {}) {
-  const candidatePaths = options.candidatePaths || CANDIDATE_PATHS;
+  const candidatePaths = options.candidatePaths || ZED_DB_PATHS;
   const dataDir = options.dataDir || DATA_DIR;
   const dbPath = candidatePaths.find((p) => fs.existsSync(p));
   if (!dbPath) return [];
@@ -72,8 +72,7 @@ export async function watchZed(cfg, state, options = {}) {
       db = new DatabaseSync(dbPath, { readOnly: true });
     }
   } catch (err) {
-    console.error('[stackhour] zed watcher: cannot open threads.db:', err.message);
-    return [];
+    throw new Error(`cannot open threads.db: ${err.message}`);
   }
 
   const rows = [];
@@ -129,7 +128,7 @@ export async function watchZed(cfg, state, options = {}) {
     state.zedDbSignature = signature;
     delete state.zedDbMtime;
   } catch (err) {
-    console.error('[stackhour] zed watcher:', err.message);
+    throw new Error(`cannot read threads.db: ${err.message}`);
   } finally {
     try { db.close(); } catch { /* ignore */ }
     if (copiedPath) {

@@ -1,9 +1,14 @@
 import { loadConfig, CONFIG_PATH } from './config.js';
 
 const cmd = process.argv[2];
-const cfg = loadConfig();
 
-switch (cmd) {
+if (cmd === 'doctor') {
+  const { runDoctor } = await import('./doctor.js');
+  process.exitCode = await runDoctor({ json: process.argv.includes('--json') });
+} else {
+  const cfg = loadConfig();
+
+  switch (cmd) {
   case 'serve': {
     const { startServer } = await import('./server.js');
     startServer(cfg);
@@ -38,6 +43,8 @@ usage: stackhour <command>
   agent [--once]    run the watcher agent (files, claude, codex, mac apps)
   import-wakatime [--days=365]   backfill history from wakatime.com
   status            print today's totals from the server
+  doctor [--json]   check config, inputs, database, server, and services
 
 config: ${CONFIG_PATH}`);
+  }
 }

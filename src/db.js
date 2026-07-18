@@ -77,8 +77,72 @@ export function openDb(dbPath) {
       seconds REAL NOT NULL,
       UNIQUE (date, project)
     );
+    CREATE TABLE IF NOT EXISTS agent_status (
+      machine TEXT PRIMARY KEY,
+      reported_at REAL NOT NULL,
+      received_at REAL NOT NULL,
+      version TEXT NOT NULL,
+      node_version TEXT NOT NULL,
+      interval_seconds REAL NOT NULL,
+      queue_depth INTEGER NOT NULL,
+      queue_bytes INTEGER NOT NULL,
+      clock_skew_seconds REAL NOT NULL,
+      watchers_json TEXT NOT NULL
+    );
   `);
   return db;
+}
+
+export function upsertAgentStatus(db, status, receivedAt = Date.now() / 1000) {
+  const reportedAt = Number(status.time);
+  const machine = String(status.machine || '').trim().slice(0, 200);
+  if (!machine || !Number.isFinite(reportedAt)) throw new Error('invalid agent status');
+  const watchers = status.watchers && typeof status.watchers === 'object' && !Array.isArray(status.watchers)
+    ? status.watchers : {};
+  db.prepare(`
+    INSERT INTO agent_status
+      (machine, reported_at, received_at, version, node_version, interval_seconds,
+       queue_depth, queue_bytes, clock_skew_seconds, watchers_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(machine) DO UPDATE SET
+      reported_at=excluded.reported_at, received_at=excluded.received_at,
+      version=excluded.version, node_version=excluded.node_version,
+      interval_seconds=excluded.interval_seconds, queue_depth=excluded.queue_depth,
+      queue_bytes=excluded.queue_bytes, clock_skew_seconds=excluded.clock_skew_seconds,
+      watchers_json=excluded.watchers_json
+  `).run(
+    machine,
+    reportedAt,
+    receivedAt,
+    String(status.version || 'unknown').slice(0, 100),
+    String(status.nodeVersion || 'unknown').slice(0, 100),
+    nonnegativeNumber(status.intervalSeconds),
+    nonnegativeNumber(status.queueDepth, { integer: true }),
+    nonnegativeNumber(status.queueBytes, { integer: true }),
+    receivedAt - reportedAt,
+    JSON.stringify(watchers),
+  );
+  return { machine, serverTime: receivedAt, clockSkewSeconds: receivedAt - reportedAt };
+}
+
+export function listAgentStatus(db, now = Date.now() / 1000) {
+  return db.prepare('SELECT * FROM agent_status ORDER BY machine').all().map((row) => {
+    let watchers = {};
+    try { watchers = JSON.parse(row.watchers_json); } catch { /* corrupted diagnostic data */ }
+    return {
+      machine: row.machine,
+      reportedAt: row.reported_at,
+      receivedAt: row.received_at,
+      ageSeconds: Math.max(0, now - row.received_at),
+      version: row.version,
+      nodeVersion: row.node_version,
+      intervalSeconds: row.interval_seconds,
+      queueDepth: row.queue_depth,
+      queueBytes: row.queue_bytes,
+      clockSkewSeconds: row.clock_skew_seconds,
+      watchers,
+    };
+  });
 }
 
 export function insertHeartbeats(db, rows) {

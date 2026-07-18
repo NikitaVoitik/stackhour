@@ -7,11 +7,20 @@ import { watchCodex } from './watch-codex.js';
 import { watchMacApps } from './watch-mac.js';
 import { watchSsh } from './watch-ssh.js';
 import { watchZed } from './watch-zed.js';
+import { VERSION } from '../version.js';
 
 const STATE_PATH = path.join(DATA_DIR, 'agent-state.json');
 const QUEUE_PATH = path.join(DATA_DIR, 'queue.jsonl');
 const LOCK_PATH = path.join(DATA_DIR, 'agent.lock');
 const MAX_SEND_BYTES = 4 * 1024 * 1024;
+const DEFAULT_WATCHERS = {
+  files: watchFiles,
+  claude: watchClaude,
+  codex: watchCodex,
+  macApps: watchMacApps,
+  ssh: watchSsh,
+  zed: watchZed,
+};
 
 function atomicWrite(file, content) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -44,18 +53,25 @@ export function saveState(state, statePath = STATE_PATH) {
   atomicWrite(statePath, JSON.stringify(state));
 }
 
-async function send(cfg, rows) {
-  const res = await fetch(`${cfg.agent.serverUrl}/api/ingest`, {
+async function post(cfg, endpoint, body, timeoutMs = 10_000) {
+  const res = await fetch(`${cfg.agent.serverUrl}${endpoint}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       ...(cfg.agent.token ? { authorization: `Bearer ${cfg.agent.token}` } : {}),
     },
-    body: JSON.stringify(rows),
-    signal: AbortSignal.timeout(10_000),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
   });
-  if (!res.ok) throw new Error(`ingest failed: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`${endpoint} failed: HTTP ${res.status}`);
   return res.json();
+}
+
+function watcherInputMarker(name, state) {
+  if (name === 'claude') return JSON.stringify(state.claudeOffsets || {});
+  if (name === 'codex') return JSON.stringify(state.codexOffsets || {});
+  if (name === 'zed') return state.zedDbSignature || state.zedDbMtime || '';
+  return null;
 }
 
 export function readQueue(queuePath = QUEUE_PATH) {
@@ -143,6 +159,7 @@ export async function runAgent(cfg, {
   statePath = STATE_PATH,
   queuePath = QUEUE_PATH,
   lockPath = LOCK_PATH,
+  watcherFns = DEFAULT_WATCHERS,
 } = {}) {
   const releaseLock = acquireAgentLock(lockPath);
   const machine = cfg.agent.machine;
@@ -150,19 +167,58 @@ export async function runAgent(cfg, {
 
   const tick = async () => {
     const state = loadState(statePath);
+    state.watcherHealth ||= {};
     const batches = [];
     const w = cfg.agent.watch;
-    const run = async (enabled, name, fn) => {
-      if (!enabled) return;
-      try { batches.push(await fn(cfg, state)); }
-      catch (err) { console.error(`[stackhour] watcher ${name} failed:`, err.message); }
+    const run = async (name, configured, available, reason) => {
+      const health = state.watcherHealth[name] ||= {};
+      health.enabled = Boolean(configured);
+      health.available = Boolean(available);
+      if (!configured || !available) {
+        health.lastCount = 0;
+        health.reason = configured ? reason : 'disabled in config';
+        return;
+      }
+      delete health.reason;
+      const before = watcherInputMarker(name, state);
+      const started = performance.now();
+      try {
+        const rows = await watcherFns[name](cfg, state);
+        if (!Array.isArray(rows)) throw new Error('watcher returned a non-array result');
+        const finished = Date.now() / 1000;
+        const inputChanged = before !== watcherInputMarker(name, state) || rows.length > 0;
+        Object.assign(health, {
+          lastOk: finished,
+          lastDurationMs: Math.round((performance.now() - started) * 10) / 10,
+          lastCount: rows.length,
+          consecutiveErrors: 0,
+          error: null,
+        });
+        if (inputChanged) health.lastInput = finished;
+        if (rows.length) {
+          health.lastEvent = Math.max(...rows.map((row) => Number(row.time) || finished));
+          health.unmatchedInputRuns = 0;
+        } else if (inputChanged) {
+          health.unmatchedInputRuns = (health.unmatchedInputRuns || 0) + 1;
+        }
+        batches.push(rows);
+      } catch (err) {
+        const finished = Date.now() / 1000;
+        Object.assign(health, {
+          lastDurationMs: Math.round((performance.now() - started) * 10) / 10,
+          lastError: finished,
+          consecutiveErrors: (health.consecutiveErrors || 0) + 1,
+          error: String(err.message || err).slice(0, 500),
+        });
+        console.error(`[stackhour] watcher ${name} failed:`, err.message);
+      }
     };
-    await run(w.files && cfg.agent.projectRoots.length, 'files', watchFiles);
-    await run(w.claude, 'claude', watchClaude);
-    await run(w.codex, 'codex', watchCodex);
-    await run(w.macApps && process.platform === 'darwin', 'macApps', watchMacApps);
-    await run(w.ssh && process.platform === 'linux', 'ssh', watchSsh);
-    await run(w.zed, 'zed', watchZed);
+    await run('files', w.files, w.files && cfg.agent.projectRoots.length > 0, 'no project roots configured');
+    await run('claude', w.claude, w.claude);
+    await run('codex', w.codex, w.codex);
+    await run('macApps', w.macApps, w.macApps && process.platform === 'darwin', 'requires macOS');
+    await run('ssh', w.ssh, w.ssh && process.platform === 'linux', 'requires Linux');
+    await run('zed', w.zed, w.zed);
     const fresh = batches.flat().map((r) => ({ machine, ...r }));
     const queued = readQueue(queuePath);
     // Persist heartbeats before their watcher offsets. A crash between these
@@ -171,22 +227,44 @@ export async function runAgent(cfg, {
     saveState(state, statePath);
 
     const pending = fresh.length ? [...queued, ...fresh] : queued;
-    if (!pending.length) return;
-    const rows = takeSendBatch(pending);
-
-    try {
-      const result = await send(cfg, rows);
-      const remaining = pending.slice(rows.length);
-      saveQueue(remaining, queuePath);
-      console.log(`[stackhour] sent ${rows.length} heartbeats (${result.inserted} new${remaining.length ? `, ${remaining.length} queued` : ''})`);
-    } catch (err) {
-      console.error(`[stackhour] server unreachable (${err.message}); queued ${pending.length}`);
+    let serverFailed = false;
+    if (pending.length) {
+      const rows = takeSendBatch(pending);
+      try {
+        const result = await post(cfg, '/api/ingest', rows);
+        const remaining = pending.slice(rows.length);
+        saveQueue(remaining, queuePath);
+        console.log(`[stackhour] sent ${rows.length} heartbeats (${result.inserted} new${remaining.length ? `, ${remaining.length} queued` : ''})`);
+      } catch (err) {
+        serverFailed = true;
+        console.error(`[stackhour] server unreachable (${err.message}); queued ${pending.length}`);
+      }
     }
+
+    const queuedAfterSend = readQueue(queuePath);
+    let queueBytes = 0;
+    try { queueBytes = fs.statSync(queuePath).size; } catch { /* no queue */ }
+    const report = {
+      time: Date.now() / 1000,
+      machine,
+      version: VERSION,
+      nodeVersion: process.version,
+      intervalSeconds: cfg.agent.intervalSeconds,
+      queueDepth: queuedAfterSend.length,
+      queueBytes,
+      watchers: state.watcherHealth,
+    };
+    if (!serverFailed) {
+      try { await post(cfg, '/api/agent-status', report, 3_000); }
+      catch (err) { console.error(`[stackhour] health report failed: ${err.message}`); }
+    }
+    return report;
   };
 
-  try { await tick(); }
+  let firstReport;
+  try { firstReport = await tick(); }
   catch (err) { releaseLock(); throw err; }
-  if (once) { releaseLock(); return; }
+  if (once) { releaseLock(); return firstReport; }
   process.once('exit', releaseLock);
   const schedule = () => setTimeout(async () => {
     try { await tick(); }
