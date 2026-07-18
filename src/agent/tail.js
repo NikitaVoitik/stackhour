@@ -4,6 +4,27 @@
 import fs from 'node:fs';
 
 const MAX_READ_PER_FILE = 5 * 1024 * 1024;
+const MAX_HEAD_LINE = 1024 * 1024;
+
+export function readFirstJsonLine(file, maxBytes = MAX_HEAD_LINE) {
+  let st;
+  try { st = fs.statSync(file); } catch { return null; }
+  if (!st.size) return null;
+  const len = Math.min(st.size, maxBytes);
+  const buf = Buffer.alloc(len);
+  let bytesRead = 0;
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    bytesRead = fs.readSync(fd, buf, 0, len, 0);
+  } catch { return null; }
+  finally { if (fd !== undefined) fs.closeSync(fd); }
+  const newline = buf.indexOf(0x0a, 0);
+  if (newline < 0 && st.size > bytesRead) return null;
+  const end = newline < 0 ? bytesRead : newline;
+  try { return JSON.parse(buf.subarray(0, end).toString('utf8')); }
+  catch { return null; }
+}
 
 export function readNewLines(file, offsets) {
   let st;
@@ -17,10 +38,19 @@ export function readNewLines(file, offsets) {
   const buf = Buffer.alloc(len);
   const fd = fs.openSync(file, 'r');
   try { fs.readSync(fd, buf, 0, len, start); } finally { fs.closeSync(fd); }
-  offsets[file] = st.size;
+
+  // Only commit the offset through the final newline. Writers can briefly
+  // expose a partial JSON object at EOF; advancing to st.size here would lose
+  // that record forever when the rest arrives on the next tick.
+  const lastNewline = buf.lastIndexOf(0x0a);
+  if (lastNewline < 0) {
+    offsets[file] = start;
+    return [];
+  }
+  offsets[file] = start + lastNewline + 1;
 
   const lines = [];
-  for (const line of buf.toString('utf8').split('\n')) {
+  for (const line of buf.subarray(0, lastNewline).toString('utf8').split('\n')) {
     const t = line.trim();
     if (!t) continue;
     try { lines.push(JSON.parse(t)); } catch { /* partial/garbled line */ }

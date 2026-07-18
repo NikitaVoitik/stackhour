@@ -65,15 +65,30 @@
 <script>
 const COLORS = ['#7aa2f7','#9ece6a','#e0af68','#f7768e','#bb9af7','#7dcfff','#ff9e64','#73daca','#c0caf5','#565f89'];
 const fmt = s => s >= 3600 ? `${Math.floor(s/3600)}h ${Math.round(s%3600/60)}m` : `${Math.round(s/60)}m`;
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+  '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+})[c]);
+
+async function getJson(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  return res.json();
+}
+
+function showError(err) {
+  document.getElementById('updated').textContent = `refresh failed: ${err.message}`;
+}
 
 async function load() {
   const days = document.getElementById('range').value;
   const groupBy = document.getElementById('groupBy').value;
   const tz = new Date().getTimezoneOffset();
-  const s = await (await fetch(`/api/summary?days=${days}&groupBy=${groupBy}&tz=${tz}`)).json();
-  const recent = await (await fetch('/api/recent?limit=30')).json();
-  const tl = await (await fetch('/api/timeline?hours=24')).json();
-  const now = await (await fetch('/api/now')).json();
+  const [s, recent, tl, now] = await Promise.all([
+    getJson(`/api/summary?days=${days}&groupBy=${groupBy}&tz=${tz}`),
+    getJson('/api/recent?limit=30'),
+    getJson('/api/timeline?hours=24'),
+    getJson('/api/now'),
+  ]);
 
   document.getElementById('updated').textContent = `updated ${new Date().toLocaleTimeString()}`;
   document.getElementById('total').textContent = fmt(s.total);
@@ -84,23 +99,23 @@ async function load() {
   document.getElementById('now').innerHTML = now.length
     ? now.map(n =>
       `<div class="now-line"><span class="dot" style="background:${n.actor==='agent'?'#bb9af7':'#9ece6a'}"></span>` +
-      `${n.actor === 'agent' ? '🤖' : '🧑'} <b>${n.project}</b> · ${n.source} · ${n.machine}</div>`).join('')
+      `${n.actor === 'agent' ? '🤖' : '🧑'} <b>${esc(n.project)}</b> · ${esc(n.source)} · ${esc(n.machine)}</div>`).join('')
     : 'nothing active';
 
   // timeline lanes: one row per project; bright segments = human, dim = agent
   const laneProjects = [...new Set(tl.segments.map(x => x.project))];
   const span = tl.to - tl.from;
-  const laneColor = {};
+  const laneColor = Object.create(null);
   laneProjects.forEach((p, i) => laneColor[p] = COLORS[i % COLORS.length]);
   document.getElementById('timeline').innerHTML = laneProjects.map(p => {
     const segs = tl.segments.filter(x => x.project === p);
-    return `<div class="lane"><div class="name" title="${p}">${p}</div><div class="track">` +
+    return `<div class="lane"><div class="name" title="${esc(p)}">${esc(p)}</div><div class="track">` +
       segs.map(x => {
         const left = 100 * (x.start - tl.from) / span;
         const width = Math.max(0.3, 100 * (x.end - x.start) / span);
         const t = d => new Date(d*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
         return `<i style="left:${left}%;width:${width}%;background:${laneColor[p]};opacity:${x.actor==='agent'?0.35:1}"
-          title="${x.actor} · ${t(x.start)}–${t(x.end)} · ${fmt(x.seconds)} · ${x.sources.join(', ')}"></i>`;
+          title="${esc(x.actor)} · ${t(x.start)}–${t(x.end)} · ${fmt(x.seconds)} · ${esc(x.sources.join(', '))}"></i>`;
       }).join('') + '</div></div>';
   }).join('') || '<div class="sub">no activity in the last 24h</div>';
   document.getElementById('totalNote').textContent = days == 1 ? 'today' : `last ${days} days`;
@@ -109,20 +124,21 @@ async function load() {
   // totals bars
   const totals = s.totals.slice(0, 12);
   const max = totals[0]?.seconds || 1;
-  const color = {};
+  const color = Object.create(null);
   totals.forEach((t, i) => color[t[groupBy]] = COLORS[i % COLORS.length]);
   document.getElementById('totals').innerHTML = totals.map(t =>
-    `<div class="row"><div class="name" title="${t[groupBy]}">${t[groupBy]}</div>
+    `<div class="row"><div class="name" title="${esc(t[groupBy])}">${esc(t[groupBy])}</div>
      <div class="bar"><i style="width:${100*t.seconds/max}%;background:${color[t[groupBy]]}"></i></div>
      <div class="val">${fmt(t.seconds)}</div>
      <div class="cost">${t.cost >= 0.01 ? '$'+t.cost.toFixed(2) : ''}</div></div>`).join('');
 
   // per-day stacked columns
-  const byDate = {};
+  const byDate = Object.create(null);
   for (const d of s.days) (byDate[d.date] ||= []).push(d);
   const dates = [];
   for (let i = days - 1; i >= 0; i--) {
-    dates.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+    // Match the same local-day shift sent to dayBuckets on the server.
+    dates.push(new Date(Date.now() - i * 86400000 - tz * 60000).toISOString().slice(0, 10));
   }
   const dayMax = Math.max(1, ...dates.map(d => (byDate[d] || []).reduce((a, x) => a + x.seconds, 0)));
   document.getElementById('days').innerHTML = dates.map(d => {
@@ -134,16 +150,16 @@ async function load() {
   document.getElementById('dayLabels').innerHTML = dates.map(d =>
     `<span>${days <= 14 ? d.slice(5) : ''}</span>`).join('');
   document.getElementById('legend').innerHTML = totals.slice(0, 10).map(t =>
-    `<span><i style="background:${color[t[groupBy]]}"></i>${t[groupBy]}</span>`).join('');
+    `<span><i style="background:${color[t[groupBy]]}"></i>${esc(t[groupBy])}</span>`).join('');
 
   document.getElementById('recent').innerHTML = recent.map(r =>
-    `<tr><td>${new Date(r.time*1000).toLocaleTimeString()}</td><td>${r.machine}</td><td>${r.source}</td>
-     <td>${r.project}</td><td title="${r.entity}">${r.entity.split('/').pop()}</td><td>${r.category}</td></tr>`).join('');
+    `<tr><td>${new Date(r.time*1000).toLocaleTimeString()}</td><td>${esc(r.machine)}</td><td>${esc(r.source)}</td>
+     <td>${esc(r.project)}</td><td title="${esc(r.entity)}">${esc(r.entity.split('/').pop())}</td><td>${esc(r.category)}</td></tr>`).join('');
 }
-document.getElementById('range').onchange = load;
-document.getElementById('groupBy').onchange = load;
-load();
-setInterval(load, 60000);
+document.getElementById('range').onchange = () => load().catch(showError);
+document.getElementById('groupBy').onchange = () => load().catch(showError);
+load().catch(showError);
+setInterval(() => load().catch(showError), 60000);
 </script>
 </body>
 </html>

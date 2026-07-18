@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readNewLines, pruneOffsets } from './tail.js';
+import { readFirstJsonLine, readNewLines, pruneOffsets } from './tail.js';
 import { costOf } from '../pricing.js';
 
 const CODEX_SESSIONS = path.join(os.homedir(), '.codex', 'sessions');
@@ -29,16 +29,17 @@ function sourceFromOriginator(originator) {
   return 'codex-cli';
 }
 
-export async function watchCodex(cfg, state) {
-  if (!fs.existsSync(CODEX_SESSIONS)) return [];
+export async function watchCodex(cfg, state, options = {}) {
+  const sessionsDir = options.sessionsDir || CODEX_SESSIONS;
+  if (!fs.existsSync(sessionsDir)) return [];
   state.codexOffsets ||= {};
   state.codexMeta ||= {}; // per-file {cwd, source} learned from meta lines
   const offsets = state.codexOffsets;
-  const now = Date.now() / 1000;
+  const now = options.now ?? Date.now() / 1000;
   const rows = [];
   const files = [];
 
-  for (const file of rolloutFiles(CODEX_SESSIONS)) {
+  for (const file of rolloutFiles(sessionsDir)) {
     files.push(file);
     let st;
     try { st = fs.statSync(file); } catch { continue; }
@@ -46,11 +47,12 @@ export async function watchCodex(cfg, state) {
     if (!firstSight && st.size <= offsets[file]) continue;
 
     const meta = (state.codexMeta[file] ||= {});
-    // on first sight of an actively-written file, read the head once for session_meta
-    if (firstSight && st.size > 0) {
+    // Read the head for session metadata. Retry if first sight caught a partial
+    // first line; the tail offset still starts at EOF to avoid historical rows.
+    if ((firstSight || !meta.cwd || !meta.source) && st.size > 0) {
       try {
-        const head = fs.readFileSync(file, { encoding: 'utf8', flag: 'r' }).slice(0, 65536).split('\n')[0];
-        const first = JSON.parse(head);
+        const first = readFirstJsonLine(file);
+        if (!first) throw new Error('missing or oversized session metadata');
         const payload = first.payload || first;
         if (first.type === 'session_meta' || payload.cwd) {
           meta.cwd = payload.cwd || meta.cwd;

@@ -55,6 +55,16 @@ git clone <this repo> ~/tempo
 
 Dashboard: `http://your-server:4040/`. CLI: `tempo status`.
 
+Run the dependency-free reliability suite:
+
+```sh
+node --experimental-sqlite --no-warnings --test test/*.test.mjs
+```
+
+The suite uses temporary databases, state, queues, watcher fixtures, and an
+ephemeral localhost port; it never reads the live Tempo config or writes the
+live database.
+
 Backfill history from wakatime.com (key in config or `WAKATIME_API_KEY`):
 
 ```sh

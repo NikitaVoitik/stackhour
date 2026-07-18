@@ -10,15 +10,42 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function readBody(req, limit = 5 * 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let size = 0;
+    let tooLarge = false;
     const chunks = [];
     req.on('data', (c) => {
+      if (tooLarge) return;
       size += c.length;
-      if (size > limit) { reject(new Error('body too large')); req.destroy(); return; }
+      if (size > limit) {
+        tooLarge = true;
+        chunks.length = 0;
+        const err = new Error('body too large');
+        err.statusCode = 413;
+        reject(err);
+        return;
+      }
       chunks.push(c);
     });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
+}
+
+async function readJson(req) {
+  const body = await readBody(req);
+  try { return JSON.parse(body); }
+  catch {
+    const err = new Error('invalid JSON');
+    err.statusCode = 400;
+    throw err;
+  }
+}
+
+function numberParam(url, name, fallback, { min = -Infinity, max = Infinity, integer = false } = {}) {
+  const raw = url.searchParams.get(name);
+  let value = raw === null ? fallback : Number(raw);
+  if (!Number.isFinite(value)) value = fallback;
+  value = Math.min(max, Math.max(min, value));
+  return integer ? Math.floor(value) : value;
 }
 
 function json(res, status, obj) {
@@ -60,22 +87,57 @@ function fromWakatime(h, userAgent, machineHeader) {
     is_write: h.is_write ? 1 : 0,
     // editor plugins are keystroke-driven (human), unless the plugin itself
     // reports AI activity (e.g. wakatime-cli --sync-ai-activity)
-    actor: String(h.category || '').includes('ai') ? 'agent' : 'human',
+    actor: /\bai\b/i.test(String(h.category || '')) ? 'agent' : 'human',
   };
 }
 
 // A file save observed by the generic file watcher may actually be an agent's
 // edit (Claude/Codex writing files triggers mtime changes too). If an agent
 // reported touching the same file within the window, hand the save to it.
-function reattributeFileSaves(rows, windowSeconds = 120) {
-  const agentEdits = rows.filter((r) => r.actor === 'agent' && r.entity_type === 'file');
+export function reattributeFileSaves(rows, windowSeconds = 120) {
+  const agentEdits = rows.filter((r) => r.actor === 'agent'
+    && r.entity_type === 'file' && r.is_write);
   if (!agentEdits.length) return rows;
+  const editsByEntity = new Map();
+  for (const edit of agentEdits) {
+    const key = JSON.stringify([edit.machine, edit.entity]);
+    let edits = editsByEntity.get(key);
+    if (!edits) editsByEntity.set(key, (edits = []));
+    edits.push(edit);
+  }
+  for (const edits of editsByEntity.values()) edits.sort((a, b) => a.time - b.time);
+
   return rows.map((r) => {
     if (r.source !== 'editor-files') return r;
-    const match = agentEdits.find((a) => a.entity === r.entity
-      && Math.abs(a.time - r.time) <= windowSeconds);
+    const edits = editsByEntity.get(JSON.stringify([r.machine, r.entity]));
+    if (!edits) return r;
+    let lo = 0;
+    let hi = edits.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (edits[mid].time < r.time) lo = mid + 1;
+      else hi = mid;
+    }
+    let match = null;
+    let matchDistance = Infinity;
+    for (const index of [lo - 1, lo]) {
+      const a = edits[index];
+      if (!a) continue;
+      const distance = Math.abs(a.time - r.time);
+      if (distance <= windowSeconds && distance < matchDistance) {
+        match = a;
+        matchDistance = distance;
+      }
+    }
     return match ? { ...r, actor: 'agent', source: match.source } : r;
   });
+}
+
+function reattributedRange(db, from, to, windowSeconds) {
+  const raw = db.prepare('SELECT * FROM heartbeats WHERE time >= ? AND time <= ?')
+    .all(from - windowSeconds, to + windowSeconds);
+  return reattributeFileSaves(raw, windowSeconds)
+    .filter((r) => r.time >= from && r.time <= to);
 }
 
 export function startServer(cfg) {
@@ -99,7 +161,7 @@ export function startServer(cfg) {
       // ---- ingest (tempo agents) ----
       if (req.method === 'POST' && p === '/api/ingest') {
         if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
-        const rows = JSON.parse(await readBody(req));
+        const rows = await readJson(req);
         if (!Array.isArray(rows)) return json(res, 400, { error: 'expected array' });
         const inserted = insertHeartbeats(db, rows);
         return json(res, 200, { inserted, received: rows.length });
@@ -111,7 +173,7 @@ export function startServer(cfg) {
         || p === '/users/current/heartbeats'
         || p === '/users/current/heartbeats.bulk')) {
         if (!authOk(req, url, cfg.server.token)) return json(res, 401, { error: 'unauthorized' });
-        const body = JSON.parse(await readBody(req));
+        const body = await readJson(req);
         const items = Array.isArray(body) ? body : [body];
         const machine = req.headers['x-machine-name'] || 'unknown';
         const rows = items.map((h) => fromWakatime(h, req.headers['user-agent'], machine));
@@ -124,14 +186,13 @@ export function startServer(cfg) {
 
       // ---- queries ----
       if (req.method === 'GET' && p === '/api/summary') {
-        const days = Math.min(Number(url.searchParams.get('days') || 1), 366);
-        const to = Number(url.searchParams.get('to') || Date.now() / 1000);
-        const from = Number(url.searchParams.get('from') || to - days * 86400);
+        const days = numberParam(url, 'days', 1, { min: 1, max: 366 });
+        const to = numberParam(url, 'to', Date.now() / 1000);
+        const from = numberParam(url, 'from', to - days * 86400);
         const groupBy = (url.searchParams.get('groupBy') || 'project')
           .split(',').filter((k) => ['project', 'source', 'machine', 'category', 'language', 'entity', 'actor'].includes(k));
-        const tz = Number(url.searchParams.get('tz') || 0);
-        const raw = db.prepare('SELECT * FROM heartbeats WHERE time >= ? AND time <= ?').all(from, to);
-        const rows = reattributeFileSaves(raw, cfg.summary.reattributeWindowSeconds);
+        const tz = numberParam(url, 'tz', 0, { min: -1440, max: 1440 });
+        const rows = reattributedRange(db, from, to, cfg.summary.reattributeWindowSeconds);
         const credited = computeCredits(rows, cfg.summary);
         const total = Math.round(credited.reduce((a, r) => a + r.credit, 0));
         const humanTotal = Math.round(credited.filter((r) => r.actor !== 'agent').reduce((a, r) => a + r.credit, 0));
@@ -148,9 +209,9 @@ export function startServer(cfg) {
       if (req.method === 'GET' && p === '/api/now') {
         // what's active right now: distinct (actor, project, source, machine)
         // seen in the last ~2 minutes
-        const windowS = Number(url.searchParams.get('window') || 150);
-        const raw = db.prepare('SELECT * FROM heartbeats WHERE time >= ?').all(Date.now() / 1000 - windowS);
-        const rows = reattributeFileSaves(raw, cfg.summary.reattributeWindowSeconds);
+        const windowS = numberParam(url, 'window', 150, { min: 1, max: 86400 });
+        const to = Date.now() / 1000;
+        const rows = reattributedRange(db, to - windowS, to, cfg.summary.reattributeWindowSeconds);
         const seen = new Map();
         for (const r of rows) {
           const key = JSON.stringify([r.actor, r.project, r.source, r.machine]);
@@ -163,19 +224,25 @@ export function startServer(cfg) {
       }
 
       if (req.method === 'GET' && p === '/api/timeline') {
-        const hours = Math.min(Number(url.searchParams.get('hours') || 24), 24 * 14);
-        const to = Number(url.searchParams.get('to') || Date.now() / 1000);
+        const hours = numberParam(url, 'hours', 24, { min: 1 / 60, max: 24 * 14 });
+        const to = numberParam(url, 'to', Date.now() / 1000);
         const from = to - hours * 3600;
-        const raw = db.prepare('SELECT * FROM heartbeats WHERE time >= ? AND time <= ?').all(from, to);
-        const rows = reattributeFileSaves(raw, cfg.summary.reattributeWindowSeconds);
+        const rows = reattributedRange(db, from, to, cfg.summary.reattributeWindowSeconds);
         const credited = computeCredits(rows, cfg.summary);
         return json(res, 200, { from, to, segments: buildSegments(credited, cfg.summary) });
       }
 
       if (req.method === 'GET' && p === '/api/recent') {
-        const limit = Math.min(Number(url.searchParams.get('limit') || 50), 500);
-        const rows = db.prepare('SELECT * FROM heartbeats ORDER BY time DESC LIMIT ?').all(limit);
-        return json(res, 200, rows);
+        const limit = numberParam(url, 'limit', 50, { min: 1, max: 500, integer: true });
+        const selected = db.prepare('SELECT * FROM heartbeats ORDER BY time DESC LIMIT ?').all(limit);
+        if (!selected.length) return json(res, 200, selected);
+        const window = cfg.summary.reattributeWindowSeconds;
+        const minTime = Math.min(...selected.map((r) => r.time));
+        const maxTime = Math.max(...selected.map((r) => r.time));
+        const context = db.prepare('SELECT * FROM heartbeats WHERE time >= ? AND time <= ?')
+          .all(minTime - window, maxTime + window);
+        const byId = new Map(reattributeFileSaves(context, window).map((r) => [r.id, r]));
+        return json(res, 200, selected.map((r) => byId.get(r.id) || r));
       }
 
       if (req.method === 'GET' && p === '/api/wakatime-days') {
@@ -185,8 +252,13 @@ export function startServer(cfg) {
 
       json(res, 404, { error: 'not found' });
     } catch (err) {
-      json(res, 500, { error: String(err.message || err) });
+      if (!res.headersSent) json(res, err.statusCode || 500, { error: String(err.message || err) });
+      else res.destroy();
     }
+  });
+
+  server.on('close', () => {
+    try { db.close(); } catch { /* already closed */ }
   });
 
   server.listen(cfg.server.port, cfg.server.host, () => {

@@ -28,11 +28,18 @@ function* walk(dir, ignoreDirs, depth, maxDepth) {
   }
 }
 
-function gitBranch(projectDir, cache) {
+export function gitBranch(projectDir, cache = {}) {
   if (projectDir in cache) return cache[projectDir];
   let branch = null;
   try {
-    const head = fs.readFileSync(path.join(projectDir, '.git', 'HEAD'), 'utf8').trim();
+    const dotGit = path.join(projectDir, '.git');
+    let gitDir = dotGit;
+    if (fs.statSync(dotGit).isFile()) {
+      const pointer = fs.readFileSync(dotGit, 'utf8').trim().match(/^gitdir:\s*(.+)$/i);
+      if (!pointer) throw new Error('invalid gitdir pointer');
+      gitDir = path.resolve(projectDir, pointer[1]);
+    }
+    const head = fs.readFileSync(path.join(gitDir, 'HEAD'), 'utf8').trim();
     branch = head.startsWith('ref: ') ? head.slice(5).replace('refs/heads/', '') : head.slice(0, 12);
   } catch { /* not a git repo */ }
   cache[projectDir] = branch;
@@ -41,7 +48,9 @@ function gitBranch(projectDir, cache) {
 
 export async function watchFiles(cfg, state) {
   const now = Date.now() / 1000;
-  const since = state.filesLastScan || now - cfg.agent.intervalSeconds;
+  const previous = state.filesLastScan || now - cfg.agent.intervalSeconds;
+  // Recover if the wall clock moved backwards after the previous tick.
+  const since = previous > now ? now - cfg.agent.intervalSeconds : previous;
   state.filesLastScan = now;
 
   const rows = [];

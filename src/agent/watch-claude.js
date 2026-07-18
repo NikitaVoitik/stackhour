@@ -9,6 +9,7 @@ import { costOf } from '../pricing.js';
 
 const CLAUDE_PROJECTS = path.join(os.homedir(), '.claude', 'projects');
 const RECENT_WINDOW_S = 3600; // ignore replayed/old lines beyond this age
+const MAX_USAGE_IDS = 20_000;
 
 function* jsonlFiles(dir, depth = 0) {
   if (depth > 4) return;
@@ -21,15 +22,18 @@ function* jsonlFiles(dir, depth = 0) {
   }
 }
 
-export async function watchClaude(cfg, state) {
-  if (!fs.existsSync(CLAUDE_PROJECTS)) return [];
+export async function watchClaude(cfg, state, options = {}) {
+  const projectsDir = options.projectsDir || CLAUDE_PROJECTS;
+  if (!fs.existsSync(projectsDir)) return [];
   state.claudeOffsets ||= {};
+  state.claudeUsageById ||= {};
   const offsets = state.claudeOffsets;
-  const now = Date.now() / 1000;
+  const usageById = state.claudeUsageById;
+  const now = options.now ?? Date.now() / 1000;
   const rows = [];
   const files = [];
 
-  for (const file of jsonlFiles(CLAUDE_PROJECTS)) {
+  for (const file of jsonlFiles(projectsDir)) {
     files.push(file);
     // cheap skip: untouched files
     let st;
@@ -50,14 +54,31 @@ export async function watchClaude(cfg, state) {
       };
       // token usage rides on assistant lines; attach to the first row we emit
       const usage = line.message?.usage;
-      const tokenFields = usage ? {
-        tokens_in: (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0),
-        tokens_out: usage.output_tokens || 0,
+      const usageId = usage && line.message?.id ? String(line.message.id) : null;
+      const currentUsage = usage ? {
+        input: usage.input_tokens || 0,
+        cacheWrite: usage.cache_creation_input_tokens || 0,
+        cacheRead: usage.cache_read_input_tokens || 0,
+        output: usage.output_tokens || 0,
+      } : null;
+      const previousUsage = usageId ? usageById[usageId] : null;
+      const usageDelta = currentUsage ? Object.fromEntries(
+        Object.entries(currentUsage).map(([key, value]) => [key, Math.max(0, value - (previousUsage?.[key] || 0))]),
+      ) : null;
+      if (usageId) {
+        usageById[usageId] = Object.fromEntries(
+          Object.entries(currentUsage).map(([key, value]) => [key, Math.max(value, previousUsage?.[key] || 0)]),
+        );
+      }
+      const chargeUsage = usageDelta && Object.values(usageDelta).some((n) => n > 0);
+      const tokenFields = chargeUsage ? {
+        tokens_in: usageDelta.input + usageDelta.cacheWrite + usageDelta.cacheRead,
+        tokens_out: usageDelta.output,
         cost: costOf(line.message?.model, {
-          input: usage.input_tokens,
-          cacheWrite: usage.cache_creation_input_tokens,
-          cacheRead: usage.cache_read_input_tokens,
-          output: usage.output_tokens,
+          input: usageDelta.input,
+          cacheWrite: usageDelta.cacheWrite,
+          cacheRead: usageDelta.cacheRead,
+          output: usageDelta.output,
         }, cfg.pricing),
       } : {};
       const content = line.message?.content;
@@ -92,6 +113,10 @@ export async function watchClaude(cfg, state) {
         rows.push({ ...base, actor: 'agent', entity: cwd, entity_type: 'app', is_write: 0, ...tokenFields });
       }
     }
+  }
+  const usageIds = Object.keys(usageById);
+  if (usageIds.length > MAX_USAGE_IDS) {
+    for (const id of usageIds.slice(0, usageIds.length - MAX_USAGE_IDS)) delete usageById[id];
   }
   pruneOffsets(offsets, files);
   return rows;

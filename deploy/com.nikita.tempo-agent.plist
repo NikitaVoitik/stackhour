@@ -9,6 +9,10 @@
     <string>-c</string>
     <string>exec "$HOME/tempo/bin/tempo" agent</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>StandardOutPath</key><string>/tmp/tempo-agent.log</string>
