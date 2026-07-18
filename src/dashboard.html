@@ -34,6 +34,10 @@
   .split .you::before { content:'you '; color:var(--dim); }
   .split .agents::before { content:'agents '; color:var(--dim); }
   .split .you { color:#9ece6a; } .split .agents { color:#bb9af7; }
+  .split .cost { color:#e0af68; }
+  .now-line { margin:4px 0; font-size:13px; }
+  .now-line .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; }
+  .row .cost { width:56px; text-align:right; color:#e0af68; font-size:11px; font-variant-numeric:tabular-nums; }
   .lane { display:flex; align-items:center; gap:10px; margin:4px 0; }
   .lane .name { width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
   .lane .track { flex:1; position:relative; height:16px; background:#1c202b; border-radius:4px; }
@@ -49,8 +53,9 @@
 </div>
 <div class="grid">
   <div class="card"><h2>Total</h2><div class="big" id="total">–</div>
-    <div class="split"><span class="you" id="humanTotal">–</span><span class="agents" id="agentTotal">–</span></div>
+    <div class="split"><span class="you" id="humanTotal">–</span><span class="agents" id="agentTotal">–</span><span class="cost" id="totalCost"></span></div>
     <div class="sub" id="totalNote"></div></div>
+  <div class="card"><h2>Now</h2><div id="now" class="sub">–</div></div>
   <div class="card"><h2 id="splitTitle">By project</h2><div id="totals"></div></div>
   <div class="card" style="grid-column:1/-1"><h2>Timeline (last 24h) — bright = you, dim = agents</h2>
     <div id="timeline"></div></div>
@@ -68,11 +73,19 @@ async function load() {
   const s = await (await fetch(`/api/summary?days=${days}&groupBy=${groupBy}&tz=${tz}`)).json();
   const recent = await (await fetch('/api/recent?limit=30')).json();
   const tl = await (await fetch('/api/timeline?hours=24')).json();
+  const now = await (await fetch('/api/now')).json();
 
   document.getElementById('updated').textContent = `updated ${new Date().toLocaleTimeString()}`;
   document.getElementById('total').textContent = fmt(s.total);
   document.getElementById('humanTotal').textContent = fmt(s.humanTotal || 0);
   document.getElementById('agentTotal').textContent = fmt(s.agentTotal || 0);
+  document.getElementById('totalCost').textContent = s.totalCost ? `$${s.totalCost.toFixed(2)} api-equiv` : '';
+
+  document.getElementById('now').innerHTML = now.length
+    ? now.map(n =>
+      `<div class="now-line"><span class="dot" style="background:${n.actor==='agent'?'#bb9af7':'#9ece6a'}"></span>` +
+      `${n.actor === 'agent' ? '🤖' : '🧑'} <b>${n.project}</b> · ${n.source} · ${n.machine}</div>`).join('')
+    : 'nothing active';
 
   // timeline lanes: one row per project; bright segments = human, dim = agent
   const laneProjects = [...new Set(tl.segments.map(x => x.project))];
@@ -101,7 +114,8 @@ async function load() {
   document.getElementById('totals').innerHTML = totals.map(t =>
     `<div class="row"><div class="name" title="${t[groupBy]}">${t[groupBy]}</div>
      <div class="bar"><i style="width:${100*t.seconds/max}%;background:${color[t[groupBy]]}"></i></div>
-     <div class="val">${fmt(t.seconds)}</div></div>`).join('');
+     <div class="val">${fmt(t.seconds)}</div>
+     <div class="cost">${t.cost >= 0.01 ? '$'+t.cost.toFixed(2) : ''}</div></div>`).join('');
 
   // per-day stacked columns
   const byDate = {};

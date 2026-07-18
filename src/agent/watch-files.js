@@ -28,12 +28,24 @@ function* walk(dir, ignoreDirs, depth, maxDepth) {
   }
 }
 
+function gitBranch(projectDir, cache) {
+  if (projectDir in cache) return cache[projectDir];
+  let branch = null;
+  try {
+    const head = fs.readFileSync(path.join(projectDir, '.git', 'HEAD'), 'utf8').trim();
+    branch = head.startsWith('ref: ') ? head.slice(5).replace('refs/heads/', '') : head.slice(0, 12);
+  } catch { /* not a git repo */ }
+  cache[projectDir] = branch;
+  return branch;
+}
+
 export async function watchFiles(cfg, state) {
   const now = Date.now() / 1000;
   const since = state.filesLastScan || now - cfg.agent.intervalSeconds;
   state.filesLastScan = now;
 
   const rows = [];
+  const branchCache = {}; // per-tick — branch switches show up next tick
   for (const root of cfg.agent.projectRoots) {
     for (const file of walk(root, cfg.agent.ignoreDirs, 0, cfg.agent.maxScanDepth)) {
       let st;
@@ -43,7 +55,9 @@ export async function watchFiles(cfg, state) {
       // project = first directory level under the root (or the root itself)
       const rel = path.relative(root, file);
       const top = rel.split(path.sep)[0];
-      const project = rel.includes(path.sep) ? top : path.basename(root);
+      const inSubdir = rel.includes(path.sep);
+      const project = inSubdir ? top : path.basename(root);
+      const projectDir = inSubdir ? path.join(root, top) : root;
       rows.push({
         time: mtime,
         source: 'editor-files',
@@ -52,6 +66,7 @@ export async function watchFiles(cfg, state) {
         entity_type: 'file',
         category: 'coding',
         language: LANG_BY_EXT[path.extname(file).toLowerCase()] || null,
+        branch: gitBranch(projectDir, branchCache),
         is_write: 1,
       });
     }

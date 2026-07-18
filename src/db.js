@@ -23,7 +23,7 @@ export function openDb(dbPath) {
       created_at REAL NOT NULL
     );
   `);
-  // migration for DBs created before the actor column existed
+  // migrations for DBs created before newer columns existed
   const cols = db.prepare('PRAGMA table_info(heartbeats)').all().map((c) => c.name);
   if (!cols.includes('actor')) {
     db.exec(`
@@ -32,9 +32,17 @@ export function openDb(dbPath) {
         WHERE source LIKE 'claude-%' OR source LIKE 'codex-%';
     `);
   }
+  if (!cols.includes('tokens_in')) {
+    db.exec(`
+      ALTER TABLE heartbeats ADD COLUMN tokens_in INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE heartbeats ADD COLUMN tokens_out INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE heartbeats ADD COLUMN cost REAL NOT NULL DEFAULT 0;
+    `);
+  }
   db.exec(`
-    CREATE UNIQUE INDEX IF NOT EXISTS hb_dedupe
-      ON heartbeats (time, machine, source, project, entity);
+    DROP INDEX IF EXISTS hb_dedupe;
+    CREATE UNIQUE INDEX IF NOT EXISTS hb_dedupe2
+      ON heartbeats (time, machine, source, project, entity, actor);
     CREATE INDEX IF NOT EXISTS hb_time ON heartbeats (time);
     -- daily per-project totals imported from wakatime.com (historical backfill)
     CREATE TABLE IF NOT EXISTS wakatime_days (
@@ -50,8 +58,8 @@ export function openDb(dbPath) {
 export function insertHeartbeats(db, rows) {
   const stmt = db.prepare(`
     INSERT OR IGNORE INTO heartbeats
-      (time, machine, source, project, entity, entity_type, category, language, branch, is_write, actor, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      (time, machine, source, project, entity, entity_type, category, language, branch, is_write, actor, tokens_in, tokens_out, cost, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   let inserted = 0;
   const now = Date.now() / 1000;
   for (const h of rows) {
@@ -68,6 +76,9 @@ export function insertHeartbeats(db, rows) {
       h.branch ? String(h.branch) : null,
       h.is_write ? 1 : 0,
       h.actor === 'agent' ? 'agent' : 'human',
+      Math.round(h.tokens_in || 0),
+      Math.round(h.tokens_out || 0),
+      Number(h.cost || 0),
       now,
     );
     inserted += r.changes;

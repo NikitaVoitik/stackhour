@@ -5,6 +5,8 @@ import { watchFiles } from './watch-files.js';
 import { watchClaude } from './watch-claude.js';
 import { watchCodex } from './watch-codex.js';
 import { watchMacApps } from './watch-mac.js';
+import { watchSsh } from './watch-ssh.js';
+import { watchZed } from './watch-zed.js';
 
 const STATE_PATH = path.join(DATA_DIR, 'agent-state.json');
 const QUEUE_PATH = path.join(DATA_DIR, 'queue.jsonl');
@@ -60,6 +62,8 @@ export async function runAgent(cfg, { once = false } = {}) {
     await run(w.claude, 'claude', watchClaude);
     await run(w.codex, 'codex', watchCodex);
     await run(w.macApps && process.platform === 'darwin', 'macApps', watchMacApps);
+    await run(w.ssh && process.platform === 'linux', 'ssh', watchSsh);
+    await run(w.zed, 'zed', watchZed);
     saveState(state);
 
     let rows = batches.flat().map((r) => ({ machine, ...r }));

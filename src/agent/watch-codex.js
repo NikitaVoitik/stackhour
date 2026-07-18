@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readNewLines, pruneOffsets } from './tail.js';
+import { costOf } from '../pricing.js';
 
 const CODEX_SESSIONS = path.join(os.homedir(), '.codex', 'sessions');
 const RECENT_WINDOW_S = 3600;
@@ -65,7 +66,11 @@ export async function watchCodex(cfg, state) {
         meta.source = sourceFromOriginator(payload.originator);
         continue;
       }
-      if (line.type === 'turn_context' && payload.cwd) { meta.cwd = payload.cwd; continue; }
+      if (line.type === 'turn_context') {
+        if (payload.cwd) meta.cwd = payload.cwd;
+        if (payload.model) meta.model = payload.model;
+        continue;
+      }
 
       const ts = Date.parse(line.timestamp) / 1000;
       if (!Number.isFinite(ts) || now - ts > RECENT_WINDOW_S) continue;
@@ -78,6 +83,19 @@ export async function watchCodex(cfg, state) {
         project: path.basename(cwd),
         category: 'ai coding',
       };
+      // per-turn token usage rides on token_count events
+      const tu = payload?.type === 'token_count'
+        ? (payload.info?.last_token_usage || payload.info?.total_token_usage_delta)
+        : null;
+      const tokenFields = tu ? {
+        tokens_in: tu.input_tokens || 0,
+        tokens_out: (tu.output_tokens || 0) + (tu.reasoning_output_tokens || 0),
+        cost: costOf(meta.model || 'gpt-5', {
+          input: Math.max(0, (tu.input_tokens || 0) - (tu.cached_input_tokens || 0)),
+          cacheRead: tu.cached_input_tokens || 0,
+          output: (tu.output_tokens || 0) + (tu.reasoning_output_tokens || 0),
+        }, cfg.pricing),
+      } : {};
       // a user_message event is Nikita typing a prompt; everything else is the agent
       const isHumanPrompt = line.type === 'event_msg' && payload?.type === 'user_message';
       // file-level entities from patch events when present
@@ -87,7 +105,7 @@ export async function watchCodex(cfg, state) {
           rows.push({ ...base, actor: 'agent', entity: fp, entity_type: 'file', is_write: 1 });
         }
       } else {
-        rows.push({ ...base, actor: isHumanPrompt ? 'human' : 'agent', entity: cwd, entity_type: 'app', is_write: 0 });
+        rows.push({ ...base, actor: isHumanPrompt ? 'human' : 'agent', entity: cwd, entity_type: 'app', is_write: 0, ...tokenFields });
       }
     }
   }

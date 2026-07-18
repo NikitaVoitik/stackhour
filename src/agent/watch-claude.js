@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readNewLines, pruneOffsets } from './tail.js';
+import { costOf } from '../pricing.js';
 
 const CLAUDE_PROJECTS = path.join(os.homedir(), '.claude', 'projects');
 const RECENT_WINDOW_S = 3600; // ignore replayed/old lines beyond this age
@@ -45,7 +46,20 @@ export async function watchClaude(cfg, state) {
         source,
         project: path.basename(cwd),
         category: 'ai coding',
+        branch: line.gitBranch || null,
       };
+      // token usage rides on assistant lines; attach to the first row we emit
+      const usage = line.message?.usage;
+      const tokenFields = usage ? {
+        tokens_in: (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0) + (usage.cache_read_input_tokens || 0),
+        tokens_out: usage.output_tokens || 0,
+        cost: costOf(line.message?.model, {
+          input: usage.input_tokens,
+          cacheWrite: usage.cache_creation_input_tokens,
+          cacheRead: usage.cache_read_input_tokens,
+          output: usage.output_tokens,
+        }, cfg.pricing),
+      } : {};
       const content = line.message?.content;
       // a genuine human prompt is a user line that is not a tool_result relay
       // and not inside a subagent sidechain
@@ -65,13 +79,17 @@ export async function watchClaude(cfg, state) {
         for (const block of content) {
           const fp = block?.type === 'tool_use' && block.input?.file_path;
           if (fp) {
-            rows.push({ ...base, actor: 'agent', entity: fp, entity_type: 'file', is_write: /edit|write/i.test(block.name || '') ? 1 : 0 });
+            rows.push({
+              ...base, actor: 'agent', entity: fp, entity_type: 'file',
+              is_write: /edit|write/i.test(block.name || '') ? 1 : 0,
+              ...(emitted ? {} : tokenFields),
+            });
             emitted = true;
           }
         }
       }
       if (!emitted && (line.type === 'user' || line.type === 'assistant')) {
-        rows.push({ ...base, actor: 'agent', entity: cwd, entity_type: 'app', is_write: 0 });
+        rows.push({ ...base, actor: 'agent', entity: cwd, entity_type: 'app', is_write: 0, ...tokenFields });
       }
     }
   }

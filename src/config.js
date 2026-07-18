@@ -26,7 +26,7 @@ const DEFAULTS = {
     machine: os.hostname(),
     intervalSeconds: 20,
     projectRoots: [],
-    watch: { files: true, claude: true, codex: true, macApps: true },
+    watch: { files: true, claude: true, codex: true, macApps: true, ssh: true, zed: true },
     // frontmost-app tracking (macOS only): process name -> source, or {source, category}
     apps: {
       Claude: { source: 'claude-desktop', category: 'ai coding' },
@@ -45,6 +45,8 @@ const DEFAULTS = {
   // reattributeWindowSeconds: file saves matching an agent edit within this
   // window count as agent work. joinGapSeconds: timeline segment merging.
   summary: { capSeconds: 120, lastEventCreditSeconds: 60, reattributeWindowSeconds: 120, joinGapSeconds: 300 },
+  // model pricing overrides (USD per 1M tokens) — see src/pricing.js for defaults
+  pricing: undefined,
   wakatime: { apiKey: '' },
 };
 

@@ -48,11 +48,19 @@ function aggregate(creditedRows, keyFn) {
 
 export function totalsBy(creditedRows, keys) {
   // keys: array of field names, e.g. ['project'] or ['project','source']
-  const totals = aggregate(creditedRows, (r) => keys.map((k) => r[k] ?? 'unknown'));
+  const totals = new Map();
+  for (const r of creditedRows) {
+    const key = JSON.stringify(keys.map((k) => r[k] ?? 'unknown'));
+    let t = totals.get(key);
+    if (!t) totals.set(key, (t = { seconds: 0, tokens: 0, cost: 0 }));
+    t.seconds += r.credit;
+    t.tokens += (r.tokens_in || 0) + (r.tokens_out || 0);
+    t.cost += r.cost || 0;
+  }
   return [...totals.entries()]
-    .map(([key, seconds]) => {
+    .map(([key, t]) => {
       const parts = JSON.parse(key);
-      const obj = { seconds: Math.round(seconds) };
+      const obj = { seconds: Math.round(t.seconds), tokens: t.tokens, cost: Math.round(t.cost * 100) / 100 };
       keys.forEach((k, i) => (obj[k] = parts[i]));
       return obj;
     })

@@ -11,10 +11,18 @@ No npm dependencies. Requires Node ≥ 22.
 
 | Signal | Covers | How |
 |---|---|---|
-| File saves in `projectRoots` | WebStorm, Zed local, **Zed remote** (on the server), any editor | mtime scan every tick |
-| `~/.claude/projects/**/*.jsonl` | Claude Code CLI, SDK sessions, Claude Desktop Cowork | incremental JSONL tail; per-file entities from tool_use blocks |
-| `~/.codex/sessions/**/rollout-*.jsonl` | Codex CLI, Codex IDE ext, Codex Desktop (local sessions) | incremental JSONL tail; `originator` labels the surface |
-| Frontmost app + idle (macOS) | Claude Desktop chat, Codex Desktop UI, editor focus fallback | osascript + ioreg poll |
+| File saves in `projectRoots` | WebStorm, Zed local, **Zed remote** (on the server), any editor, manual edits | mtime scan every tick; git branch from `.git/HEAD` |
+| `~/.claude/projects/**/*.jsonl` | Claude Code CLI, SDK sessions, Claude Desktop Cowork | incremental JSONL tail; tokens + cost from usage blocks |
+| `~/.codex/sessions/**/rollout-*.jsonl` | Codex CLI, Codex IDE ext, Codex Desktop (local sessions) | incremental JSONL tail; tokens + cost from token_count events |
+| Frontmost app + window title + idle (macOS) | Claude Desktop chat, Codex Desktop UI, editor focus + project detection | osascript + ioreg poll |
+| `/dev/pts/*` atimes (Linux) | You typing over SSH (vim, shells, agent prompts) | pty idle + foreground-process cwd |
+| Zed `threads.db` | Zed agent panel / ACP sessions | SQLite copy + updated_at diff |
+
+**Human vs agent:** every heartbeat carries an `actor`. Your prompts, file
+saves, SSH typing, and focused-app time are `human`; everything agents do
+(including file saves they cause) is `agent`. Agent streams accrue in parallel
+per project; your attention is single-threaded. Costs shown are API-equivalent
+estimates (see `src/pricing.js`; override via `pricing` in config).
 
 Optionally, official WakaTime editor plugins can be pointed at this server for
 keystroke-level granularity: the server speaks the WakaTime heartbeat protocol at
@@ -39,10 +47,10 @@ cp ~/tempo/deploy/tempo-server.service ~/.config/systemd/user/
 cp ~/tempo/deploy/tempo-agent.service ~/.config/systemd/user/
 systemctl --user daemon-reload && systemctl --user enable --now tempo-server tempo-agent
 
-# Mac
-cp ~/tempo/deploy/com.nikita.tempo-agent.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.nikita.tempo-agent.plist
-# first tick will prompt for Automation permission (System Events) — allow it
+# Mac — one-shot installer (writes config, loads launchd agent, triggers the
+# Automation permission prompt; grant Accessibility too for window titles)
+git clone <this repo> ~/tempo
+~/tempo/deploy/setup-mac.sh http://your-server:4040 <token> ~/dev ~/client
 ```
 
 Dashboard: `http://your-server:4040/`. CLI: `tempo status`.

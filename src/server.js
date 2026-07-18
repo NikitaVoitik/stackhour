@@ -135,11 +135,31 @@ export function startServer(cfg) {
         const credited = computeCredits(rows, cfg.summary);
         const total = Math.round(credited.reduce((a, r) => a + r.credit, 0));
         const humanTotal = Math.round(credited.filter((r) => r.actor !== 'agent').reduce((a, r) => a + r.credit, 0));
+        const totalCost = Math.round(rows.reduce((a, r) => a + (r.cost || 0), 0) * 100) / 100;
+        const totalTokens = rows.reduce((a, r) => a + (r.tokens_in || 0) + (r.tokens_out || 0), 0);
         return json(res, 200, {
           from, to, total, humanTotal, agentTotal: total - humanTotal,
+          totalCost, totalTokens,
           totals: totalsBy(credited, groupBy.length ? groupBy : ['project']),
           days: dayBuckets(credited, groupBy.length ? groupBy : ['project'], tz),
         });
+      }
+
+      if (req.method === 'GET' && p === '/api/now') {
+        // what's active right now: distinct (actor, project, source, machine)
+        // seen in the last ~2 minutes
+        const windowS = Number(url.searchParams.get('window') || 150);
+        const raw = db.prepare('SELECT * FROM heartbeats WHERE time >= ?').all(Date.now() / 1000 - windowS);
+        const rows = reattributeFileSaves(raw, cfg.summary.reattributeWindowSeconds);
+        const seen = new Map();
+        for (const r of rows) {
+          const key = JSON.stringify([r.actor, r.project, r.source, r.machine]);
+          const prev = seen.get(key);
+          if (!prev || r.time > prev.time) {
+            seen.set(key, { actor: r.actor, project: r.project, source: r.source, machine: r.machine, time: r.time, entity: r.entity });
+          }
+        }
+        return json(res, 200, [...seen.values()].sort((a, b) => b.time - a.time));
       }
 
       if (req.method === 'GET' && p === '/api/timeline') {
