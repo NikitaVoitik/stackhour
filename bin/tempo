@@ -1,0 +1,4 @@
+#!/bin/sh
+# node:sqlite is behind a flag on Node 22; harmless on newer versions
+DIR="$(cd "$(dirname "$0")" && pwd)"
+exec node --experimental-sqlite --no-warnings "$DIR/../src/cli.js" "$@"

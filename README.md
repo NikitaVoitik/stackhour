@@ -1,0 +1,78 @@
+# tempo
+
+Self-hosted coding time tracker. One Node app, two roles:
+
+- **`tempo serve`** — runs on the Linux server: ingest API + SQLite + web dashboard.
+- **`tempo agent`** — runs on every machine (Mac + Linux): watches activity and ships heartbeats to the server. Offline-safe (disk queue, retries).
+
+No npm dependencies. Requires Node ≥ 22.
+
+## What the agent tracks, with zero editor plugins
+
+| Signal | Covers | How |
+|---|---|---|
+| File saves in `projectRoots` | WebStorm, Zed local, **Zed remote** (on the server), any editor | mtime scan every tick |
+| `~/.claude/projects/**/*.jsonl` | Claude Code CLI, SDK sessions, Claude Desktop Cowork | incremental JSONL tail; per-file entities from tool_use blocks |
+| `~/.codex/sessions/**/rollout-*.jsonl` | Codex CLI, Codex IDE ext, Codex Desktop (local sessions) | incremental JSONL tail; `originator` labels the surface |
+| Frontmost app + idle (macOS) | Claude Desktop chat, Codex Desktop UI, editor focus fallback | osascript + ioreg poll |
+
+Optionally, official WakaTime editor plugins can be pointed at this server for
+keystroke-level granularity: the server speaks the WakaTime heartbeat protocol at
+`/api/v1/users/current/heartbeats(.bulk)`. Set in `~/.wakatime.cfg`:
+
+```ini
+[settings]
+api_url = http://your-server:4040/api/v1
+api_key = <your server token>
+```
+
+## Setup
+
+```sh
+# both machines
+git clone <this repo> ~/tempo
+mkdir -p ~/.config/tempo && cp ~/tempo/config.example.json ~/.config/tempo/config.json
+$EDITOR ~/.config/tempo/config.json   # set token, serverUrl, projectRoots
+
+# Linux server
+cp ~/tempo/deploy/tempo-server.service ~/.config/systemd/user/
+cp ~/tempo/deploy/tempo-agent.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now tempo-server tempo-agent
+
+# Mac
+cp ~/tempo/deploy/com.nikita.tempo-agent.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.nikita.tempo-agent.plist
+# first tick will prompt for Automation permission (System Events) — allow it
+```
+
+Dashboard: `http://your-server:4040/`. CLI: `tempo status`.
+
+Backfill history from wakatime.com (key in config or `WAKATIME_API_KEY`):
+
+```sh
+tempo import-wakatime --days=365
+```
+
+## Tuning
+
+Everything lives in `~/.config/tempo/config.json` (defaults in `src/config.js`):
+
+- `summary.capSeconds` — max seconds one heartbeat can earn (default 120).
+  Raise for more generous totals, lower for stricter ones.
+- `agent.intervalSeconds` — tick rate (default 20s).
+- `agent.apps` — which macOS apps to track and how to label them.
+- `agent.ignoreDirs` / `maxScanDepth` — file-scan noise control.
+
+The credit model is ~40 lines in `src/summarize.js`; the watchers are one small
+file each under `src/agent/`. Fork away.
+
+## Notes & limits
+
+- Codex **cloud** tasks and Claude/ChatGPT **web** usage never touch local disk —
+  invisible to any local tracker.
+- Pure Claude Desktop chat has no local transcript; it's tracked only via the
+  macOS frontmost-app watcher (app-level, not per-conversation).
+- The transcript formats (`~/.claude`, `~/.codex`) are undocumented and may
+  drift; watchers fail soft (skip unparseable lines).
+- Keep the server on a trusted network (Tailscale recommended); the dashboard
+  has no auth, and ingest is protected only by the shared token.

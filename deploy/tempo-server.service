@@ -1,0 +1,11 @@
+[Unit]
+Description=tempo time-tracking server
+After=network.target
+
+[Service]
+ExecStart=%h/tempo/bin/tempo serve
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

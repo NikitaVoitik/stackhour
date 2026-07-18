@@ -1,0 +1,23 @@
+{
+  "server": {
+    "port": 4040,
+    "host": "0.0.0.0",
+    "token": "generate-a-long-random-string"
+  },
+  "agent": {
+    "serverUrl": "http://your-linux-server:4040",
+    "token": "generate-a-long-random-string",
+    "intervalSeconds": 20,
+    "projectRoots": ["~/dev", "~/client"],
+    "watch": { "files": true, "claude": true, "codex": true, "macApps": true },
+    "apps": {
+      "Claude": { "source": "claude-desktop", "category": "ai coding" },
+      "Codex": { "source": "codex-desktop", "category": "ai coding" },
+      "WebStorm": { "source": "webstorm", "category": "coding" },
+      "Zed": { "source": "zed", "category": "coding" }
+    },
+    "idleSeconds": 120
+  },
+  "summary": { "capSeconds": 120, "lastEventCreditSeconds": 60 },
+  "wakatime": { "apiKey": "waka_xxx (only needed for import-wakatime)" }
+}
