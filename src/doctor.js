@@ -165,7 +165,7 @@ export async function diagnose(options = {}) {
     } else if (options.checkServices !== false && platform === 'darwin') {
       try {
         await (options.execFn || exec)('launchctl',
-          ['print', `gui/${process.getuid()}/com.nikita.stackhour-agent`]);
+          ['print', `gui/${process.getuid()}/com.stackhour.agent`]);
         add('services', 'ok', 'Stackhour launch agent active');
       } catch { add('services', 'warn', 'Stackhour launch agent inactive'); }
     }

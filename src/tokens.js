@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { CONFIG_PATH } from './config.js';
-import { generateToken, optionValues, writeConfig } from './setup.js';
+import { createEnrollment, generateToken, optionValues, validUrl, writeConfig } from './setup.js';
 
 function readServerConfig(configPath) {
   let config;
@@ -20,6 +20,11 @@ function machineName(value) {
     throw new Error('machine must be 1-200 printable characters');
   }
   return machine;
+}
+
+function serverUrl(config, override) {
+  const value = override || config.server.publicUrl;
+  return value ? validUrl(value) : null;
 }
 
 export function createMachineToken(machine, { configPath = CONFIG_PATH, force = false, token = generateToken() } = {}) {
@@ -61,8 +66,17 @@ export function runToken(args, { configPath = CONFIG_PATH, stdout = process.stdo
       force: args.includes('--force'),
       token: optionValues(args, 'token').at(-1),
     });
-    stdout.write(`Token for ${result.machine}: ${result.token}\n`);
-    return result;
+    const config = readServerConfig(configPath);
+    const publicUrl = serverUrl(config, optionValues(args, 'server-url').at(-1));
+    if (args.includes('--raw') || !publicUrl) {
+      stdout.write(`Token for ${result.machine}: ${result.token}\n`);
+      return result;
+    }
+    const enrollment = createEnrollment({ serverUrl: publicUrl, ...result });
+    stdout.write(`Enrolled ${result.machine}. On that machine run:\n\n`);
+    stdout.write(`  ./bin/stackhour init agent --enrollment=${enrollment} --install\n\n`);
+    stdout.write('Add one or more --project-root=/path options before --install if needed.\n');
+    return { ...result, serverUrl: publicUrl, enrollment };
   }
   if (command === 'revoke') {
     const result = revokeMachineToken(machine, { configPath });

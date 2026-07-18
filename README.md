@@ -1,162 +1,415 @@
 # Stackhour
 
-Self-hosted coding time tracker. One Node app, two roles:
+Stackhour is a dependency-free, self-hosted coding time tracker for humans and
+coding agents. It replaces WakaTime with one Node.js application and a SQLite
+database you control.
 
-- **`stackhour serve`** — runs on the Linux server: ingest API + SQLite + web dashboard.
-- **`stackhour agent`** — runs on every machine (Mac + Linux): watches activity and ships heartbeats to the server. Offline-safe (disk queue, retries).
+- `stackhour serve` runs the ingest API, SQLite storage, and web dashboard.
+- `stackhour agent` watches local activity and sends heartbeats to the server.
+- One agent can run on the server and additional agents can run on Linux or
+  macOS machines.
+- Offline agents queue heartbeats on disk and retry automatically.
 
-No npm dependencies. Requires Node ≥ 22.
+Requirements: Node.js 22 or newer, Git, and Linux or macOS. There are no npm
+packages to install. The launcher enables Node's `--experimental-sqlite` flag.
 
-## What the agent tracks, with zero editor plugins
+## Quick start
 
-| Signal | Covers | How |
-|---|---|---|
-| File saves in `projectRoots` | WebStorm, Zed local, **Zed remote** (on the server), any editor, manual edits | mtime scan every tick; git branch from `.git/HEAD` |
-| `~/.claude/projects/**/*.jsonl` | Claude Code CLI, SDK sessions, Claude Desktop Cowork | incremental JSONL tail; tokens + cost from usage blocks |
-| `~/.codex/sessions/**/rollout-*.jsonl` | Codex CLI, Codex IDE ext, Codex Desktop (local sessions) | incremental JSONL tail; tokens + cost from token_count events |
-| Frontmost app + window title + idle (macOS) | Claude Desktop chat, Codex Desktop UI, editor focus + project detection | osascript + ioreg poll |
-| `/dev/pts/*` atimes (Linux) | You typing over SSH (vim, shells, agent prompts) | pty idle + foreground-process cwd |
-| Zed `threads.db` | Zed agent panel / ACP sessions | SQLite copy + updated_at diff |
+Stackhour is intended to live on a private network. The examples below use a
+Tailscale or LAN hostname named `stackhour-server`; replace it with the URL that
+your other machines can actually reach. The dashboard is not authenticated, so
+do not expose port 4040 directly to the public internet.
 
-**Human vs agent:** every heartbeat carries an `actor`. Your prompts, file
-saves, SSH typing, and focused-app time are `human`; everything agents do
-(including file saves they cause) is `agent`. Agent streams accrue in parallel
-per project; your attention is single-threaded. Costs shown are API-equivalent
-estimates (see `src/pricing.js`; override via `pricing` in config).
+### 1. Install the Linux server
 
-Optionally, official WakaTime editor plugins can be pointed at this server for
-keystroke-level granularity: the server speaks the WakaTime heartbeat protocol at
-`/api/v1/users/current/heartbeats(.bulk)`. Set in `~/.wakatime.cfg`:
+```sh
+git clone https://github.com/NikitaVoitik/stackhour.git ~/stackhour
+cd ~/stackhour
+mkdir -p "$HOME/dev"
+
+./bin/stackhour init server \
+  --public-url=http://stackhour-server:4040 \
+  --project-root="$HOME/dev" \
+  --install
+```
+
+This one command:
+
+1. creates `~/.config/stackhour/config.json` with mode `0600`;
+2. generates a machine-specific token for the server's local agent;
+3. stores the public URL used in future enrollment commands;
+4. installs and starts `stackhour-server.service` and
+   `stackhour-agent.service` as systemd user services.
+
+Check the result:
+
+```sh
+./bin/stackhour doctor
+curl http://127.0.0.1:4040/api/health
+systemctl --user status stackhour-server stackhour-agent
+```
+
+Open `http://stackhour-server:4040/` in a browser. If the services must keep
+running after logout, enable user lingering once:
+
+```sh
+loginctl enable-linger "$USER"
+```
+
+If service installation failed after the config was created, it can be retried
+without regenerating credentials:
+
+```sh
+./bin/stackhour install server
+```
+
+### 2. Enroll another machine
+
+On the server, create a credential for the exact machine name you want to see
+in reports:
+
+```sh
+cd ~/stackhour
+./bin/stackhour token create nikita-macbook
+```
+
+The command prints one copy-and-paste command containing an enrollment code.
+The code packages the server URL, machine name, and token. It is encoded, not
+encrypted: treat it as a password and do not post it in chat or commit it.
+
+On the MacBook:
+
+```sh
+git clone https://github.com/NikitaVoitik/stackhour.git ~/stackhour
+cd ~/stackhour
+
+# Paste the generated command and add roots before --install, for example:
+./bin/stackhour init agent \
+  --enrollment=PASTE_THE_GENERATED_CODE \
+  --project-root="$HOME/dev" \
+  --project-root="$HOME/client" \
+  --install
+
+./bin/stackhour doctor
+```
+
+The macOS installer creates
+`~/Library/LaunchAgents/com.stackhour.agent.plist`, loads it with `launchctl`,
+and writes logs to `/tmp/stackhour-agent.log`. The first poll can trigger an
+Automation permission prompt. For focused-window project detection, also grant
+Accessibility permission to the Node executable or terminal in System Settings
+→ Privacy & Security.
+
+The same enrollment command works on another Linux machine; `--install` creates
+only its `stackhour-agent.service`.
+
+### Rotate or revoke a machine
+
+```sh
+# Server: rotate the credential and print a new enrollment command.
+./bin/stackhour token create nikita-macbook --force
+
+# MacBook: apply the replacement and restart/reinstall the launch agent.
+./bin/stackhour init agent --enrollment=NEW_CODE --force --install
+
+# Server: permanently reject that machine's current credential.
+./bin/stackhour token revoke nikita-macbook
+
+# Names only; secrets are never listed.
+./bin/stackhour token list
+```
+
+## What Stackhour tracks
+
+| Signal | Source label | Actor | Input |
+|---|---|---|---|
+| File saves under `projectRoots` | `editor-files` | human initially; reattributed when an agent made the edit | recursive mtime scan |
+| Claude Code, SDK, and Cowork sessions | `claude-code` / `claude-desktop` | human prompts and agent work separately | `~/.claude/projects/**/*.jsonl` |
+| Codex CLI, IDE, and desktop sessions | `codex-*` | human prompts and agent work separately | `~/.codex/sessions/**/rollout-*.jsonl` |
+| Active SSH terminals on Linux | `ssh` | human | `/dev/pts/*` activity and foreground cwd |
+| Focused applications on macOS | configured app source | human | frontmost window and idle time |
+| Zed agent threads | `zed-agent` | agent | Zed `threads.db` updates |
+| WakaTime-compatible editor plugins | editor name | human or agent from category | HTTP heartbeat API |
+
+Every heartbeat has an `actor`:
+
+- `human`: prompts, manual file saves, SSH typing, and focused-app activity;
+- `agent`: Claude, Codex, Zed agents, tool calls, and matching file saves caused
+  by those agents.
+
+Human credit streams are split by machine and source, so switching projects
+does not double-count attention. Agent streams additionally split by project,
+allowing genuinely parallel agents to accrue time independently. Each
+heartbeat earns the gap until the next heartbeat in its stream, capped by
+`summary.capSeconds`.
+
+Token and cost fields ride on heartbeats. Costs are API-equivalent estimates
+from `src/pricing.js`, not invoices or actual subscription spend.
+
+An illustrative stored heartbeat looks like this:
+
+```json
+{
+  "time": 1784383200.25,
+  "machine": "nikita-macbook",
+  "source": "codex-desktop",
+  "project": "NikitaVoitik/stackhour",
+  "entity": "/Users/nikita/dev/stackhour/src/server.js",
+  "entity_type": "file",
+  "category": "ai coding",
+  "language": "JavaScript",
+  "branch": "main",
+  "is_write": 1,
+  "actor": "agent",
+  "tokens_in": 1832,
+  "tokens_out": 211,
+  "cost": 0.0041
+}
+```
+
+The unique identity is `(time, machine, source, project, entity, actor)`. Do
+not remove `actor` or merge human and agent streams when changing the schema or
+summary logic.
+
+## Project identity
+
+Stackhour finds a repository from the heartbeat's cwd or file, reads its Git
+remote—including worktree `commondir` metadata—and uses `owner/repository` as
+the canonical project. This keeps differently named clones on multiple machines
+together and avoids collisions between repositories sharing a basename.
+
+Use aliases when a repository has several remotes or should have a friendlier
+name:
+
+```json
+{
+  "agent": {
+    "projectAliases": {
+      "github.com/NikitaVoitik/stackhour": "stackhour",
+      "/Users/nikita/client/acme-api": "acme/api",
+      "legacy-title-from-an-editor": "legacy/app"
+    }
+  }
+}
+```
+
+Alias keys are case-insensitive and can be absolute repository paths,
+normalized Git remotes, `owner/repository`, or detected labels.
+
+## Configuration and files
+
+Default locations:
+
+| Purpose | Path |
+|---|---|
+| Configuration | `~/.config/stackhour/config.json` |
+| Server database | `~/.local/share/stackhour/stackhour.db` |
+| Agent offsets and health | `~/.local/share/stackhour/agent-state.json` |
+| Offline queue | `~/.local/share/stackhour/queue.jsonl` |
+| Default backups | `~/.local/share/stackhour/backups/` |
+
+Tests and temporary deployments can isolate everything with
+`STACKHOUR_CONFIG` and `STACKHOUR_DATA`:
+
+```sh
+STACKHOUR_CONFIG=/tmp/stackhour/config.json \
+STACKHOUR_DATA=/tmp/stackhour/data \
+./bin/stackhour init server --public-url=http://127.0.0.1:4141 --port=4141
+```
+
+A representative configuration is:
+
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 4040,
+    "publicUrl": "http://stackhour-server:4040",
+    "db": "/home/nikita/.local/share/stackhour/stackhour.db",
+    "tokens": {
+      "stackhour-server": "generated-secret",
+      "nikita-macbook": "different-generated-secret"
+    }
+  },
+  "agent": {
+    "serverUrl": "http://127.0.0.1:4040",
+    "token": "generated-secret",
+    "machine": "stackhour-server",
+    "intervalSeconds": 20,
+    "projectRoots": ["/home/nikita/dev"],
+    "projectAliases": {},
+    "watch": {
+      "files": true,
+      "claude": true,
+      "codex": true,
+      "macApps": true,
+      "ssh": true,
+      "zed": true
+    }
+  },
+  "summary": {
+    "capSeconds": 120,
+    "lastEventCreditSeconds": 60,
+    "reattributeWindowSeconds": 120,
+    "joinGapSeconds": 300
+  }
+}
+```
+
+Important tuning fields:
+
+- `agent.intervalSeconds`: watcher polling interval, default 20 seconds;
+- `agent.ignoreDirs` and `agent.maxScanDepth`: file scanner limits;
+- `agent.apps`: macOS process-to-source mappings and title patterns;
+- `summary.capSeconds`: maximum credit from a heartbeat, default 120 seconds;
+- `summary.reattributeWindowSeconds`: file-save-to-agent-edit matching window;
+- `pricing`: per-model API pricing overrides in USD per million tokens.
+
+## Health and service operations
+
+`stackhour doctor` is read-only. It checks Node and SQLite support, config
+permissions, project roots, watcher inputs, queue state, server authentication,
+database integrity, versions, clock skew, parser silence, and user services.
+
+```sh
+./bin/stackhour doctor
+./bin/stackhour doctor --json
+./bin/stackhour status
+```
+
+Linux service operations:
+
+```sh
+systemctl --user status stackhour-server stackhour-agent
+journalctl --user -u stackhour-server -u stackhour-agent -f
+systemctl --user restart stackhour-server stackhour-agent
+```
+
+macOS agent operations:
+
+```sh
+launchctl print "gui/$(id -u)/com.stackhour.agent"
+tail -f /tmp/stackhour-agent.log
+launchctl kickstart -k "gui/$(id -u)/com.stackhour.agent"
+```
+
+Manual foreground mode, useful for debugging or containers:
+
+```sh
+./bin/stackhour serve
+./bin/stackhour agent --once
+./bin/stackhour agent
+```
+
+## Data management
+
+Inspect the database without changing it:
+
+```sh
+./bin/stackhour data stats
+./bin/stackhour data stats --json
+```
+
+Export deterministic, versioned JSONL. Output is mode `0600`, written
+atomically, and never replaced unless `--force` is supplied:
+
+```sh
+./bin/stackhour data export \
+  --output="$HOME/stackhour-export-2026.jsonl" \
+  --from=2026-01-01 \
+  --to=2026-12-31
+```
+
+Preview retention pruning first. The confirmed operation removes heartbeats
+strictly older than the cutoff and imported WakaTime days before its UTC date in
+one transaction:
+
+```sh
+./bin/stackhour data prune --before=2025-01-01
+./bin/stackhour data prune --before=2025-01-01 --confirm
+```
+
+## Backup and recovery
+
+Create and verify a consistent, standalone SQLite snapshot while the server is
+running:
+
+```sh
+./bin/stackhour backup create
+./bin/stackhour backup create --output="$HOME/backups/stackhour.db"
+./bin/stackhour backup verify "$HOME/backups/stackhour.db"
+```
+
+Restore is preview-only without `--confirm`. Stop the server for the confirmed
+operation; agents can continue running and will queue activity until it returns.
+
+```sh
+systemctl --user stop stackhour-server
+./bin/stackhour backup restore "$HOME/backups/stackhour.db"
+./bin/stackhour backup restore "$HOME/backups/stackhour.db" --confirm
+systemctl --user start stackhour-server
+./bin/stackhour doctor
+```
+
+The input and replacement are integrity-checked. The previous database is kept
+beside the live DB as `stackhour.db.pre-restore-<timestamp>`.
+
+Configuration and tokens are intentionally not included in database backups.
+Back up `~/.config/stackhour/config.json` separately with appropriate secret
+handling.
+
+## WakaTime plugin compatibility
+
+The server accepts official WakaTime heartbeat routes. Create a raw token for
+the editor's machine, then configure its plugin:
+
+```sh
+./bin/stackhour token create nikita-macbook --raw
+```
 
 ```ini
 [settings]
-api_url = http://your-server:4040/api/v1
-api_key = <your server token>
+api_url = http://stackhour-server:4040/api/v1
+api_key = PASTE_THE_RAW_TOKEN
 ```
 
-## Setup
+Machine-scoped authentication requires the plugin's `X-Machine-Name` header to
+match the enrolled name. Stackhour classifies ordinary editor categories as
+human and AI categories as agent work.
+
+Historical WakaTime summaries can be imported with an API key in
+`wakatime.apiKey` or `WAKATIME_API_KEY`:
 
 ```sh
-# server
-git clone <this repo> ~/stackhour
-~/stackhour/bin/stackhour init server
-# Save the printed agent token; the config is written mode 0600.
-
-# Linux server
-cp ~/stackhour/deploy/stackhour-server.service ~/.config/systemd/user/
-cp ~/stackhour/deploy/stackhour-agent.service ~/.config/systemd/user/
-systemctl --user daemon-reload && systemctl --user enable --now stackhour-server stackhour-agent
-
-# Mac — one-shot installer (writes config, loads launchd agent, triggers the
-# Automation permission prompt; grant Accessibility too for window titles)
-git clone <this repo> ~/stackhour
-~/stackhour/deploy/setup-mac.sh http://your-server:4040 <token> ~/dev ~/client
+WAKATIME_API_KEY=waka_xxx ./bin/stackhour import-wakatime --days=365
 ```
 
-For another Linux agent, run:
+Imported rows currently live in `wakatime_days`; they are exportable and
+prunable but are not yet merged into dashboard charts.
+
+## Updating and testing
 
 ```sh
-# On the server; prints the new secret once.
-stackhour token create my-linux
-# On the agent, use that machine-specific secret.
-stackhour init agent --server-url=http://your-server:4040 --token=<token> \
-  --machine=my-linux --project-root=~/dev
-```
-
-Both init commands preserve the other role in a shared config and refuse to
-replace an existing role unless `--force` is supplied.
-
-Each agent has its own credential. `stackhour token list` shows enrolled
-machine names without secrets; `stackhour token create NAME --force` rotates
-one credential and `stackhour token revoke NAME` removes it. The server rejects
-heartbeats or health reports whose machine does not match the presented token.
-
-Dashboard: `http://your-server:4040/`. CLI: `stackhour status`.
-
-## Health and diagnostics
-
-Each agent reports machine health separately from heartbeats: queue depth,
-clock skew, Stackhour/Node versions, and per-watcher poll time, input movement,
-last emitted event, duration, and errors. The dashboard flags stale agents,
-watcher failures, queued heartbeats, clock skew, and likely parser drift (five
-consecutive input changes that produced no heartbeat).
-
-Run the read-only diagnostic command on any machine:
-
-```sh
-stackhour doctor
-stackhour doctor --json
-```
-
-It checks Node and SQLite support, config parsing without printing secrets,
-storage permissions, project roots, Claude/Codex/Zed inputs, database integrity,
-server authentication, the local machine's latest watcher report, and user
-service state. Errors produce a non-zero exit code; warnings do not.
-
-Run the dependency-free reliability suite:
-
-```sh
+cd ~/stackhour
+git pull --ff-only
 node --experimental-sqlite --no-warnings --test test/*.test.mjs
+systemctl --user restart stackhour-server stackhour-agent   # Linux server
 ```
 
-The suite uses temporary databases, state, queues, watcher fixtures, and an
-ephemeral localhost port; it never reads the live Stackhour config or writes the
-live database.
+The test suite uses temporary configs, databases, queues, watcher fixtures, and
+ephemeral loopback ports. It never reads or writes the live Stackhour config or
+database.
 
-Backfill history from wakatime.com (key in config or `WAKATIME_API_KEY`):
+## Limits
 
-```sh
-stackhour import-wakatime --days=365
-```
-
-Inspect, export, or prune the local database:
-
-```sh
-stackhour data stats
-stackhour data export --output=stackhour.jsonl --from=2026-01-01
-stackhour data prune --before=2025-01-01          # preview only
-stackhour data prune --before=2025-01-01 --confirm
-```
-
-Exports are atomic mode-0600 JSONL files and never overwrite without
-`--force`. Pruning is a transaction and remains a dry run without `--confirm`.
-
-Create, verify, and restore database backups (config secrets are excluded):
-
-```sh
-stackhour backup create
-stackhour backup verify ~/.local/share/stackhour/backups/stackhour-....db
-systemctl --user stop stackhour-server
-stackhour backup restore /path/to/backup.db                 # preview
-stackhour backup restore /path/to/backup.db --confirm
-systemctl --user start stackhour-server
-```
-
-A confirmed restore verifies the input and replacement, refuses a busy
-database, and retains the previous DB beside it as `*.pre-restore-*`.
-
-## Tuning
-
-Everything lives in `~/.config/stackhour/config.json` (defaults in `src/config.js`):
-
-- `summary.capSeconds` — max seconds one heartbeat can earn (default 120).
-  Raise for more generous totals, lower for stricter ones.
-- `agent.intervalSeconds` — tick rate (default 20s).
-- `agent.projectAliases` — canonical names keyed by repository path, normalized
-  Git remote (`github.com/owner/repo`), or detected label.
-- `agent.apps` — which macOS apps to track and how to label them.
-- `agent.ignoreDirs` / `maxScanDepth` — file-scan noise control.
-
-The credit model is ~40 lines in `src/summarize.js`; the watchers are one small
-file each under `src/agent/`. Fork away.
-
-## Notes & limits
-
-- Codex **cloud** tasks and Claude/ChatGPT **web** usage never touch local disk —
-  invisible to any local tracker.
-- Pure Claude Desktop chat has no local transcript; it's tracked only via the
-  macOS frontmost-app watcher (app-level, not per-conversation).
-- The transcript formats (`~/.claude`, `~/.codex`) are undocumented and may
-  drift; watchers fail soft (skip unparseable lines).
-- Keep the server on a trusted network (Tailscale recommended); the dashboard
-  has no auth, and ingest is protected only by the shared token.
+- Codex cloud tasks and Claude/ChatGPT web sessions do not write local watcher
+  data and are invisible.
+- Pure Claude Desktop chat has no local transcript and is tracked only through
+  macOS focused-app activity.
+- Claude, Codex, and Zed storage formats are undocumented. Watchers skip
+  malformed records, report errors and likely schema drift, and retain their
+  offline queue.
+- Zed thread rows currently lack reliable project attribution and are reported
+  as `zed-agent`.
+- The dashboard and read APIs are unauthenticated. Keep the server behind
+  Tailscale, a VPN, or an authenticated reverse proxy.

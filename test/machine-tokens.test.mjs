@@ -8,6 +8,7 @@ import { afterEach, test } from 'node:test';
 import { runAgent, saveQueue } from '../src/agent/index.js';
 import { startServer } from '../src/server.js';
 import { initServer, writeConfig } from '../src/setup.js';
+import { parseEnrollment } from '../src/setup.js';
 import {
   createMachineToken,
   listMachineTokens,
@@ -253,6 +254,28 @@ test('token command creates and rotates only the named credential and has secret
   output.clear();
   assert.throws(() => runToken(['unknown'], { configPath: file, stdout: output.stdout }), /usage:/);
   assert.equal(output.read(), '');
+});
+
+test('token command emits a copy-paste enrollment command when the server has a public URL', () => {
+  const file = configPath();
+  writeConfig(file, { server: { publicUrl: 'https://stackhour.example.test/', tokens: {} } });
+  const output = captureOutput();
+  const result = runToken(['create', 'macbook', '--token=created-secret'], {
+    configPath: file, stdout: output.stdout,
+  });
+  assert.equal(result.serverUrl, 'https://stackhour.example.test');
+  assert.deepEqual(parseEnrollment(result.enrollment), {
+    serverUrl: 'https://stackhour.example.test', machine: 'macbook', token: 'created-secret',
+  });
+  assert.match(output.read(), /\.\/bin\/stackhour init agent --enrollment=[A-Za-z0-9_-]+ --install/);
+  assert.doesNotMatch(output.read(), /created-secret/);
+
+  output.clear();
+  const raw = runToken(['create', 'linux', '--token=linux-secret', '--raw'], {
+    configPath: file, stdout: output.stdout,
+  });
+  assert.deepEqual(raw, { machine: 'linux', token: 'linux-secret' });
+  assert.equal(output.read(), 'Token for linux: linux-secret\n');
 });
 
 test('server initialization enrolls the local agent in server.tokens with a matching credential', () => {

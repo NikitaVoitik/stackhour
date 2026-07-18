@@ -1,6 +1,7 @@
 [Unit]
 Description=Stackhour coding time-tracking server
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 ExecStart=%h/stackhour/bin/stackhour serve

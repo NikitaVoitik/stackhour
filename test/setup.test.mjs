@@ -6,10 +6,12 @@ import path from 'node:path';
 import { afterEach, test } from 'node:test';
 
 import {
+  createEnrollment,
   generateToken,
   initAgent,
   initServer,
   optionValues,
+  parseEnrollment,
   runInit,
   writeConfig,
 } from '../src/setup.js';
@@ -95,6 +97,7 @@ test('server initialization creates secure defaults and a matching local agent',
   assert.equal(result.configPath, file);
   assert.equal(saved.server.host, '0.0.0.0');
   assert.equal(saved.server.port, 4040);
+  assert.equal(saved.server.publicUrl, 'http://127.0.0.1:4040');
   assert.equal(saved.server.tokens[os.hostname()], result.token);
   assert.equal(Buffer.from(result.token, 'base64url').length, 32);
   assert.equal(path.basename(saved.server.db), 'stackhour.db');
@@ -118,6 +121,7 @@ test('server initialization validates port, host, machine, and explicit token be
     [{ machine: '' }, /machine/i],
     [{ machine: '   ' }, /machine/i],
     [{ token: '' }, /token/i],
+    [{ publicUrl: 'ftp://example.test' }, /http or https/i],
   ];
 
   for (const [options, error] of invalid) {
@@ -125,6 +129,56 @@ test('server initialization validates port, host, machine, and explicit token be
     assert.throws(() => initServer({ configPath: file, ...options }), error);
     assert.equal(fs.existsSync(file), false);
   }
+});
+
+test('enrollment codes round-trip URL, machine, and token without exposing structure', () => {
+  const enrollment = createEnrollment({
+    serverUrl: 'https://stackhour.example.test/', machine: 'macbook', token: 'private-token',
+  });
+  assert.match(enrollment, /^[A-Za-z0-9_-]+$/);
+  assert.doesNotMatch(enrollment, /private-token|macbook|stackhour/);
+  assert.deepEqual(parseEnrollment(enrollment), {
+    serverUrl: 'https://stackhour.example.test', machine: 'macbook', token: 'private-token',
+  });
+  for (const invalid of ['', 'not base64!', Buffer.from('{}').toString('base64url'), Buffer.from(JSON.stringify({ v: 2 })).toString('base64url')]) {
+    assert.throws(() => parseEnrollment(invalid), /enrollment code/);
+  }
+});
+
+test('agent initialization consumes an enrollment code with project roots', () => {
+  const dir = tempDir();
+  const root = path.join(dir, 'projects');
+  const file = path.join(dir, 'config.json');
+  fs.mkdirSync(root);
+  const enrollment = createEnrollment({ serverUrl: 'https://tempo.example.test', machine: 'mac', token: 'secret' });
+  const result = initAgent({ configPath: file, enrollment, projectRoots: [root] });
+  assert.deepEqual(result.agent, {
+    serverUrl: 'https://tempo.example.test', token: 'secret', machine: 'mac', projectRoots: [root],
+  });
+  assert.throws(() => initAgent({
+    configPath: path.join(dir, 'other.json'), enrollment, serverUrl: 'https://other.test', force: true,
+  }), /do not combine/);
+});
+
+test('runInit installs an enrolled agent without printing its credential', () => {
+  const dir = tempDir();
+  const root = path.join(dir, 'projects');
+  fs.mkdirSync(root);
+  const enrollment = createEnrollment({ serverUrl: 'https://stackhour.test', machine: 'laptop', token: 'hidden-token' });
+  const installed = [];
+  let output = '';
+  const result = runInit([
+    'agent', `--enrollment=${enrollment}`, `--project-root=${root}`, '--install',
+  ], {
+    configPath: path.join(dir, 'config.json'),
+    installer: (role) => { installed.push(role); return { role }; },
+    stdout: { write: (value) => { output += value; } },
+  });
+  assert.equal(result.agent.machine, 'laptop');
+  assert.deepEqual(installed, ['agent']);
+  assert.match(output, /Enrolled laptop with https:\/\/stackhour\.test/);
+  assert.match(output, /stackhour doctor/);
+  assert.doesNotMatch(output, /hidden-token/);
 });
 
 test('agent initialization normalizes its URL and project roots', () => {
@@ -299,20 +353,26 @@ test('runInit applies repeated CLI options while output excludes preserved secre
   assert.doesNotMatch(output, /new-agent-secret|preserved-server-secret|unrelated-api-secret/);
 });
 
-test('server init output reveals only the newly generated enrollment token', () => {
+test('server init output shows actionable next steps without revealing credentials', () => {
   const file = configPath();
   writeConfig(file, {
     agent: { serverUrl: 'https://old.test', token: 'preserved-agent-secret', machine: 'mac', projectRoots: [] },
     wakatime: { apiKey: 'unrelated-api-secret' },
   });
   let output = '';
-  const result = runInit(['server', '--host=127.0.0.1', '--port=4141'], {
+  const installed = [];
+  const result = runInit(['server', '--host=127.0.0.1', '--port=4141', '--public-url=https://stackhour.test', '--install'], {
     configPath: file,
     stdout: { write: (chunk) => { output += chunk; } },
+    installer: (role) => { installed.push(role); return { role }; },
   });
 
   assert.match(output, /Created server config/);
-  assert.match(output, new RegExp(result.token));
+  assert.match(output, /Public URL: https:\/\/stackhour\.test/);
+  assert.match(output, /token create <machine>/);
+  assert.deepEqual(installed, ['server', 'agent']);
+  assert.equal(result.server.publicUrl, 'https://stackhour.test');
+  assert.doesNotMatch(output, new RegExp(result.token));
   assert.doesNotMatch(output, /preserved-agent-secret|unrelated-api-secret/);
 });
 

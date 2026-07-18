@@ -2,6 +2,7 @@
   "server": {
     "port": 4040,
     "host": "0.0.0.0",
+    "publicUrl": "http://stackhour-server:4040",
     "tokens": { "linux-server": "generate-a-long-random-string" }
   },
   "agent": {

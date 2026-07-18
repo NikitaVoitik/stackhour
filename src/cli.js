@@ -21,6 +21,10 @@ if (cmd === 'doctor') {
   const { runBackup } = await import('./backup.js');
   try { await runBackup(process.argv.slice(3)); }
   catch (err) { console.error(`stackhour backup: ${err.message}`); process.exitCode = 1; }
+} else if (cmd === 'install') {
+  const { runInstall } = await import('./install.js');
+  try { runInstall(process.argv.slice(3)); }
+  catch (err) { console.error(`stackhour install: ${err.message}`); process.exitCode = 1; }
 } else {
   const cfg = loadConfig();
 
@@ -60,12 +64,12 @@ usage: stackhour <command>
   import-wakatime [--days=365]   backfill history from wakatime.com
   status            print today's totals from the server
   doctor [--json]   check config, inputs, database, server, and services
-  init server [--host=0.0.0.0] [--port=4040] [--machine=NAME]
-                    create server + local-agent config and a secure token
-  init agent --server-url=URL --token=TOKEN [--machine=NAME]
-             [--project-root=PATH ...] [--force]
-                    create config for an agent machine
-  token create MACHINE [--force]   create or rotate a machine token
+  init server [--public-url=URL] [--project-root=PATH ...] [--install]
+                    configure the server and its local agent
+  init agent --enrollment=CODE [--project-root=PATH ...] [--install]
+                    enroll and optionally install an agent service
+  token create MACHINE [--force] [--raw] [--server-url=URL]
+                    enroll a machine and print its copy-paste command
   token list                       list enrolled machines (never secrets)
   token revoke MACHINE             revoke a machine token
   data stats [--json]              inspect local database size and coverage
@@ -77,6 +81,7 @@ usage: stackhour <command>
                                    create and verify a consistent snapshot
   backup verify FILE               integrity-check a backup
   backup restore FILE [--confirm]  preview or restore, preserving old DB
+  install <server|agent>           install and start user service(s)
 
 config: ${CONFIG_PATH}`);
   }
