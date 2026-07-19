@@ -88,6 +88,13 @@ pub fn load_with_defaults(dir: &Path, default_target: &str, default_engine: &str
             continue;
         };
         let migrated = format!("{target}:{DEFAULT_ENGINE}");
+        // DIVERGENCE (deliberate, see tests/session_state_parity.rs): the JS
+        // guard is `!s.sessions[`${target}:claude`]` — a TRUTHINESS test. A
+        // slot cleared by /new holds `null`, which is falsy, so the JS
+        // re-migrates the bare legacy key over it on the next restart and
+        // RESURRECTS the session the user just cleared. (Reachable on the
+        // owner's live state.json today: its bare "mac" key holds a string.)
+        // Keying off PRESENCE makes /new stick across a restart.
         if !sessions.contains_key(&migrated) {
             sessions.insert(migrated, Some(legacy));
         }
