@@ -952,18 +952,10 @@ mod tests {
     }
 
     fn mk_agent(name: &str, engine: &str, skills: &[&str]) -> AgentDef {
-        AgentDef {
-            name: name.to_string(),
-            label: name.to_string(),
-            engine: engine.to_string(),
-            model: None,
-            soul: Soul::new(PathBuf::from("/nonexistent/soul.md")),
-            skills: skills.iter().map(|s| s.to_string()).collect(),
-            permission_mode: "default".to_string(),
-            cwd: None,
-            prompt_template: None,
-            tools: ToolPolicy::default(),
-        }
+        // AgentDef carries a private field (permission_mode_explicit), so it
+        // is built through its constructor rather than a struct literal.
+        AgentDef::new(name, Path::new("/nonexistent"), engine)
+            .with_skills(skills.iter().map(|s| s.to_string()).collect())
     }
 
     fn mk_command(name: &str, kind: CommandKind, agent: Option<&str>, template: Option<&str>) -> CommandDef {

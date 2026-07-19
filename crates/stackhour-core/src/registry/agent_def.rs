@@ -55,7 +55,7 @@ use std::time::SystemTime;
 
 use super::cycle::MAX_DEPTH;
 use super::error::FieldError;
-use super::toml_util::{opt_enum, opt_nonempty_string, opt_string, opt_table, root_table, string_list};
+use super::toml_util::{opt_enum, opt_nonempty_string, opt_table, root_table, string_list};
 use super::{Registry, RegistryEntityKind, RegistryError};
 
 /// Engine-specific tool allow/deny policy strings, passed through the
@@ -583,10 +583,13 @@ mod tests {
         f.set_modified(new).expect("set_modified");
     }
 
-    /// A registry containing exactly these agents (everything else default),
-    /// so soul composition can be exercised without touching the disk loader.
+    /// A registry containing exactly these agents (everything else shipped
+    /// defaults), so soul composition can be exercised without laying out a
+    /// whole config tree on disk. Loading a non-existent dir is the
+    /// "built-ins only" path, which is deliberately cheap.
     fn reg_with(agents: Vec<AgentDef>) -> Registry {
-        let mut reg = Registry::empty();
+        let mut reg = crate::registry::load(Path::new("/nonexistent-stackhour-config"));
+        reg.agents.clear();
         for def in agents {
             reg.agents.insert(def.name.clone(), def);
         }
