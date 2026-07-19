@@ -71,6 +71,31 @@ fn default_watchers() -> Vec<Box<dyn Watcher>> {
     vec![Box::new(watch_files::FilesWatcher)]
 }
 
+/// Node's `setTimeout` ceiling, `TIMEOUT_MAX` = 2^31-1 milliseconds (~24.8
+/// days). Anything above it is not a real interval, it is a typo.
+const TIMEOUT_MAX_SECONDS: f64 = 2_147_483_647.0 / 1000.0;
+
+/// Turn `agent.intervalSeconds` into a sleep duration that can never panic.
+///
+/// `intervalSeconds` reaches us straight out of a JS-semantics `Number()`
+/// coercion with no range validation, so it can be negative, NaN, infinite or
+/// absurdly large. `Duration::from_secs_f64` panics on NaN and on anything
+/// past ~1.8e19 seconds, which used to abort the agent with exit 101 AFTER a
+/// successful first tick — invisible to `--once` and a restart-loop under
+/// systemd.
+///
+/// Floor at 1s (as before) and ceil at Node's own timer maximum. Node
+/// technically wraps an over-large `setTimeout` delay down to 1ms, which
+/// would busy-loop; clamping up to the ceiling is the same "keep running"
+/// outcome without burning a core.
+fn tick_interval(interval_seconds: f64) -> Duration {
+    // NaN survives neither comparison, so name it explicitly.
+    if interval_seconds.is_nan() {
+        return Duration::from_secs(1);
+    }
+    Duration::from_secs_f64(interval_seconds.clamp(1.0, TIMEOUT_MAX_SECONDS))
+}
+
 fn unix_now() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -304,9 +329,47 @@ pub fn run_agent(cfg: &Config, once: bool) -> Result<Value> {
 
     // Sleep AFTER the tick (a drifting loop, matching the JS `setTimeout`
     // chain) so a slow tick can never queue up overlapping runs.
-    let interval = Duration::from_secs_f64(cfg.agent.interval_seconds.max(1.0));
+    let interval = tick_interval(cfg.agent.interval_seconds);
     loop {
         std::thread::sleep(interval);
         tick(cfg, &data_dir, &mut watchers);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression: `agent.intervalSeconds` is an unvalidated JS `Number()`
+    /// coercion, so a config typo like `1e20` used to reach
+    /// `Duration::from_secs_f64` and panic (exit 101) after the first
+    /// successful tick. Every hostile value must produce a finite Duration.
+    #[test]
+    fn tick_interval_never_panics_on_hostile_config_values() {
+        for hostile in [
+            1e20,
+            f64::MAX,
+            f64::INFINITY,
+            f64::NAN,
+            f64::NEG_INFINITY,
+            -1.0,
+            0.0,
+        ] {
+            let d = tick_interval(hostile);
+            assert!(d >= Duration::from_secs(1), "{hostile} floored below 1s");
+            assert!(
+                d <= Duration::from_secs_f64(TIMEOUT_MAX_SECONDS),
+                "{hostile} exceeded the timer ceiling"
+            );
+        }
+    }
+
+    /// Sane values pass through untouched, including sub-second ones being
+    /// floored to exactly 1s the way the old `.max(1.0)` did.
+    #[test]
+    fn tick_interval_preserves_ordinary_values() {
+        assert_eq!(tick_interval(20.0), Duration::from_secs(20));
+        assert_eq!(tick_interval(0.5), Duration::from_secs(1));
+        assert_eq!(tick_interval(1.5), Duration::from_secs_f64(1.5));
     }
 }
