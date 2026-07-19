@@ -130,7 +130,10 @@ mod tests {
             "{\"time\":1}\n{ truncated\n\n{\"time\":2}\n",
         )
         .unwrap();
-        assert_eq!(read_queue(tmp.path()), vec![json!({"time":1}), json!({"time":2})]);
+        assert_eq!(
+            read_queue(tmp.path()),
+            vec![json!({"time":1}), json!({"time":2})]
+        );
     }
 
     /// The queue holds heartbeats for an unreachable server; it must not be

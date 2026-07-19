@@ -50,7 +50,8 @@ const FRONTMOST_SCRIPT: &str = r#"
       return appName & linefeed & winTitle
     end tell"#;
 
-const IDLE_SCRIPT: &str = "ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'";
+const IDLE_SCRIPT: &str =
+    "ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'";
 
 fn real_runner(program: &str, args: &[&str]) -> std::io::Result<String> {
     let out = std::process::Command::new(program).args(args).output()?;
@@ -289,7 +290,9 @@ mod tests {
         let cfg = crate::test_config(json!({
             "agent": {"idleSeconds": 300, "apps": {"Zed": {"source": "zed", "category": "coding"}}}
         }));
-        let mut w = MacWatcher { runner: Some(runner) };
+        let mut w = MacWatcher {
+            runner: Some(runner),
+        };
         let rows = w.run(&cfg, &mut json!({}), 1234.0).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["actor"], "human");
@@ -310,7 +313,9 @@ mod tests {
             })
         }
         let cfg = crate::test_config(json!({"agent": {"idleSeconds": 300}}));
-        let mut w = MacWatcher { runner: Some(runner) };
+        let mut w = MacWatcher {
+            runner: Some(runner),
+        };
         assert!(w.run(&cfg, &mut json!({}), 1.0).unwrap().is_empty());
     }
 }

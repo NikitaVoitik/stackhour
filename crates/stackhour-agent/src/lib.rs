@@ -287,7 +287,9 @@ pub fn tick(cfg: &Config, data_dir: &Path, watchers: &mut [Box<dyn Watcher>]) ->
                 } else {
                     format!(", {} queued", remaining.len())
                 };
-                println!("[stackhour] sent {take} heartbeats ({inserted} new{tail})");
+                println!(
+                    "[stackhour] sent {take} heartbeats ({inserted} new{tail})"
+                );
             }
             Err(e) => {
                 server_failed = true;
@@ -443,3 +445,4 @@ mod tests {
         assert_eq!(tick_interval(1.5), Duration::from_secs_f64(1.5));
     }
 }
+

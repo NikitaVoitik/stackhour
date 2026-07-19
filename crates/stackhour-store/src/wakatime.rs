@@ -377,7 +377,10 @@ mod tests {
     fn empty_body_imports_nothing() {
         let db = open_mem();
         assert_eq!(apply_summaries(&db, &json!({})).expect("apply"), 0);
-        assert_eq!(apply_summaries(&db, &json!({"data": null})).expect("apply"), 0);
+        assert_eq!(
+            apply_summaries(&db, &json!({"data": null})).expect("apply"),
+            0
+        );
     }
 
     /// The Authorization header is base64 of the raw key with NO trailing

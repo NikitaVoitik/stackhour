@@ -73,7 +73,9 @@ fn uri_encode_path(path: &Path) -> String {
     let mut out = String::with_capacity(raw.len());
     for b in raw.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{b:02X}")),
         }
     }
@@ -155,7 +157,8 @@ pub fn open_db(path: &Path) -> Result<Connection> {
     // `PRAGMA journal_mode` returns a row, so it must not go through
     // execute_batch's execute() path (which can reject result-producing
     // statements depending on rusqlite's feature flags).
-    db.pragma_update(None, "busy_timeout", 5000i64).map_err(sql_err)?;
+    db.pragma_update(None, "busy_timeout", 5000i64)
+        .map_err(sql_err)?;
     db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))
         .map_err(sql_err)?;
 
@@ -172,12 +175,16 @@ pub fn open_db(path: &Path) -> Result<Connection> {
             db.execute_batch(ACTOR_MIGRATION).map_err(sql_err)?;
         }
         if !has("tokens_in") {
-            db.execute_batch("ALTER TABLE heartbeats ADD COLUMN tokens_in INTEGER NOT NULL DEFAULT 0")
-                .map_err(sql_err)?;
+            db.execute_batch(
+                "ALTER TABLE heartbeats ADD COLUMN tokens_in INTEGER NOT NULL DEFAULT 0",
+            )
+            .map_err(sql_err)?;
         }
         if !has("tokens_out") {
-            db.execute_batch("ALTER TABLE heartbeats ADD COLUMN tokens_out INTEGER NOT NULL DEFAULT 0")
-                .map_err(sql_err)?;
+            db.execute_batch(
+                "ALTER TABLE heartbeats ADD COLUMN tokens_out INTEGER NOT NULL DEFAULT 0",
+            )
+            .map_err(sql_err)?;
         }
         if !has("cost") {
             db.execute_batch("ALTER TABLE heartbeats ADD COLUMN cost REAL NOT NULL DEFAULT 0")
@@ -215,7 +222,9 @@ pub fn open_immutable(path: &Path) -> Result<Connection> {
     let uri = format!("file:{}?immutable=1", uri_encode_path(path));
     Connection::open_with_flags(
         uri,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_URI
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(sql_err)
 }
@@ -435,7 +444,11 @@ fn heartbeat_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Heartbeat> {
     })
 }
 
-fn collect_heartbeats(db: &Connection, sql: &str, params: &[&dyn rusqlite::ToSql]) -> Result<Vec<Heartbeat>> {
+fn collect_heartbeats(
+    db: &Connection,
+    sql: &str,
+    params: &[&dyn rusqlite::ToSql],
+) -> Result<Vec<Heartbeat>> {
     let mut stmt = db.prepare(sql).map_err(sql_err)?;
     let rows = stmt.query_map(params, heartbeat_from_row).map_err(sql_err)?;
     let mut out = Vec::new();
@@ -869,7 +882,12 @@ mod tests {
         assert_eq!(r["clockSkewSeconds"], json!(5));
         assert_eq!(r["watchers"], json!({"editor": {"enabled": true}}));
         // camelCase key order is part of the response shape.
-        let keys: Vec<&str> = r.as_object().expect("obj").keys().map(String::as_str).collect();
+        let keys: Vec<&str> = r
+            .as_object()
+            .expect("obj")
+            .keys()
+            .map(String::as_str)
+            .collect();
         assert_eq!(
             keys,
             vec![
@@ -920,7 +938,8 @@ mod tests {
         }
         // An explicit null is Number(null) === 0 and IS accepted, unlike an
         // absent key (undefined -> NaN), which is rejected above.
-        upsert_agent_status(&db, &json!({"time": null, "machine": "nul"}), 1.0).expect("null time is 0");
+        upsert_agent_status(&db, &json!({"time": null, "machine": "nul"}), 1.0)
+            .expect("null time is 0");
         // Number("7") coerces here (unlike heartbeat time).
         upsert_agent_status(&db, &json!({"time": "7", "machine": "box"}), 9.0).expect("string time");
         let r = list_agent_status(&db, 9.0).expect("list").remove(0);
@@ -972,7 +991,8 @@ mod tests {
     fn agent_status_age_clamps_and_skew_does_not() {
         let (_dir, db) = temp_db();
         // Agent clock ahead of the server: skew is negative and stays negative.
-        let ack = upsert_agent_status(&db, &json!({"time": 500.0, "machine": "box"}), 100.0).expect("up");
+        let ack =
+            upsert_agent_status(&db, &json!({"time": 500.0, "machine": "box"}), 100.0).expect("up");
         assert_eq!(ack.clock_skew_seconds, -400.0);
         // `now` before received_at: ageSeconds clamps at 0.
         let r = list_agent_status(&db, 50.0).expect("list").remove(0);

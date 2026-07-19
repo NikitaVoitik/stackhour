@@ -133,7 +133,8 @@ impl Drop for TmpGuard {
 fn finalize_snapshot(file: &Path) -> Result<()> {
     {
         let db = Connection::open(file).map_err(sql_err)?;
-        db.pragma_update(None, "busy_timeout", 5000i64).map_err(sql_err)?;
+        db.pragma_update(None, "busy_timeout", 5000i64)
+            .map_err(sql_err)?;
         // PRAGMA wal_checkpoint(TRUNCATE) -> (busy, log, checkpointed).
         let busy: i64 = db
             .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
@@ -190,7 +191,9 @@ pub fn verify_backup(path: &Path) -> Result<BackupInfo> {
         })
         .map_err(sql_err)?;
     if !tables.iter().any(|name| name == "heartbeats") {
-        return Err(Error::msg("not a Stackhour database (heartbeats table missing)"));
+        return Err(Error::msg(
+            "not a Stackhour database (heartbeats table missing)",
+        ));
     }
 
     let heartbeats: i64 = db
@@ -219,7 +222,12 @@ fn default_destination(source: &Path, now_ms: i64) -> PathBuf {
 
 /// Create a verified backup of `db_path`. `now_ms` feeds the
 /// `stackhour-backup-<iso-with-dashes>.db` default filename.
-pub fn create_backup(db_path: &Path, output: Option<&Path>, force: bool, now_ms: i64) -> Result<BackupInfo> {
+pub fn create_backup(
+    db_path: &Path,
+    output: Option<&Path>,
+    force: bool,
+    now_ms: i64,
+) -> Result<BackupInfo> {
     let source_path = resolve_path(db_path);
     require_file(&source_path, "database")?;
 
@@ -364,7 +372,9 @@ pub fn run_backup_cli(cfg: &Config, args: &[String]) -> Result<()> {
             Ok(())
         }
         Some("restore") => {
-            let file = args.get(1).ok_or_else(|| Error::msg("backup file is required"))?;
+            let file = args
+                .get(1)
+                .ok_or_else(|| Error::msg("backup file is required"))?;
             let result = restore_backup(
                 &cfg.server.db,
                 Path::new(file),
@@ -512,7 +522,10 @@ mod tests {
         let err = create_backup(&source, Some(&custom), false, 0).expect_err("must refuse");
         assert_eq!(
             err.message(),
-            format!("backup exists: {}; pass --force to replace it", custom.display())
+            format!(
+                "backup exists: {}; pass --force to replace it",
+                custom.display()
+            )
         );
         assert_eq!(entities(&custom), vec!["old-output"]);
 
@@ -578,7 +591,10 @@ mod tests {
         let err = create_backup(&missing, None, false, 0).expect_err("must fail");
         assert_eq!(
             err.message(),
-            format!("database does not exist or is not a file: {}", missing.display())
+            format!(
+                "database does not exist or is not a file: {}",
+                missing.display()
+            )
         );
     }
 
@@ -619,7 +635,10 @@ mod tests {
         let missing = dir.path().join("missing.db");
         assert_eq!(
             verify_backup(&missing).expect_err("missing").message(),
-            format!("backup does not exist or is not a file: {}", missing.display())
+            format!(
+                "backup does not exist or is not a file: {}",
+                missing.display()
+            )
         );
         assert!(verify_backup(dir.path())
             .expect_err("directory")
@@ -648,7 +667,10 @@ mod tests {
 
     #[test]
     fn resolve_path_normalizes_lexically() {
-        assert_eq!(resolve_path(Path::new("/a/b/../c/./d")), PathBuf::from("/a/c/d"));
+        assert_eq!(
+            resolve_path(Path::new("/a/b/../c/./d")),
+            PathBuf::from("/a/c/d")
+        );
         assert_eq!(resolve_path(Path::new("/..")), PathBuf::from("/"));
         assert_eq!(resolve_path(Path::new("/a/")), PathBuf::from("/a"));
         let cwd = std::env::current_dir().expect("cwd");

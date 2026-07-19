@@ -258,7 +258,8 @@ mod tests {
     #[test]
     fn round_trips_through_json() {
         let hb = sample();
-        let back: Heartbeat = serde_json::from_str(&serde_json::to_string(&hb).expect("ser")).expect("de");
+        let back: Heartbeat =
+            serde_json::from_str(&serde_json::to_string(&hb).expect("ser")).expect("de");
         assert_eq!(back, hb);
     }
 

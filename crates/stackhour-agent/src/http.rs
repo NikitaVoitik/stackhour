@@ -15,7 +15,13 @@ const INGEST_TIMEOUT: Duration = Duration::from_secs(10);
 const STATUS_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// One POST with the shared header shape. Returns the parsed JSON body.
-fn post(server_url: &str, token: &str, endpoint: &str, body: &Value, timeout: Duration) -> Result<Value> {
+fn post(
+    server_url: &str,
+    token: &str,
+    endpoint: &str,
+    body: &Value,
+    timeout: Duration,
+) -> Result<Value> {
     let client = reqwest::blocking::Client::builder()
         .timeout(timeout)
         .build()
@@ -33,7 +39,10 @@ fn post(server_url: &str, token: &str, endpoint: &str, body: &Value, timeout: Du
     let res = req.send().map_err(|e| Error::msg(e.to_string()))?;
     let status = res.status();
     if !status.is_success() {
-        return Err(Error::msg(format!("{endpoint} failed: HTTP {}", status.as_u16())));
+        return Err(Error::msg(format!(
+            "{endpoint} failed: HTTP {}",
+            status.as_u16()
+        )));
     }
     res.json().map_err(|e| Error::msg(e.to_string()))
 }
@@ -50,7 +59,13 @@ pub fn post_ingest(server_url: &str, token: &str, rows: &[Value]) -> Result<i64>
 /// Never returns an error: a lost health report is cosmetic, and letting it
 /// fail a tick would drop real heartbeats on the floor.
 pub fn post_status(server_url: &str, token: &str, report: &Value) {
-    if let Err(e) = post(server_url, token, "/api/agent-status", report, STATUS_TIMEOUT) {
+    if let Err(e) = post(
+        server_url,
+        token,
+        "/api/agent-status",
+        report,
+        STATUS_TIMEOUT,
+    ) {
         eprintln!("[stackhour] health report failed: {}", e.message());
     }
 }
@@ -133,15 +148,19 @@ mod tests {
         let (url, rx) = one_shot(Box::leak(ok_response(r#"{"inserted":0}"#).into_boxed_str()));
         post_ingest(&url, "", &[json!({ "time": 1 })]).unwrap();
         let raw = rx.recv().unwrap();
-        assert!(!raw.to_lowercase().contains("authorization"), "got: {raw}");
+        assert!(
+            !raw.to_lowercase().contains("authorization"),
+            "got: {raw}"
+        );
     }
 
     /// A rejected batch must surface as an error so the caller KEEPS the
     /// queue rather than dropping it.
     #[test]
     fn a_non_2xx_response_is_an_error_naming_the_status() {
-        let (url, _rx) =
-            one_shot("HTTP/1.1 401 Unauthorized\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
+        let (url, _rx) = one_shot(
+            "HTTP/1.1 401 Unauthorized\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+        );
         let err = post_ingest(&url, "bad", &[json!({ "time": 1 })]).unwrap_err();
         assert_eq!(err.message(), "/api/ingest failed: HTTP 401");
     }
@@ -164,8 +183,9 @@ mod tests {
     #[test]
     fn status_failures_are_swallowed() {
         post_status("http://127.0.0.1:1", "t", &json!({ "machine": "box" }));
-        let (url, _rx) =
-            one_shot("HTTP/1.1 500 Internal Server Error\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
+        let (url, _rx) = one_shot(
+            "HTTP/1.1 500 Internal Server Error\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+        );
         post_status(&url, "t", &json!({ "machine": "box" }));
     }
 
@@ -176,6 +196,9 @@ mod tests {
         let raw = rx.recv().unwrap();
         assert!(raw.starts_with("POST /api/agent-status "), "got: {raw}");
         let body = raw.split("\r\n\r\n").nth(1).unwrap();
-        assert_eq!(serde_json::from_str::<Value>(body).unwrap()["queueDepth"], 3);
+        assert_eq!(
+            serde_json::from_str::<Value>(body).unwrap()["queueDepth"],
+            3
+        );
     }
 }
