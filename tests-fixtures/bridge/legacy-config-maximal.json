@@ -1,0 +1,25 @@
+{
+  "token": "222222:TEST-BOT-TOKEN-NOT-REAL-BBBBBBBBBBBBBBBBBBBB",
+  "chatId": 2,
+  "defaultTarget": "mac",
+  "maxMediaBytes": 536870912,
+  "targets": {
+    "gcp": {
+      "label": "☁️ GCP",
+      "type": "local",
+      "cwd": "/home/testuser",
+      "claudeBin": "/home/testuser/.local/bin/claude",
+      "codexBin": "/home/testuser/.local/bin/codex",
+      "extraPath": "/home/testuser/.local/bin:/usr/bin:/bin",
+      "permissionMode": "default",
+      "model": "claude-test-model",
+      "codexModel": "codex-test-model"
+    },
+    "mac": {
+      "label": "🖥️ Mac",
+      "type": "worker",
+      "permissionMode": "default"
+    }
+  },
+  "elevenLabsApiKey": ""
+}
