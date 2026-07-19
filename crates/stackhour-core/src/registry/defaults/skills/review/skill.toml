@@ -1,0 +1,19 @@
+# A skill is a reusable prompt fragment plus the tool policy and environment
+# it needs. Agents list skills by name; the bodies are appended to the system
+# prompt under a "## Skills" heading, in the order the agent declares them.
+#
+# The skill's name is the DIRECTORY name — "review" — not a key in this file.
+
+description = "Careful code review with a fixed rubric"
+
+# Prose body, relative to this directory. Re-read whenever its mtime changes,
+# so you can iterate on the wording between messages without restarting.
+body = "skill.md"
+
+# Narrow what the engine may do while this skill is active. deny wins.
+[tools]
+allow = ["Read", "Grep", "Glob", "Bash"]
+deny = ["Write", "Edit"]
+
+[env]
+REVIEW_STRICT = "1"

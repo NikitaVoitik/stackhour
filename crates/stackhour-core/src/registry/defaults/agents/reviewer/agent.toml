@@ -1,0 +1,28 @@
+# An agent binds an engine, a model and a soul document together. The agent's
+# name is the DIRECTORY name — "reviewer".
+
+label = "Reviewer"
+
+# Required, and cross-checked against the built-in engines plus anything in
+# engines/. Getting this wrong drops the agent and tells you the known names.
+engine = "claude"
+
+# Optional. Omitted = the engine's own default model.
+# model = "claude-sonnet-4-5"
+
+# Optional reasoning effort: "low" | "medium" | "high". Passed through only if
+# the engine declares effort_args; engines that have no such flag ignore it.
+# effort = "high"
+
+# The soul document, relative to this directory. Defaults to "soul.md".
+soul = "soul.md"
+
+# Skills to compose into the system prompt, by name.
+skills = ["review"]
+
+# "default" keeps the engine's approval prompts. "bypassPermissions" removes
+# them — only for agents you trust in directories you trust.
+permission_mode = "default"
+
+[tools]
+deny = ["WebSearch"]

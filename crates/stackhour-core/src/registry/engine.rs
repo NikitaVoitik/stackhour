@@ -51,6 +51,9 @@ const PLACEHOLDER_SESSION_ID: &str = "{{session_id}}";
 const PLACEHOLDER_MODEL: &str = "{{model}}";
 const PLACEHOLDER_PERMISSION_MODE: &str = "{{permission_mode}}";
 const PLACEHOLDER_SYSTEM_PROMPT: &str = "{{system_prompt}}";
+/// Substituted into `effort_args`. Engines that declare no `effort_args`
+/// silently ignore an agent's `effort` field.
+const PLACEHOLDER_EFFORT: &str = "{{effort}}";
 
 /// Which shipped stream parser to use for the child's stdout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,6 +132,11 @@ pub struct EngineDef {
     pub env: IndexMap<String, String>,
     /// Applied ONLY on the live-status (coordinator) lane.
     pub partial_messages_flag: Option<String>,
+    /// e.g. `["--reasoning-effort", "{{effort}}"]`. Spliced only when the
+    /// agent sets `effort`; `None` means this engine has no notion of effort
+    /// and an agent's `effort` is ignored rather than an error (engines are
+    /// swappable, so a soft ignore is the right failure mode).
+    pub effort_args: Option<Vec<String>>,
 }
 
 /// Spawn-time template variables for [`EngineDef::assemble_argv`].
@@ -139,6 +147,9 @@ pub struct ArgvVars<'a> {
     /// None renders as `default` (JS: `tgt.permissionMode || 'default'`).
     pub permission_mode: Option<&'a str>,
     pub system_prompt: Option<&'a str>,
+    /// Agent reasoning effort ("low" | "medium" | "high"); `None` = the
+    /// engine's own default and `effort_args` is not spliced at all.
+    pub effort: Option<&'a str>,
     /// true on the coordinator's local lane (enables partial_messages_flag).
     pub live_status: bool,
 }
@@ -152,6 +163,7 @@ fn subst(template: &str, vars: &ArgvVars<'_>) -> String {
             vars.permission_mode.unwrap_or("default"),
         )
         .replace(PLACEHOLDER_SYSTEM_PROMPT, vars.system_prompt.unwrap_or(""))
+        .replace(PLACEHOLDER_EFFORT, vars.effort.unwrap_or(""))
 }
 
 /// The built-in `claude` engine (argv byte-identical to coordinator.mjs/worker.mjs).
@@ -188,6 +200,8 @@ pub fn builtin_claude() -> EngineDef {
         prompt_delivery: PromptDelivery::Stdin,
         env: IndexMap::new(),
         partial_messages_flag: Some("--include-partial-messages".to_string()),
+        // Claude Code exposes no reasoning-effort flag today.
+        effort_args: None,
     }
 }
 
@@ -222,6 +236,9 @@ pub fn builtin_codex() -> EngineDef {
         prompt_delivery: PromptDelivery::Stdin,
         env: IndexMap::new(),
         partial_messages_flag: None,
+        // Left unset to preserve byte-parity with coordinator.mjs/worker.mjs,
+        // which never pass a reasoning-effort flag to codex.
+        effort_args: None,
     }
 }
 
@@ -272,6 +289,11 @@ impl EngineDef {
         splice_in(&mut out, self.permission_argv(vars.permission_mode));
         if vars.model.is_some() {
             if let Some(template) = &self.model_args {
+                splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
+            }
+        }
+        if vars.effort.is_some() {
+            if let Some(template) = &self.effort_args {
                 splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
             }
         }
@@ -395,6 +417,7 @@ impl EngineDef {
         let model_args = opt_string_array(table, "model_args")?;
         let permission_args = opt_string_array(table, "permission_args")?;
         let system_prompt_args = opt_string_array(table, "system_prompt_args")?;
+        let effort_args = opt_string_array(table, "effort_args")?;
 
         let prompt_delivery = match opt_string(table, "prompt")? {
             None => PromptDelivery::Stdin,
@@ -440,6 +463,7 @@ impl EngineDef {
             prompt_delivery,
             env,
             partial_messages_flag,
+            effort_args,
         })
     }
 }
@@ -901,5 +925,90 @@ flag = ["--resume", "{{session_id}}"]
             ..ArgvVars::default()
         };
         assert_eq!(def.assemble_argv(&vars), builtin.assemble_argv(&vars));
+    }
+
+    // ---- effort_args (agents' `effort`, spliced only when the engine opts in) ----
+
+    fn effort_engine() -> EngineDef {
+        EngineDef::from_toml(
+            "ollama",
+            &r#"
+bin = "ollama"
+kind = "plain-lines"
+args = ["run", "-"]
+effort_args = ["--reasoning-effort", "{{effort}}"]
+"#
+            .parse::<toml::Value>()
+            .unwrap(),
+        )
+        .expect("engine")
+    }
+
+    #[test]
+    fn effort_args_parse_from_toml() {
+        assert_eq!(
+            effort_engine().effort_args,
+            Some(vec!["--reasoning-effort".to_string(), "{{effort}}".to_string()])
+        );
+    }
+
+    #[test]
+    fn effort_args_are_spliced_when_the_agent_sets_effort() {
+        let def = effort_engine();
+        let vars = ArgvVars {
+            effort: Some("high"),
+            ..ArgvVars::default()
+        };
+        assert_eq!(
+            def.assemble_argv(&vars),
+            vec!["run", "--reasoning-effort", "high", "-"]
+        );
+    }
+
+    #[test]
+    fn effort_args_are_omitted_when_the_agent_sets_no_effort() {
+        let def = effort_engine();
+        assert_eq!(
+            def.assemble_argv(&ArgvVars::default()),
+            vec!["run", "-"]
+        );
+    }
+
+    #[test]
+    fn effort_on_an_engine_without_effort_args_is_silently_ignored() {
+        // Byte-parity guard: an agent may declare effort while running on
+        // claude/codex, which have no such flag. It must not leak into argv.
+        for def in [builtin_claude(), builtin_codex()] {
+            let with = ArgvVars {
+                effort: Some("high"),
+                live_status: true,
+                ..ArgvVars::default()
+            };
+            let without = ArgvVars {
+                live_status: true,
+                ..ArgvVars::default()
+            };
+            assert_eq!(def.assemble_argv(&with), def.assemble_argv(&without));
+        }
+    }
+
+    #[test]
+    fn effort_args_default_to_none_when_absent_from_toml() {
+        let def = EngineDef::from_toml(
+            "x",
+            &"bin = \"x\"\n".parse::<toml::Value>().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(def.effort_args, None);
+    }
+
+    #[test]
+    fn effort_args_must_be_an_array_of_strings() {
+        let err = EngineDef::from_toml(
+            "x",
+            &"bin = \"x\"\neffort_args = 3\n".parse::<toml::Value>().unwrap(),
+        )
+        .unwrap_err();
+        assert!(err.contains("effort_args"), "got: {err}");
     }
 }
