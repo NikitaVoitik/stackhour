@@ -13,7 +13,7 @@
 //! Telegram poller, so they are safe to run beside the live Node bridge.
 
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
@@ -440,9 +440,9 @@ fn known_gap_ship_target_is_not_carried_into_the_runtime_config() {
 }
 
 /// Every recursive file under `root`.
-fn walk(root: &PathBuf) -> Vec<PathBuf> {
+fn walk(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    let mut stack = vec![root.clone()];
+    let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
         let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;

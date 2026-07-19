@@ -4,16 +4,18 @@
 > bridge (`src/bridge/*.mjs`), reached through the `bin/stackhour` launcher.
 > That is the working implementation — use it.
 >
-> The Rust port of the bridge (`crates/stackhour-bridge`) is **incomplete and not
-> runnable**. `target/release/stackhour bridge` exits 1 with
-> `` `bridge` is not implemented in the Rust port yet ``. Roughly 46 function
-> bodies are still `todo!()`, concentrated in the Telegram HTTP client, the job
-> queue, config loading, message rendering, media handling, the installer, and
-> both daemon main loops. The supporting libraries that *are* finished — engine
-> spawning and stream parsing, soul composition, skill loading, the keyboard,
-> command dispatch, persisted state, and the config registry — are covered by
-> tests but have no daemon driving them. Do not follow the install instructions
-> below with the Rust binary; they will not work.
+> The Rust port of the bridge (`crates/stackhour-bridge`) is **partially
+> runnable**. `bridge migrate`, `bridge claim`, `bridge return`,
+> `bridge coordinator` and `bridge worker` exist and run; `bridge install`,
+> `bridge doctor`, `bridge status` and `bridge restart` are still `todo!()` and
+> exit 1 with `` `bridge` is not implemented in the Rust port yet ``. So the
+> install instructions below still do not work with the Rust binary — the
+> systemd unit has to be written by hand.
+>
+> The Rust coordinator has not yet been run against the real bot token. See
+> [docs/bridge-migration.md](bridge-migration.md) for the cutover runbook, the
+> verification order, the rollback, and an honest parity table (what is proven
+> equivalent, what is unproven, and what is known to differ).
 >
 > The Rust side additionally gains a config registry that the Node bridge does
 > not have: custom engines, agents, skills, commands, and prompt overrides
