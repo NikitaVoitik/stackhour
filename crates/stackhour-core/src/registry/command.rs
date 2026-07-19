@@ -14,7 +14,7 @@
 //! | `sequence` | run other commands in order, aborting on first failure    |
 //! | `builtin`  | EMBEDDED ONLY — the irreducible bridge verbs              |
 //!
-//! The nine verbs the JS coordinator registered with Telegram now live in
+//! The ten verbs the JS coordinator registered with Telegram now live in
 //! [`builtin_commands`], parsed from the embedded TOML text in
 //! [`BUILTIN_COMMANDS_TOML`], so the shipped table and a user's table are
 //! literally the same schema and `bridge init` can write that text out
@@ -1254,6 +1254,7 @@ rest = true
             ("codex", "Use Codex 🛠"),
             ("mac", "Run on the Mac 🖥️"),
             ("gcp", "Run on the GCP box ☁️"),
+            ("ship", "Ship a Blort task 🚀"),
             ("where", "Show active target & session"),
             ("new", "Fresh session on active target"),
             ("stop", "Kill/cancel the running job"),
@@ -1305,7 +1306,10 @@ rest = true
         ]));
         assert_eq!(
             table.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec!["claude", "codex", "mac", "gcp", "where", "new", "stop", "menu", "help", "deploy"]
+            vec![
+                "claude", "codex", "mac", "gcp", "ship", "where", "new", "stop", "menu",
+                "help", "deploy",
+            ]
         );
         assert_eq!(table["gcp"].description, "My GCP");
         assert_eq!(table["gcp"].kind, CommandKind::Shell);

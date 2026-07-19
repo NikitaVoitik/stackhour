@@ -122,7 +122,7 @@ fn a_legacy_config_json_with_none_of_the_new_sections_behaves_exactly_as_before(
     // /help still renders the Node help body verbatim.
     assert_eq!(
         baseline.commands.keys().collect::<Vec<_>>(),
-        ["claude", "codex", "mac", "gcp", "where", "new", "stop", "menu", "help"]
+        ["claude", "codex", "mac", "gcp", "ship", "where", "new", "stop", "menu", "help"]
             .iter()
             .collect::<Vec<_>>()
     );

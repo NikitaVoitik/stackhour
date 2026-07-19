@@ -348,6 +348,7 @@ mod tests {
             "🛠 /codex — use Codex",
             "🖥️ /mac — run on the Mac",
             "☁️ /gcp — run on the GCP box",
+            "🚀 /ship — ship a Blort task (Notion→PR)",
             "ℹ️ /where — active engine, target &amp; session",
             "🆕 /new — fresh session for this engine + target",
             "⏹ /stop — kill/cancel the running job",
