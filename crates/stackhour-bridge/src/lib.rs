@@ -13,6 +13,7 @@ pub mod installer;
 pub mod jobs;
 pub mod keyboard;
 pub mod local_lane;
+pub mod macqueue;
 pub mod media;
 pub mod migrate;
 pub mod registry_ctx;
