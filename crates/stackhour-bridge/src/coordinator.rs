@@ -638,6 +638,20 @@ pub fn run_coordinator(runtime_dir: &Path) -> ! {
     serve(rt)
 }
 
+/// What the daemon hands `Tg::set_my_commands` at startup.
+///
+/// `set_my_commands` adds the `{ "commands": … }` wrapper itself, so this must
+/// be the LIST. It used to be [`crate::commands::my_commands_payload`], which
+/// is already wrapped: the body went out as `{"commands":{"commands":[…]}}`,
+/// Telegram answered 400, `call()` swallowed it, and the bot ran with NO
+/// registered commands and nothing in the log. Every unit test passed
+/// throughout, because none of them exercised this line — it took driving the
+/// real binary against a mock Bot API to see it
+/// (`test/parity/command-surface.mjs`).
+fn registration_payload(reg: &Registry) -> Value {
+    crate::commands::my_commands_list(reg)
+}
+
 /// The startup sequence and the poll loop, given an assembled runtime.
 fn serve(rt: Arc<Runtime>) -> ! {
     let reg = rt.ctx.registry();
@@ -653,12 +667,7 @@ fn serve(rt: Arc<Runtime>) -> ! {
     }
 
     crate::media::prune_media(&rt.ctx.paths.media_dir, MEDIA_MAX_AGE);
-    // `set_my_commands` adds the `{ "commands": … }` wrapper itself, so it
-    // must be handed the LIST. Passing the wrapped payload here produced
-    // `{"commands":{"commands":[…]}}`, which Telegram rejects with a 400 that
-    // `call()` swallows — the bot ended up with no registered commands and no
-    // error anywhere. Caught by test/parity/command-surface.mjs.
-    rt.tg.set_my_commands(crate::commands::my_commands_list(&reg));
+    rt.tg.set_my_commands(registration_payload(&reg));
 
     // The online banner. Sent before the loop starts, so a restart is visible.
     {
@@ -706,5 +715,26 @@ fn serve(rt: Arc<Runtime>) -> ! {
             }
             rt.handle_update(u);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The daemon's registration body must be the command ARRAY. If this ever
+    /// becomes an object again, the bot registers nothing and says nothing.
+    #[test]
+    fn the_registration_payload_is_a_bare_command_array() {
+        let reg = stackhour_core::registry::load(Path::new("/nonexistent/stackhour-registration"));
+        let payload = registration_payload(&reg);
+        let list = payload
+            .as_array()
+            .expect("setMyCommands takes the list, not the wrapped body");
+        let names: Vec<&str> = list.iter().map(|c| c["command"].as_str().unwrap()).collect();
+        assert_eq!(
+            names,
+            vec!["claude", "codex", "mac", "gcp", "ship", "where", "new", "stop", "menu", "help"]
+        );
     }
 }
