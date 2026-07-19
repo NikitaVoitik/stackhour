@@ -389,3 +389,23 @@ fn the_binary_under_test_exists() {
         bin()
     );
 }
+
+/// Regression: `import-wakatime` must reach the ported importer rather than
+/// the "not implemented in the Rust port yet" stub. With no API key anywhere
+/// the importer is the only thing that can produce this message — Node's
+/// `importWakatime` throws exactly the same string.
+#[test]
+fn import_wakatime_is_dispatched_to_the_ported_importer() {
+    let sb = Sandbox::new();
+    assert!(sb.run(&["init", "server"]).status.success());
+    let out = sb.run(&["import-wakatime"]);
+    let err = stderr(&out);
+    assert!(
+        err.contains("no wakatime.apiKey in config and no WAKATIME_API_KEY set"),
+        "expected the importer's own error, got: {err}"
+    );
+    assert!(
+        !err.contains("not implemented in the Rust port yet"),
+        "import-wakatime is still routed to the unimplemented stub"
+    );
+}

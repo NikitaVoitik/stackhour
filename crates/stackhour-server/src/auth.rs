@@ -22,31 +22,44 @@ pub enum Principal {
     Machine(String),
 }
 
+/// JS truthiness of a config value. Missing, `null`, `false`, `0`/`-0`/`NaN`
+/// and `""` are falsy; EVERYTHING else — including objects and arrays — is
+/// truthy, exactly as `serverConfig.token || ''` sees it in src/server.js.
+///
+/// This is deliberately separate from [`truthy_string`]: whether auth is
+/// ENABLED is a truthiness question, whether a supplied token can MATCH is a
+/// stringification question. Conflating them is a fail-open bug — a config
+/// with `"token": {}` must lock the server, not open it.
+fn is_truthy(value: Option<&Value>) -> bool {
+    match value {
+        None | Some(Value::Null) => false,
+        Some(Value::Bool(b)) => *b,
+        Some(Value::String(s)) => !s.is_empty(),
+        Some(Value::Number(n)) => !n.as_f64().map(|f| f == 0.0 || f.is_nan()).unwrap_or(false),
+        // Objects and arrays are truthy in JS.
+        Some(_) => true,
+    }
+}
+
 /// JS `String(value)` for the scalar shapes a config token can hold, paired
 /// with JS truthiness. Returns `None` for anything falsy (missing, null,
 /// `false`, `0`, `""`) so callers can mirror `token && safeEqual(...)`.
+///
+/// Objects and arrays return `None` too, but callers MUST NOT read that as
+/// "no token configured" — use [`is_truthy`] for that question. Here `None`
+/// only means "nothing a supplied token could usefully equal", so such a
+/// value never matches and auth stays closed.
 fn truthy_string(value: Option<&Value>) -> Option<String> {
-    match value? {
-        Value::String(s) => {
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.clone())
-            }
-        }
+    let value = value?;
+    if !is_truthy(Some(value)) {
+        return None;
+    }
+    match value {
+        Value::String(s) => Some(s.clone()),
         Value::Bool(true) => Some("true".to_string()),
-        Value::Bool(false) => None,
-        Value::Number(n) => {
-            // JS: 0 and -0 are falsy, every other number is truthy.
-            if n.as_f64().map(|f| f == 0.0).unwrap_or(false) {
-                None
-            } else {
-                Some(n.to_string())
-            }
-        }
-        // Objects/arrays are truthy in JS; String() of them is not a shape any
-        // sane config produces, and it can never equal a supplied token in a
-        // useful way. Treat as absent.
+        // `String(1.0)` is "1" in JS, not "1.0" — go through the shared
+        // number formatter rather than serde_json's Display.
+        Value::Number(_) => Some(stackhour_core::jsnum::js_display(value)),
         _ => None,
     }
 }
@@ -120,9 +133,13 @@ pub fn authenticate(headers: &HeaderMap, query: &str, server_cfg: &Value) -> Opt
         .get("tokens")
         .and_then(Value::as_object)
         .filter(|map| !map.is_empty());
+    let legacy_configured = is_truthy(server_cfg.get("token"));
     let legacy = truthy_string(server_cfg.get("token"));
 
-    if legacy.is_none() && tokens.is_none() {
+    // Open mode is decided by TRUTHINESS, not by whether we could turn the
+    // value into a comparable string. `"token": {}` is truthy in Node, so it
+    // keeps auth on (and simply never matches) instead of opening the server.
+    if !legacy_configured && tokens.is_none() {
         return Some(Principal::Open);
     }
 
@@ -177,6 +194,58 @@ mod tests {
             h.insert(AUTHORIZATION, value.parse().expect("valid header value"));
         }
         h
+    }
+
+    /// Regression (fail-open): a `server.token` holding an object or array is
+    /// TRUTHY in Node, so `legacy = serverConfig.token || ''` keeps auth on and
+    /// every request 401s. Rust used to stringify it to `None` and treat that
+    /// as "no tokens configured", dropping the whole server into open mode —
+    /// ingest, agent-status and the WakaTime bulk endpoints writable by anyone
+    /// who could reach the port.
+    #[test]
+    fn a_non_string_token_keeps_auth_closed_instead_of_opening_the_server() {
+        for weird in [json!({}), json!([]), json!({"mac": "abc"}), json!(["abc"])] {
+            let cfg = json!({ "token": weird, "tokens": {} });
+            assert_eq!(
+                authenticate(&headers(None), "", &cfg),
+                None,
+                "token={weird} must be unauthorized, never Principal::Open"
+            );
+            // And it can never be matched by guessing its stringification.
+            assert_eq!(
+                authenticate(&headers(Some("Bearer [object Object]")), "", &cfg),
+                None
+            );
+        }
+    }
+
+    /// The open-mode path itself must survive: genuinely falsy token values
+    /// still mean "no tokens configured anywhere".
+    #[test]
+    fn falsy_token_values_still_open_the_server() {
+        for falsy in [json!(null), json!(""), json!(false), json!(0)] {
+            assert_eq!(
+                authenticate(&headers(None), "", &json!({ "token": falsy })),
+                Some(Principal::Open),
+                "token={falsy} is falsy and must open"
+            );
+        }
+        assert_eq!(
+            authenticate(&headers(None), "", &json!({})),
+            Some(Principal::Open)
+        );
+    }
+
+    /// Parity nit: JS `String(1.0)` is "1", not "1.0". A numeric token that
+    /// authenticated against Node must authenticate here.
+    #[test]
+    fn a_numeric_token_stringifies_the_way_js_does() {
+        let cfg = json!({ "token": 1.0 });
+        assert_eq!(
+            authenticate(&headers(Some("Bearer 1")), "", &cfg),
+            Some(Principal::Global)
+        );
+        assert_eq!(authenticate(&headers(Some("Bearer 1.0")), "", &cfg), None);
     }
 
     fn b64(s: &str) -> String {

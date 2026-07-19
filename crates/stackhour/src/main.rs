@@ -157,9 +157,30 @@ fn main() -> ExitCode {
                 }
             }
         }
+        "import-wakatime" => {
+            let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+            // Node: `process.argv.find(a => a.startsWith('--days='))` — the
+            // FIRST occurrence, not the last, then a raw `Number()` coercion
+            // (so `--days=abc` yields NaN and imports nothing, exit 0).
+            let days = match args::option_values(&tail, "days").first() {
+                Some(raw) => {
+                    stackhour_core::jsnum::js_number(&serde_json::Value::String(raw.clone()))
+                }
+                None => 365.0,
+            };
+            let result = stackhour_core::config::load_config(&paths.config_path)
+                .and_then(|cfg| stackhour_store::wakatime::import_wakatime(&cfg, days));
+            match result {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(err) => {
+                    eprintln!("stackhour: {}", err.message());
+                    ExitCode::FAILURE
+                }
+            }
+        }
         // Verbs that exist in the Node CLI but are not ported yet. Kept
         // distinct from the help path so we never silently claim parity.
-        "import-wakatime" | "bridge" => {
+        "bridge" => {
             eprintln!("stackhour: `{cmd}` is not implemented in the Rust port yet");
             ExitCode::FAILURE
         }
