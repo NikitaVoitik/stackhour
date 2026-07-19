@@ -93,8 +93,7 @@ fn fixture(name: &str) -> Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test/render-parity")
         .join(name);
-    let raw = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let raw = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
 }
 
@@ -143,18 +142,13 @@ fn deliver_final_payloads_match_the_node_coordinator_for_every_case() {
                 got.len(),
                 want_calls.len(),
                 got.iter().map(|c| c["method"].clone()).collect::<Vec<_>>(),
-                want_calls
-                    .iter()
-                    .map(|c| c["method"].clone())
-                    .collect::<Vec<_>>(),
+                want_calls.iter().map(|c| c["method"].clone()).collect::<Vec<_>>(),
             ));
             continue;
         }
         for (i, (g, w)) in got.iter().zip(want_calls.iter()).enumerate() {
             if g != w {
-                failures.push(format!(
-                    "{name}: payload #{i} differs\n  rust: {g}\n  node: {w}"
-                ));
+                failures.push(format!("{name}: payload #{i} differs\n  rust: {g}\n  node: {w}"));
             }
         }
     }

@@ -64,19 +64,24 @@ home = pathlib.Path(tempfile.mkdtemp(prefix="stackhour-parity-"))
 (home / "engines").mkdir(parents=True)
 # `cat` echoes the prompt straight back, so the engine's "answer" is exactly
 # the case text and the only thing under test is the rendering.
-(home / "engines/claude.toml").write_text(
+(home / "engines/echo.toml").write_text(
     'label = "Echo"\nbin = "/bin/cat"\nkind = "plain-lines"\nargs = []\n'
 )
+(home / "state.json").write_text(json.dumps(
+    {"offset": 0, "active": "gcp", "engine": "echo", "sessions": {}}))
 (home / "config.json").write_text(json.dumps({
     "token": "0000000000:FAKE-LOCAL-MOCK-TOKEN-NOT-A-SECRET",
     "chatId": 4242,
     "defaultTarget": "gcp",
     "apiRoot": f"http://127.0.0.1:{port}",
-    "targets": {"gcp": {"label": "GCP", "type": "local", "cwd": str(home),
-                        "claudeBin": "/bin/cat", "permissionMode": "default"}},
+    "targets": {
+        "gcp": {"label": "GCP", "type": "local", "cwd": str(home),
+                "claudeBin": "/bin/cat", "permissionMode": "default"},
+        "mac": {"label": "Mac", "type": "remote", "permissionMode": "default"},
+    },
 }))
 
-env = dict(os.environ, STACKHOUR_BRIDGE_HOME=str(home))
+env = dict(os.environ, STACKHOUR_BRIDGE_HOME=str(home), STACKHOUR_CONFIG_DIR=str(home))
 proc = subprocess.Popen([str(BIN), "bridge", "coordinator", "--runtime-dir", str(home)],
                         env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 deadline = time.time() + 30
@@ -92,7 +97,7 @@ except subprocess.TimeoutExpired:
     proc.kill()
     out = proc.communicate()[0]
 
-print(json.dumps({"case": case_name, "calls": recorded}, indent=2, ensure_ascii=False))
+print(json.dumps({"case": case_name, "calls": recorded}, indent=2))
 if not recorded:
     sys.stderr.write("no payloads recorded; coordinator output:\n" + (out or "")[-4000:] + "\n")
     sys.exit(1)
