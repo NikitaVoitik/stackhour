@@ -142,6 +142,11 @@ pub fn apply_agent(def: &EngineDef, agent: Option<&AgentDef>, reg: &Registry, re
     if let Some(cwd) = &agent.cwd {
         req.cwd = Some(expand_tilde(cwd));
     }
+    // Only for engines that DECLARE `effort_args`; otherwise the agent's
+    // effort is silently ignored rather than breaking the run.
+    if let Some(effort) = agent_effort(def, Some(agent)) {
+        req.effort = Some(effort.to_string());
+    }
 
     // Per-agent prompt wrapper, by template NAME. Rendering an unknown
     // template yields "", which would silently eat the user's message, so a

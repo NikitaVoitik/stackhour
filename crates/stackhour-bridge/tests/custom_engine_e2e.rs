@@ -113,7 +113,6 @@ fn argv_is_assembled_from_the_config_alone() {
 /// Step 2b — the bridge's own `build_argv` must agree with the core reference
 /// implementation it is documented to delegate to.
 #[test]
-#[ignore = "blocked on engines.rs runner scaffold (build_argv is todo!())"]
 fn the_runner_assembles_argv_from_the_config_alone() {
     let (_d, reg, _bin) = fixture();
     let engine = reg.engines.get("fake-echo").expect("engine");
@@ -134,12 +133,10 @@ fn the_runner_assembles_argv_from_the_config_alone() {
 /// Step 3 — the whole point: spawn the config-declared binary, hand it the
 /// prompt, and read its streamed status back.
 ///
-/// Ignored, not deleted: this is the acceptance criterion for the engine
-/// runner. `engines::run_engine` is still a `todo!()` scaffold, so the
-/// config-only extensibility story stops one step short of a live spawn.
-/// Un-ignore the moment the runner lands.
+/// This is THE acceptance criterion for config-only engine extensibility: the
+/// runner reaches an engine it has never been compiled against, purely through
+/// the `EngineDef` the loader built from TOML.
 #[test]
-#[ignore = "blocked on engines.rs runner scaffold (run_engine is todo!())"]
 fn the_bridge_spawns_the_config_only_engine_and_streams_its_status_back() {
     let (_d, reg, bin_dir) = fixture();
     let engine = reg.engines.get("fake-echo").expect("engine");
@@ -183,9 +180,9 @@ fn the_bridge_spawns_the_config_only_engine_and_streams_its_status_back() {
 /// extraPath, argv from `assemble_argv`, prompt on stdin, `plain-lines` status
 /// accumulated as it arrives) by hand.
 ///
-/// This is what step 3 will assert once `run_engine` exists. It is here so the
-/// fixture above is known-good rather than aspirational: if this fails, the
-/// config format itself cannot describe a spawnable engine.
+/// Step 3 asserts the same thing THROUGH the runner. This one keeps the
+/// fixture honest: if step 3 passes and this fails, the runner is compensating
+/// for a config format that cannot actually describe a spawnable engine.
 #[test]
 #[cfg(unix)]
 fn the_config_alone_describes_a_spawnable_streaming_engine() {
@@ -273,4 +270,145 @@ fn an_agent_can_bind_to_the_config_only_engine() {
             .is_some_and(|s| s.contains("You are a fake.")),
         "the soul did not reach the engine's declared system-prompt flag"
     );
+}
+
+/// Step 5 — the resume-retry rule is engine-agnostic too. A config-only engine
+/// that fails a resume with no output gets exactly ONE fresh (session-less)
+/// rerun, driven by the `resume` style it declared in TOML.
+#[test]
+#[cfg(unix)]
+fn a_config_only_engine_gets_the_resume_retry_rule_for_free() {
+    // Fails whenever `--resume` is on its argv, succeeds otherwise.
+    const FLAKY_SH: &str = r#"#!/bin/sh
+cat >/dev/null
+case "$*" in
+  *--resume*) echo "stale session" >&2; exit 7 ;;
+esac
+echo "FRESH-RUN-OK"
+"#;
+    let dir = tempfile::tempdir().expect("tempdir");
+    write(
+        dir.path(),
+        "engines/flaky.toml",
+        "bin = \"flaky\"\nkind = \"plain-lines\"\nargs = [\"-\"]\n[resume]\nflag = [\"--resume\", \"{{session_id}}\"]\n",
+    );
+    let bin_dir = dir.path().join("bin");
+    fs::create_dir_all(&bin_dir).expect("mkdir bin");
+    let script = bin_dir.join("flaky");
+    fs::write(&script, FLAKY_SH).expect("write script");
+    make_executable(&script);
+
+    let reg = registry::load_with(dir.path(), registry::EnvSource::fixed(&[]));
+    assert!(reg.errors.is_empty(), "registry errors: {:?}", reg.errors);
+    let engine = reg.engines.get("flaky").expect("engine");
+
+    let req = RunRequest {
+        prompt: "hi".into(),
+        session_id: Some("dead-session".into()),
+        extra_path: Some(bin_dir.to_string_lossy().into_owned()),
+        ..RunRequest::default()
+    };
+
+    // Without the rule, the resume failure is what the user would see.
+    let once = engines::run_engine(engine, req.clone(), None);
+    assert_eq!(once.code, Some(7), "the resume attempt should have failed");
+    assert!(once.text.is_empty());
+
+    // With it, the fresh rerun's output is what comes back.
+    let retried = engines::run_with_resume_retry(engine, req, None);
+    assert_eq!(retried.code, Some(0), "the fresh rerun should succeed");
+    assert!(retried.retried_fresh, "the retry flag must be set");
+    assert_eq!(retried.text, "FRESH-RUN-OK");
+}
+
+/// Step 6 — an agent's `effort` reaches a config-only engine through the
+/// `effort_args` template that engine declared, and is silently ignored by
+/// engines that declare none. Both halves are config, not code.
+#[test]
+#[cfg(unix)]
+fn effort_reaches_a_config_only_engine_that_declares_effort_args() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    write(
+        dir.path(),
+        "engines/thinky.toml",
+        "bin = \"fake-echo\"\nkind = \"plain-lines\"\nargs = [\"-\"]\neffort_args = [\"--effort\", \"{{effort}}\"]\n",
+    );
+    write(dir.path(), "engines/dumb.toml", FAKE_ENGINE_TOML);
+    write(
+        dir.path(),
+        "agents/deep/agent.toml",
+        "engine = \"thinky\"\neffort = \"high\"\n",
+    );
+    let reg = registry::load_with(dir.path(), registry::EnvSource::fixed(&[]));
+    assert!(reg.errors.is_empty(), "registry errors: {:?}", reg.errors);
+    let agent = reg.agents.get("deep").expect("agent");
+
+    let thinky = reg.engines.get("thinky").expect("engine").clone();
+    let mut req = RunRequest {
+        prompt: "think".into(),
+        ..RunRequest::default()
+    };
+    souls::apply_agent(&thinky, Some(agent), &reg, &mut req);
+    assert_eq!(
+        engines::build_argv(&thinky, &req),
+        vec!["--effort", "high", "-"],
+        "the agent's effort must splice through the engine's declared template"
+    );
+
+    // The same agent on an engine with no `effort_args` is unaffected.
+    let dumb = reg.engines.get("dumb").expect("engine").clone();
+    let mut req = RunRequest {
+        prompt: "think".into(),
+        ..RunRequest::default()
+    };
+    souls::apply_agent(&dumb, Some(agent), &reg, &mut req);
+    assert_eq!(req.effort, None);
+    assert!(!engines::build_argv(&dumb, &req).contains(&"--effort".to_string()));
+}
+
+/// Step 7 — `/stop` works against a config-only engine: the runner hands back
+/// a terminate handle that SIGTERMs whatever the config told it to spawn.
+#[test]
+#[cfg(unix)]
+fn a_config_only_engine_can_be_stopped_through_the_running_job_handle() {
+    // `exec` so the process we spawn IS the long sleep: otherwise the shell
+    // dies on SIGTERM but its orphaned child keeps our stdout pipe open.
+    const SLEEPER_SH: &str = "#!/bin/sh\ncat >/dev/null\necho STARTED\nexec sleep 60\n";
+    let dir = tempfile::tempdir().expect("tempdir");
+    write(
+        dir.path(),
+        "engines/sleeper.toml",
+        "bin = \"sleeper\"\nkind = \"plain-lines\"\nargs = [\"-\"]\n",
+    );
+    let bin_dir = dir.path().join("bin");
+    fs::create_dir_all(&bin_dir).expect("mkdir bin");
+    let script = bin_dir.join("sleeper");
+    fs::write(&script, SLEEPER_SH).expect("write script");
+    make_executable(&script);
+
+    let reg = registry::load_with(dir.path(), registry::EnvSource::fixed(&[]));
+    let engine = reg.engines.get("sleeper").expect("engine");
+
+    let (tx, rx) = mpsc::channel();
+    let (job, handle) = engines::spawn_engine(
+        engine,
+        RunRequest {
+            prompt: "go".into(),
+            extra_path: Some(bin_dir.to_string_lossy().into_owned()),
+            ..RunRequest::default()
+        },
+        Some(tx),
+    );
+
+    // Wait until the child is demonstrably running, then stop it.
+    let first = rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("the engine never started");
+    assert_eq!(first, "STARTED");
+    job.terminate();
+
+    let result = handle.join().expect("runner thread");
+    assert_ne!(result.code, Some(0), "the child should not have run to completion");
+    // Terminating an already-reaped job is a no-op, not a panic.
+    job.terminate();
 }

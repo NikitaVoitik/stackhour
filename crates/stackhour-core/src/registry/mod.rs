@@ -48,7 +48,7 @@ pub use agent_def::{AgentDef, Soul, ToolPolicy};
 pub use args::{bind_args, ArgSpec};
 pub use command::{CommandDef, CommandKind, RESERVED};
 pub use cycle::detect_cycles;
-pub use engine::{EngineDef, PromptDelivery, ResumeStyle, StreamKind};
+pub use engine::{ArgvVars, EngineDef, PromptDelivery, ResumeStyle, StreamKind};
 pub use error::FieldError;
 pub use prompt::PromptStore;
 pub use skill::SkillDef;
