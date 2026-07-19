@@ -91,6 +91,29 @@ const P_WHERE: &[Placeholder] = &[P_ENGINE, P_TARGET];
 pub const DEFAULTS: &[PromptDefault] = &[
     // ---- composition (agent turns; new in the rewrite) ----
     PromptDefault {
+        // coordinator.mjs `ORWELL_RULES` — the standing style rules the JS
+        // bridge hands to EVERY default-path turn (claude via
+        // `--append-system-prompt`, codex prepended to the prompt). Hardcoded
+        // there, a template here: this is the registry's system-prompt
+        // concept, so a user can reword or empty it without touching code.
+        // An empty body disables the house rules entirely.
+        name: "house-rules",
+        body: "Follow Orwell's writing rules in every reply:\n1. Never use a metaphor, simile, or other figure of speech you are used to seeing in print.\n2. Never use a long word where a short one will do.\n3. If it is possible to cut a word out, always cut it out.\n4. Never use the passive where the active will do.\n5. Never use a foreign phrase, a scientific word, or jargon where plain English will do.\n6. Break any of these rules sooner than say anything outright barbarous.",
+        placeholders: NONE,
+    },
+    PromptDefault {
+        // How the house rules reach an engine with no `system_prompt_args`
+        // (codex): prepended to the user prompt, exactly as coordinator.mjs
+        // does with its '[Standing style rules]\n' header. Applied only on a
+        // FRESH attempt — a resumed thread already carries them.
+        name: "house-rules-turn",
+        body: "[Standing style rules]\n{{system}}\n\n{{prompt}}",
+        placeholders: &[
+            ph("system", "the rendered `house-rules` template", true),
+            ph("prompt", "the user's text for this turn", true),
+        ],
+    },
+    PromptDefault {
         name: "system",
         body: "{{soul}}\n\n## Skills\n{{skills}}",
         placeholders: &[

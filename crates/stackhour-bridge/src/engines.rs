@@ -24,7 +24,6 @@
 
 use stackhour_core::registry::engine::ArgvVars;
 use stackhour_core::registry::{EngineDef, PromptDelivery, StreamKind};
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -36,8 +35,6 @@ use std::time::{Duration, Instant};
 /// (parity with coordinator.mjs's `Date.now() - lastStatus > 800`). The
 /// `plain-lines` parser has no upstream throttle and emits every line.
 const ACTIVITY_THROTTLE: Duration = Duration::from_millis(800);
-/// Activity detail truncation width (parity with `.slice(0, 80)`).
-const ACTIVITY_DETAIL_MAX: usize = 80;
 
 /// One engine invocation request.
 #[derive(Debug, Clone, Default)]
@@ -54,8 +51,23 @@ pub struct RunRequest {
     pub cwd: Option<PathBuf>,
     /// true on the coordinator's local lane (enables partial_messages_flag).
     pub live_status: bool,
-    /// Target extraPath, prepended to the child's PATH.
+    /// Target `extraPath`. When set it becomes the child's WHOLE `PATH`, not a
+    /// prefix — coordinator.mjs spawns with `PATH: tgt.extraPath ||
+    /// process.env.PATH`, so the child cannot see anything the target did not
+    /// list. Reproduced deliberately: prepending would silently widen what a
+    /// target's engine can execute.
     pub extra_path: Option<String>,
+    /// Per-target binary override (`targets.<name>.claudeBin` / `codexBin`).
+    /// `None` falls back to the [`EngineDef`]'s own `bin`.
+    pub bin: Option<String>,
+    /// The standing house rules (registry `house-rules`). Used only when no
+    /// agent supplied a `system_prompt`: engines that declare
+    /// `system_prompt_args` get it as their system prompt, engines that do not
+    /// get it prepended to the prompt on FRESH attempts only.
+    pub house_rules: Option<String>,
+    /// Body of the `house-rules-turn` template, pre-rendered by the caller
+    /// with `{{system}}` still in place. `None` uses the built-in shape.
+    pub house_rules_turn: Option<String>,
     /// Effective tool allow-list (agent `[tools]` unioned with its skills').
     /// Empty = unrestricted.
     pub allow_tools: Vec<String>,
@@ -98,13 +110,73 @@ impl RunningJob {
     }
 }
 
-/// The exact log line emitted when the resume-retry rule fires (parity with
-/// coordinator.mjs / worker.mjs).
+/// The resume-retry log line the MAC WORKER writes (worker.mjs).
+///
+/// The coordinator's local lane writes a DIFFERENT one — see
+/// [`resume_retry_log_line_local`]. Two lanes, two strings; the reference has
+/// both and a single shared wording would be a (small) divergence.
 pub fn resume_retry_log_line(engine: &str, code: Option<i32>) -> String {
     format!(
         "{engine} resume failed ({}); retry fresh",
         code.unwrap_or_default()
     )
+}
+
+/// The resume-retry log line the coordinator's LOCAL lane writes
+/// (coordinator.mjs:281) — it names the target and says "retrying", not
+/// "retry".
+///
+/// This goes to the log FILE only. The JS never shows it in Telegram, so it
+/// must not be pushed down the activity channel, which would render it as a
+/// status edit the user sees.
+pub fn resume_retry_log_line_local(engine: &str, target: &str, code: Option<i32>) -> String {
+    format!(
+        "{engine} resume failed on {target} ({}); retrying fresh",
+        code.unwrap_or_default()
+    )
+}
+
+/// The default `house-rules-turn` shape, used when the caller passes none.
+const HOUSE_RULES_TURN_FALLBACK: &str = "[Standing style rules]\n{{system}}\n\n{{prompt}}";
+
+/// Fold the standing house rules into a request, exactly where the JS puts
+/// them.
+///
+/// * An engine that declares `system_prompt_args` (claude) takes them as its
+///   system prompt — but only when no agent already supplied one. An active
+///   agent's composed soul is a deliberate override, not an addition.
+/// * An engine that does not (codex) gets them prepended to the prompt, and
+///   ONLY on a fresh attempt: coordinator.mjs guards the prefix with
+///   `engine === 'codex' && !resume`, so a resumed thread — which already
+///   carries the rules — does not get them again. Because the resume-retry
+///   rerun clears `session_id`, the retry picks the prefix up, matching the
+///   JS, where the prompt is composed per attempt rather than per run.
+///
+/// Empty or whitespace-only rules are a no-op, which is how a user disables
+/// them: an empty `prompts/house-rules.md`.
+pub fn apply_house_rules(def: &EngineDef, req: &mut RunRequest) {
+    let Some(rules) = req.house_rules.clone() else {
+        return;
+    };
+    if rules.trim().is_empty() {
+        return;
+    }
+    if def.system_prompt_args.is_some() {
+        if req.system_prompt.is_none() {
+            req.system_prompt = Some(rules);
+        }
+        return;
+    }
+    if req.system_prompt.is_some() || req.session_id.is_some() {
+        return;
+    }
+    let template = req
+        .house_rules_turn
+        .clone()
+        .unwrap_or_else(|| HOUSE_RULES_TURN_FALLBACK.to_string());
+    req.prompt = template
+        .replace("{{system}}", &rules)
+        .replace("{{prompt}}", &req.prompt);
 }
 
 /// Assemble the final argv for a request (unit-tested standalone — the argv
@@ -143,12 +215,14 @@ pub fn run_engine(
 }
 
 /// Like [`run_engine`], plus the resume-retry rule: exit code != 0 with a
-/// session id and no text -> ONE fresh (session-less) rerun, with the exact
-/// log line.
+/// session id and no text -> ONE fresh (session-less) rerun. `on_retry` is
+/// called once, with the failed attempt's exit code, just before the rerun;
+/// the caller formats and logs its own lane's line.
 pub fn run_with_resume_retry(
     def: &EngineDef,
     req: RunRequest,
     activity: Option<mpsc::Sender<String>>,
+    on_retry: Option<&dyn Fn(Option<i32>)>,
 ) -> RunResult {
     let had_session = req.session_id.is_some();
     let mut fresh = req.clone();
@@ -158,8 +232,11 @@ pub fn run_with_resume_retry(
     if !(failed && had_session && first.text.is_empty()) {
         return first;
     }
-    if let Some(tx) = activity.as_ref() {
-        let _ = tx.send(resume_retry_log_line(&def.name, first.code));
+    // The lane owns the wording AND the sink: the coordinator writes
+    // `resume_retry_log_line_local` to coordinator.log, the worker writes
+    // `resume_retry_log_line` to its own log. Neither reaches Telegram.
+    if let Some(log) = on_retry {
+        log(first.code);
     }
     fresh.session_id = None;
     let mut second = run_engine(def, fresh, activity);
@@ -171,13 +248,17 @@ pub fn run_with_resume_retry(
 /// (used by the coordinator's local lane).
 pub fn spawn_engine(
     def: &EngineDef,
-    req: RunRequest,
+    mut req: RunRequest,
     activity: Option<mpsc::Sender<String>>,
 ) -> (RunningJob, std::thread::JoinHandle<RunResult>) {
     let job = RunningJob::default();
+    apply_house_rules(def, &mut req);
     let argv = build_argv(def, &req);
 
-    let mut cmd = Command::new(&def.bin);
+    // The target's per-engine binary override wins over the EngineDef's own
+    // `bin` (JS: `tgt.claudeBin` / `tgt.codexBin || <default>`).
+    let bin = req.bin.clone().unwrap_or_else(|| def.bin.clone());
+    let mut cmd = Command::new(&bin);
     cmd.args(&argv)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -189,16 +270,21 @@ pub fn spawn_engine(
         cmd.env(k, v);
     }
     if let Some(extra) = &req.extra_path {
-        cmd.env("PATH", prepend_path(extra));
+        cmd.env("PATH", extra);
     }
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
-            // Node resolves `child.on('error')` with the message and no code.
+            // Node resolves `child.on('error')` with the message, NO code, and
+            // the session id captured so far — which on a spawn failure is the
+            // one we were asked to resume. Dropping it would silently clear
+            // context the JS preserves.
             let msg = e.to_string();
+            let seeded = req.session_id.clone();
             let handle = std::thread::spawn(move || RunResult {
                 error: Some(msg),
+                session_id: seeded,
                 ..RunResult::default()
             });
             return (job, handle);
@@ -259,13 +345,6 @@ pub fn spawn_engine(
     });
 
     (job, handle)
-}
-
-fn prepend_path(extra: &str) -> String {
-    match std::env::var("PATH") {
-        Ok(existing) if !existing.is_empty() => format!("{extra}:{existing}"),
-        _ => extra.to_string(),
-    }
 }
 
 // ---------- stream parsers ----------
@@ -345,7 +424,7 @@ impl StreamState {
                     .iter()
                     .rfind(|c| c.get("type").and_then(|v| v.as_str()) == Some("tool_use"));
                 if let Some(tool) = last_tool {
-                    self.emit(activity, claude_activity_line(tool));
+                    self.emit(activity, crate::render::claude_activity(tool));
                 }
             }
             Some("result") => {
@@ -392,17 +471,17 @@ impl StreamState {
             return;
         }
         if let Some(item) = item {
-            self.emit(activity, codex_activity_line(item));
+            self.emit(activity, crate::render::codex_activity(item));
         }
     }
 
     /// Throttled activity emit (JS: `Date.now() - lastStatus > 800`). Empty
     /// lines are dropped without consuming the throttle window.
-    fn emit(&mut self, activity: Option<&mpsc::Sender<String>>, line: String) {
+    fn emit(&mut self, activity: Option<&mpsc::Sender<String>>, line: Option<String>) {
         let Some(tx) = activity else { return };
-        if line.is_empty() {
+        let Some(line) = line.filter(|l| !l.is_empty()) else {
             return;
-        }
+        };
         let now = Instant::now();
         if self
             .last_activity
@@ -412,65 +491,6 @@ impl StreamState {
         }
         self.last_activity = Some(now);
         let _ = tx.send(line);
-    }
-}
-
-fn truncate_detail(detail: &str) -> String {
-    let collapsed = detail.split_whitespace().collect::<Vec<_>>().join(" ");
-    collapsed.chars().take(ACTIVITY_DETAIL_MAX).collect()
-}
-
-/// `⚙️ <ToolName>[: <detail>]` — parity with coordinator.mjs `activityLine`.
-fn claude_activity_line(tool: &serde_json::Value) -> String {
-    let name = tool.get("name").and_then(|v| v.as_str()).unwrap_or_default();
-    if name.is_empty() {
-        return String::new();
-    }
-    let input = tool.get("input");
-    let field = |k: &str| input.and_then(|i| i.get(k)).and_then(|v| v.as_str());
-    let detail = if name == "Bash" {
-        field("command").unwrap_or_default()
-    } else {
-        field("file_path")
-            .or_else(|| field("pattern"))
-            .or_else(|| field("url"))
-            .or_else(|| field("command"))
-            .unwrap_or_default()
-    };
-    let detail = truncate_detail(detail);
-    if detail.is_empty() {
-        format!("⚙️ {name}")
-    } else {
-        format!("⚙️ {name}: {detail}")
-    }
-}
-
-/// `⚙️ <Friendly>[: <detail>]` — parity with coordinator.mjs `codexActivity`.
-fn codex_activity_line(item: &serde_json::Value) -> String {
-    let ty = item.get("type").and_then(|v| v.as_str()).unwrap_or_default();
-    if ty.is_empty() || ty == "agent_message" {
-        return String::new();
-    }
-    let field = |k: &str| item.get(k).and_then(|v| v.as_str());
-    let detail = field("command")
-        .or_else(|| field("query"))
-        .or_else(|| field("name"))
-        .or_else(|| field("path"))
-        .unwrap_or_default();
-    let detail = truncate_detail(detail);
-
-    let names: HashMap<&str, &str> = HashMap::from([
-        ("command_execution", "Command"),
-        ("file_change", "File change"),
-        ("mcp_tool_call", "Tool"),
-        ("web_search", "Web search"),
-        ("todo_list", "Plan"),
-    ]);
-    let label = names.get(ty).copied().unwrap_or(ty);
-    if detail.is_empty() {
-        format!("⚙️ {label}")
-    } else {
-        format!("⚙️ {label}: {detail}")
     }
 }
 
@@ -559,23 +579,4 @@ mod tests {
         assert_eq!(r.text, "ok");
     }
 
-    #[test]
-    fn activity_lines_match_the_js_formatting() {
-        assert_eq!(
-            claude_activity_line(&json!({"name":"Bash","input":{"command":"ls  -l\n"}})),
-            "⚙️ Bash: ls -l"
-        );
-        assert_eq!(
-            claude_activity_line(&json!({"name":"Read","input":{"file_path":"/tmp/x"}})),
-            "⚙️ Read: /tmp/x"
-        );
-        assert_eq!(
-            codex_activity_line(&json!({"type":"command_execution","command":"echo hi"})),
-            "⚙️ Command: echo hi"
-        );
-        assert_eq!(
-            codex_activity_line(&json!({"type":"agent_message","text":"hi"})),
-            ""
-        );
-    }
 }

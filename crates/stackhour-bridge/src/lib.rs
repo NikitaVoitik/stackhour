@@ -12,6 +12,7 @@ pub mod engines;
 pub mod installer;
 pub mod jobs;
 pub mod keyboard;
+pub mod local_lane;
 pub mod media;
 pub mod migrate;
 pub mod registry_ctx;
@@ -29,8 +30,16 @@ pub mod worker;
 pub struct BridgePaths {
     pub runtime_dir: PathBuf,
     pub jobs_dir: PathBuf,
+    /// Jobs the worker has claimed but not yet returned. `claim` renames into
+    /// here; `return` removes the marker. Nothing ever reaps it — a job whose
+    /// worker died stays here forever, exactly as in the JS.
+    pub inprogress_dir: PathBuf,
     pub results_dir: PathBuf,
     pub media_dir: PathBuf,
+    /// `<runtime_dir>/worker-heartbeat` — a bare decimal ms epoch, no
+    /// trailing newline. Written by every `claim` poll, read by
+    /// [`jobs::worker_alive`].
+    pub heartbeat_path: PathBuf,
     /// `<runtime_dir>/state.json`.
     pub state_path: PathBuf,
     /// `<runtime_dir>/config.json` (coordinator).
@@ -44,8 +53,10 @@ impl BridgePaths {
     pub fn from_runtime_dir(runtime_dir: &Path) -> Self {
         BridgePaths {
             jobs_dir: runtime_dir.join("jobs"),
+            inprogress_dir: runtime_dir.join("inprogress"),
             results_dir: runtime_dir.join("results"),
             media_dir: runtime_dir.join("media"),
+            heartbeat_path: runtime_dir.join("worker-heartbeat"),
             state_path: runtime_dir.join("state.json"),
             config_path: runtime_dir.join("config.json"),
             worker_config_path: runtime_dir.join("worker-config.json"),
@@ -79,7 +90,7 @@ impl BridgePaths {
     /// `media/` is 0700 because it holds Telegram attachments — other users
     /// on a shared box have no business reading them.
     pub fn ensure_dirs(&self) -> std::io::Result<()> {
-        for dir in [&self.jobs_dir, &self.results_dir] {
+        for dir in [&self.jobs_dir, &self.inprogress_dir, &self.results_dir] {
             std::fs::create_dir_all(dir)?;
         }
         std::fs::create_dir_all(&self.media_dir)?;
@@ -138,8 +149,12 @@ mod tests {
         let p = BridgePaths::from_runtime_dir(Path::new("/rt"));
         assert_eq!(p.runtime_dir, Path::new("/rt"));
         assert_eq!(p.jobs_dir, Path::new("/rt/jobs"));
+        assert_eq!(p.inprogress_dir, Path::new("/rt/inprogress"));
         assert_eq!(p.results_dir, Path::new("/rt/results"));
         assert_eq!(p.media_dir, Path::new("/rt/media"));
+        // The heartbeat is a FILE in the runtime dir, not a subdirectory —
+        // claim.mjs and the coordinator both hardcode that location.
+        assert_eq!(p.heartbeat_path, Path::new("/rt/worker-heartbeat"));
         assert_eq!(p.state_path, Path::new("/rt/state.json"));
         assert_eq!(p.config_path, Path::new("/rt/config.json"));
         assert_eq!(p.worker_config_path, Path::new("/rt/worker-config.json"));
@@ -173,6 +188,7 @@ mod tests {
         let p = BridgePaths::from_runtime_dir(tmp.path());
         p.ensure_dirs().expect("mkdir");
         assert!(p.jobs_dir.is_dir() && p.results_dir.is_dir() && p.media_dir.is_dir());
+        assert!(p.inprogress_dir.is_dir(), "claim renames into inprogress/");
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

@@ -43,6 +43,17 @@ echo "FAKE-ECHO-DONE"
 
 /// Write the config tree + the fake engine binary. Returns (tempdir, registry,
 /// bin dir) — the tempdir must outlive both.
+/// A target's `extraPath` REPLACES the child's whole PATH (coordinator.mjs
+/// spawns with `PATH: tgt.extraPath || process.env.PATH`), so a target that
+/// wants the system tools has to list them — as the real config does. The
+/// fake engine is a shell script that shells out, so it needs them.
+fn target_path(bin_dir: &std::path::Path) -> String {
+    match std::env::var("PATH") {
+        Ok(p) if !p.is_empty() => format!("{}:{p}", bin_dir.display()),
+        _ => bin_dir.display().to_string(),
+    }
+}
+
 fn fixture() -> (tempfile::TempDir, Registry, std::path::PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     write(dir.path(), "engines/fake-echo.toml", FAKE_ENGINE_TOML);
@@ -145,7 +156,7 @@ fn the_bridge_spawns_the_config_only_engine_and_streams_its_status_back() {
     let req = RunRequest {
         prompt: "SENTINEL-PROMPT-7391".into(),
         model: Some("tiny-1".into()),
-        extra_path: Some(bin_dir.to_string_lossy().into_owned()),
+        extra_path: Some(target_path(&bin_dir)),
         ..RunRequest::default()
     };
     let result = engines::run_engine(engine, req, Some(tx));
@@ -305,7 +316,7 @@ echo "FRESH-RUN-OK"
     let req = RunRequest {
         prompt: "hi".into(),
         session_id: Some("dead-session".into()),
-        extra_path: Some(bin_dir.to_string_lossy().into_owned()),
+        extra_path: Some(target_path(&bin_dir)),
         ..RunRequest::default()
     };
 
@@ -315,7 +326,7 @@ echo "FRESH-RUN-OK"
     assert!(once.text.is_empty());
 
     // With it, the fresh rerun's output is what comes back.
-    let retried = engines::run_with_resume_retry(engine, req, None);
+    let retried = engines::run_with_resume_retry(engine, req, None, None);
     assert_eq!(retried.code, Some(0), "the fresh rerun should succeed");
     assert!(retried.retried_fresh, "the retry flag must be set");
     assert_eq!(retried.text, "FRESH-RUN-OK");
@@ -394,7 +405,7 @@ fn a_config_only_engine_can_be_stopped_through_the_running_job_handle() {
         engine,
         RunRequest {
             prompt: "go".into(),
-            extra_path: Some(bin_dir.to_string_lossy().into_owned()),
+            extra_path: Some(target_path(&bin_dir)),
             ..RunRequest::default()
         },
         Some(tx),

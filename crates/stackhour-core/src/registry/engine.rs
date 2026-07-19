@@ -20,8 +20,11 @@
 //!    last base arg is exactly `-`, else the end of the base args.
 //! 3. Insert at the splice point, in order: `partial_messages_flag` (only when
 //!    `live_status`), the rendered `permission_args`, the rendered
-//!    `model_args` (only when a model is set), the rendered
-//!    `system_prompt_args` (only when a system prompt is set).
+//!    `system_prompt_args` (only when a system prompt is set), the rendered
+//!    `model_args` (only when a model is set), then the additive
+//!    `effort_args` / tool-policy args. The system-prompt-before-model order
+//!    is byte-parity with coordinator.mjs, which emits
+//!    `--permission-mode <m> --append-system-prompt <rules> --model <m>`.
 //! 4. When a session id is present: `ResumeStyle::Flag` appends its rendered
 //!    args at the very end (claude: `--resume <id>`); `ResumeStyle::Subcommand`
 //!    inserts the subcommand word right after the first arg and places the raw
@@ -354,6 +357,14 @@ impl EngineDef {
             }
         }
         splice_in(&mut out, self.permission_argv(vars.permission_mode));
+        // BEFORE the model args: coordinator.mjs emits
+        // `--permission-mode <m> --append-system-prompt <rules> --model <m>`,
+        // and this splice order is the byte-parity surface.
+        if vars.system_prompt.is_some() {
+            if let Some(template) = &self.system_prompt_args {
+                splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
+            }
+        }
         if vars.model.is_some() {
             if let Some(template) = &self.model_args {
                 splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
@@ -371,11 +382,6 @@ impl EngineDef {
         }
         if !vars.deny_tools.is_empty() {
             if let Some(template) = &self.disallowed_tools_args {
-                splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
-            }
-        }
-        if vars.system_prompt.is_some() {
-            if let Some(template) = &self.system_prompt_args {
                 splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
             }
         }
