@@ -13,6 +13,7 @@
 use std::process::ExitCode;
 
 mod args;
+mod bridge_migrate;
 mod doctor;
 mod doctor_checks;
 mod init;
@@ -180,10 +181,16 @@ fn main() -> ExitCode {
         }
         // Verbs that exist in the Node CLI but are not ported yet. Kept
         // distinct from the help path so we never silently claim parity.
-        "bridge" => {
-            eprintln!("stackhour: `{cmd}` is not implemented in the Rust port yet");
-            ExitCode::FAILURE
-        }
+        "bridge" => match tail.first().map(String::as_str) {
+            // The one bridge verb that is ported. It touches no network and
+            // starts no poller, so it is safe to run beside the live Node
+            // coordinator.
+            Some("migrate") => bridge_migrate::run(&tail[1..]),
+            _ => {
+                eprintln!("stackhour: `{cmd}` is not implemented in the Rust port yet");
+                ExitCode::FAILURE
+            }
+        },
         // Node's `default:` case — an unknown verb (or none) prints usage and
         // exits 0. `loadConfig()` runs BEFORE the switch in cli.js, so a
         // corrupt config.json must fail here rather than print help.

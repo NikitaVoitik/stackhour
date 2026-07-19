@@ -13,6 +13,7 @@ pub mod installer;
 pub mod jobs;
 pub mod keyboard;
 pub mod media;
+pub mod migrate;
 pub mod registry_ctx;
 pub mod render;
 pub mod skills;

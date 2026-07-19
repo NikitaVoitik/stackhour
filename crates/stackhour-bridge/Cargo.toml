@@ -22,6 +22,7 @@ chrono.workspace = true
 url.workspace = true
 libc.workspace = true
 hostname.workspace = true
+toml.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
