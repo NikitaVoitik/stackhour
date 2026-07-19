@@ -391,6 +391,54 @@ fn verify_is_clean_right_after_migrating() {
     assert!(stdout(&out).contains("every legacy key reached a destination"));
 }
 
+/// KNOWN PARITY GAP — `/ship` loses its destination in the migration.
+///
+/// coordinator.mjs:363 hardcodes `state.active = 'blort'` for `/ship`. The
+/// Rust equivalent (`CoordCtx::ship_cfg`) instead seeds the ship target from
+/// `default_target` and only overrides it from a `ship.target` key in the
+/// runtime config — a key this migration never writes. So after a cutover the
+/// `blort` target still exists in `targets` but nothing selects it: `/ship`
+/// parks the user on `gcp` (the fixture's defaultTarget) instead.
+///
+/// The migrator DOES warn about this rather than hiding it, and that warning
+/// is asserted here so it cannot silently disappear. This test documents
+/// today's behaviour; when the gap is closed it will fail loudly and should be
+/// rewritten to assert `ship.target == "blort"`.
+#[test]
+fn known_gap_ship_target_is_not_carried_into_the_runtime_config() {
+    let dir = TempDir::new().unwrap();
+    let cfg = dir.path().join("config");
+    let rt = dir.path().join("run");
+    let out = run(&[
+        "bridge",
+        "migrate",
+        "--from",
+        fixture("legacy-config.json").to_str().unwrap(),
+        "--to",
+        cfg.to_str().unwrap(),
+        "--runtime-dir",
+        rt.to_str().unwrap(),
+    ]);
+    assert!(out.status.success());
+
+    let runtime = read_json(&rt.join("config.json"));
+    assert!(
+        runtime.get("targets").and_then(|t| t.get("blort")).is_some(),
+        "the blort target itself should still survive in the config"
+    );
+    assert!(
+        runtime.get("ship").is_none(),
+        "a ship.target key now exists — the gap is CLOSED; rewrite this test \
+         to assert it equals \"blort\""
+    );
+
+    // The loss has to stay disclosed on the way out.
+    assert!(
+        stdout(&out).contains("/ship cannot switch to it"),
+        "the migration stopped warning that /ship loses its target"
+    );
+}
+
 /// Every recursive file under `root`.
 fn walk(root: &PathBuf) -> Vec<PathBuf> {
     let mut out = Vec::new();
