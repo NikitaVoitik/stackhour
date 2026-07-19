@@ -807,7 +807,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn ingest_returns_inserted_and_received() {
             let h = Harness::new("{}");
             let body = json!([hb(1.0, "mac"), hb(2.0, "mac")]).to_string();
@@ -819,7 +818,6 @@ mod tests {
 
         /// Bad rows and duplicates make `inserted` < `received`.
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn ingest_counts_skipped_and_deduped_rows() {
             let h = Harness::new("{}");
             let body = json!([hb(1.0, "mac"), hb(1.0, "mac"), json!({ "machine": "mac" })]).to_string();
@@ -830,7 +828,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn ingest_rejects_a_non_array_body() {
             let h = Harness::new("{}");
             for body in ["{}", "null", "5", r#""x""#] {
@@ -841,7 +838,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn ingest_rejects_invalid_json() {
             let h = Harness::new("{}");
             let (status, body) = h.post("/api/ingest", &[], "[").await;
@@ -850,7 +846,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn unauthorized_requests_never_reach_the_body() {
             let h = Harness::new(r#"{"server":{"token":"s3cret"}}"#);
             let (status, body) = h.post("/api/ingest", &[], "not even json").await;
@@ -868,7 +863,6 @@ mod tests {
         /// The whole batch is refused atomically: ZERO rows are inserted,
         /// including the ones the token WAS allowed to write.
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn machine_scope_violation_inserts_nothing() {
             let h = Harness::new(r#"{"server":{"tokens":{"mac":"m-tok"}}}"#);
             let auth = [("authorization", "Bearer m-tok")];
@@ -886,7 +880,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn agent_status_acks_with_the_clock_skew() {
             let h = Harness::new("{}");
             let body = json!({ "time": 0, "machine": "mac", "version": "0.1.0" }).to_string();
@@ -901,7 +894,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn agent_status_rejects_non_objects_and_invalid_reports() {
             let h = Harness::new("{}");
             for body in ["[]", "null", "5"] {
@@ -916,7 +908,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn agent_status_honours_machine_scope() {
             let h = Harness::new(r#"{"server":{"tokens":{"mac":"m-tok"}}}"#);
             let auth = [("authorization", "Bearer m-tok")];
@@ -927,7 +918,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn wakatime_bulk_answers_202_with_response_pairs() {
             let h = Harness::new("{}");
             let body = json!([
@@ -953,7 +943,6 @@ mod tests {
 
         /// A single object is wrapped into a one-element batch.
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn wakatime_accepts_a_bare_object() {
             let h = Harness::new("{}");
             let body = json!({ "time": 1.0, "entity": "/a.js" }).to_string();
@@ -971,7 +960,6 @@ mod tests {
         /// The echo is of the RAW request values, and absent keys vanish —
         /// even when the mapped row substituted a default.
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn wakatime_echo_omits_absent_keys() {
             let h = Harness::new("{}");
             let (status, body) = h.post("/users/current/heartbeats", &[], "[{}]").await;
@@ -982,7 +970,6 @@ mod tests {
         }
 
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn wakatime_scopes_on_the_machine_header() {
             let h = Harness::new(r#"{"server":{"tokens":{"mac":"m-tok"}}}"#);
             let body = json!([{ "time": 1.0, "entity": "/a.js" }]).to_string();
@@ -1010,7 +997,6 @@ mod tests {
 
         /// WakaTime plugins authenticate with Basic base64(key) / base64(key:).
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn wakatime_accepts_basic_auth() {
             use base64::Engine as _;
             let h = Harness::new(r#"{"server":{"token":"s3cret"}}"#);
@@ -1028,7 +1014,6 @@ mod tests {
 
         /// A wrong method on a known path is the JS catch-all 404, not a 405.
         #[tokio::test]
-        #[ignore = "blocked on dashboard::DashboardLocator::locate() (sibling scaffold); enable in the integration phase"]
         async fn wrong_method_on_a_known_path_is_404() {
             let h = Harness::new("{}");
             let res = h

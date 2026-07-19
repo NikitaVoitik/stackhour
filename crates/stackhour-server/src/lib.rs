@@ -388,8 +388,6 @@ mod tests {
 
     // Exercises make_app, which calls DashboardLocator::locate — still
     // `todo!()` in the sibling module at the time of writing. REMOVE this
-    // #[ignore] once dashboard.rs is implemented; the test itself is correct.
-    #[ignore = "blocked on dashboard::DashboardLocator::locate scaffold"]
     #[tokio::test]
     async fn with_db_serialises_access_and_survives_panics() {
         let dir = tempfile::tempdir().expect("tempdir");

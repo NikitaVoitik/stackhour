@@ -562,9 +562,31 @@ mod tests {
         row.tokens_out = 5;
         let body = summary_body(0.0, 10.0, &[row], &[], &["project"], 0.0);
         assert_eq!(body["total"], Value::from(0));
-        assert_eq!(body["totalCost"], Value::from(1.01));
+        // NOT 1.01: `1.005 * 100` is 100.49999999999999 in IEEE754, so
+        // `Math.round(...) / 100` is 1 in Node too. Verified with
+        //   node -e "console.log(Math.round(1.005*100)/100)"  ->  1
+        assert_eq!(body["totalCost"], Value::from(1));
         assert_eq!(body["totalTokens"], Value::from(12));
         assert_eq!(body["totals"], Value::Array(vec![]));
+    }
+
+    /// The same path, with a cost pair that legitimately reaches 1.01, so the
+    /// "totals come from raw rows" contract is still pinned against a value
+    /// that is not a rounding artefact.
+    #[test]
+    fn summary_cost_sums_raw_rows_before_rounding() {
+        let mut a = hb(1, 100.0, "alpha", "human");
+        a.cost = 1.005;
+        a.tokens_in = 7;
+        a.tokens_out = 5;
+        let mut b = hb(2, 200.0, "alpha", "human");
+        b.cost = 0.004;
+        b.tokens_in = 1;
+        b.tokens_out = 0;
+        // 1.009 rounds to 1.01; rounding each row first would give 1 + 0 = 1.
+        let body = summary_body(0.0, 10.0, &[a, b], &[], &["project"], 0.0);
+        assert_eq!(body["totalCost"], Value::from(1.01));
+        assert_eq!(body["totalTokens"], Value::from(13));
     }
 
     /// `from`/`to` echo verbatim, including fractional and negative values.
