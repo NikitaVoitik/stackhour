@@ -130,6 +130,25 @@ async fn not_found() -> Response {
     json_error(StatusCode::NOT_FOUND, "not found")
 }
 
+/// Answers every HEAD request with the catch-all 404, without routing it.
+///
+/// src/server.js guards each route with an explicit `req.method === 'GET'`,
+/// so a HEAD probe matched nothing and fell through to
+/// `json(res, 404, { error: 'not found' })`. axum is the opposite: a GET route
+/// implicitly serves HEAD (and `MethodFilter::GET` does NOT opt out of that —
+/// `MethodRouter` retries HEAD against its GET handler by design), so without
+/// this layer every read endpoint would answer HEAD with a 200 that Node never
+/// sends. Rejecting ahead of the router is the only place the two agree.
+async fn reject_head(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    if req.method() == axum::http::Method::HEAD {
+        return not_found().await;
+    }
+    next.run(req).await
+}
+
 /// Whether any ingest token is configured (legacy global OR a non-empty
 /// per-machine map). Mirrors
 /// `!cfg.server.token && Object.keys(cfg.server.tokens || {}).length === 0`.
@@ -223,6 +242,7 @@ pub fn build_router(app: App) -> Router {
         .merge(detail::routes())
         .fallback(not_found)
         .with_state(app)
+        .layer(axum::middleware::from_fn(reject_head))
 }
 
 /// Build an [`App`] for tests / embedding.
@@ -386,8 +406,7 @@ mod tests {
         assert_eq!(&bytes[..], br#"{"error":"not found"}"#);
     }
 
-    // Exercises make_app, which calls DashboardLocator::locate — still
-    // `todo!()` in the sibling module at the time of writing. REMOVE this
+    /// Exercises make_app, which calls DashboardLocator::locate.
     #[tokio::test]
     async fn with_db_serialises_access_and_survives_panics() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -427,5 +446,134 @@ mod tests {
     #[test]
     fn body_limit_matches_node() {
         assert_eq!(BODY_LIMIT, 5 * 1024 * 1024);
+    }
+
+    /// Whole-router assembly tests. These are the first thing that exercises
+    /// `build_router` end to end — the four merged groups, the deliberate
+    /// merge ordering, and the catch-all — rather than a single group.
+    mod router {
+        use super::*;
+        use axum::body::Body;
+        use axum::http::Request;
+        use tower::ServiceExt;
+
+        struct Harness {
+            router: Router,
+            _dir: tempfile::TempDir,
+        }
+
+        impl Harness {
+            fn new() -> Self {
+                let dir = tempfile::tempdir().expect("tempdir");
+                let db_path = dir.path().join("stackhour.db");
+                let cfg = config_with(
+                    &json!({ "server": { "db": db_path } }).to_string(),
+                    dir.path(),
+                );
+                let db = stackhour_store::open_db(&db_path).expect("open db");
+                // A dashboard override that does not exist on disk, so the
+                // embedded copy is served and the test is HOME-independent.
+                let app = make_app(cfg, db, Some(dir.path().join("dashboard.html")));
+                Harness {
+                    router: build_router(app),
+                    _dir: dir,
+                }
+            }
+
+            async fn send(&self, method: &str, uri: &str) -> (StatusCode, String, Vec<u8>) {
+                let req = Request::builder()
+                    .method(method)
+                    .uri(uri)
+                    .body(Body::empty())
+                    .expect("request");
+                let res = self.router.clone().oneshot(req).await.expect("response");
+                let status = res.status();
+                let ctype = res
+                    .headers()
+                    .get(header::CONTENT_TYPE)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_string();
+                let bytes = axum::body::to_bytes(res.into_body(), 1 << 22)
+                    .await
+                    .expect("body");
+                (status, ctype, bytes.to_vec())
+            }
+        }
+
+        /// build_router merges all four groups without an axum route/fallback
+        /// conflict. Merely constructing the Harness proves it (a conflict is
+        /// a panic at merge time), but assert on a live route too.
+        #[tokio::test]
+        async fn build_router_assembles_all_four_groups() {
+            let h = Harness::new();
+            for path in [
+                "/",
+                "/api/health",
+                "/api/summary",
+                "/api/now",
+                "/api/timeline",
+                "/api/recent",
+                "/api/wakatime-days",
+                "/api/agent-status",
+                "/api/detail?dimension=project&value=x",
+            ] {
+                let (status, _, _) = h.send("GET", path).await;
+                assert_eq!(status, StatusCode::OK, "GET {path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn dashboard_is_served_as_html_on_both_paths() {
+            let h = Harness::new();
+            for path in ["/", "/index.html"] {
+                let (status, ctype, body) = h.send("GET", path).await;
+                assert_eq!(status, StatusCode::OK);
+                assert_eq!(ctype, "text/html; charset=utf-8");
+                assert_eq!(body, dashboard::EMBEDDED_DASHBOARD.as_bytes());
+            }
+        }
+
+        /// src/server.js guards every read route with `req.method === 'GET'`,
+        /// so a HEAD probe falls through to the catch-all 404 — it is NOT an
+        /// implicit 200 the way `axum::routing::get` would give.
+        #[tokio::test]
+        async fn head_falls_through_to_the_json_404() {
+            let h = Harness::new();
+            for path in ["/", "/api/health", "/api/agent-status", "/api/detail"] {
+                let (status, ctype, _) = h.send("HEAD", path).await;
+                assert_eq!(status, StatusCode::NOT_FOUND, "HEAD {path}");
+                assert_eq!(ctype, "application/json", "HEAD {path}");
+            }
+        }
+
+        /// A known path with the wrong method is a JSON 404, never a 405 with
+        /// an empty body — including /api/detail, whose group was the one
+        /// missing `method_not_allowed_fallback`.
+        #[tokio::test]
+        async fn wrong_method_is_a_json_404_on_every_group() {
+            let h = Harness::new();
+            for (method, path) in [
+                ("PUT", "/api/detail"),
+                ("PUT", "/api/health"),
+                ("PUT", "/api/ingest"),
+                ("POST", "/"),
+                ("POST", "/api/summary"),
+                ("GET", "/api/ingest"),
+            ] {
+                let (status, _, body) = h.send(method, path).await;
+                assert_eq!(status, StatusCode::NOT_FOUND, "{method} {path}");
+                assert_eq!(body, br#"{"error":"not found"}"#, "{method} {path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn unknown_path_is_the_catch_all_404() {
+            let h = Harness::new();
+            let (status, ctype, body) = h.send("GET", "/nope").await;
+            assert_eq!(status, StatusCode::NOT_FOUND);
+            assert_eq!(ctype, "application/json");
+            assert_eq!(body, br#"{"error":"not found"}"#);
+        }
     }
 }

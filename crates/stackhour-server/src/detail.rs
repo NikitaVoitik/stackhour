@@ -23,8 +23,17 @@ const RECENT_LIMIT: usize = 50;
 const BREAKDOWN_LIMIT: usize = 20;
 
 /// The /api/detail route group (single handler + unit-tested helpers).
+///
+/// `method_not_allowed_fallback` matches the JS dispatcher exactly as
+/// `ingest.rs` and `read_api.rs` do: src/server.js:346 guards this path with
+/// `req.method === 'GET'`, so `PUT /api/detail` fell through the if-chain to
+/// the catch-all `404 {"error":"not found"}` — never a 405 with an empty body.
 pub fn routes() -> Router<App> {
-    Router::new().route("/api/detail", get(detail))
+    Router::new()
+        .route("/api/detail", get(detail))
+        .method_not_allowed_fallback(|| async {
+            crate::json_error(StatusCode::NOT_FOUND, "not found")
+        })
 }
 
 /// A parsed query string with JS `URLSearchParams` lookup semantics.
