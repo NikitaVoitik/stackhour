@@ -1,5 +1,25 @@
 # Telegram bridge for Claude Code and Codex
 
+> **Implementation status.** Everything in this document describes the **Node.js**
+> bridge (`src/bridge/*.mjs`), reached through the `bin/stackhour` launcher.
+> That is the working implementation — use it.
+>
+> The Rust port of the bridge (`crates/stackhour-bridge`) is **incomplete and not
+> runnable**. `target/release/stackhour bridge` exits 1 with
+> `` `bridge` is not implemented in the Rust port yet ``. Roughly 46 function
+> bodies are still `todo!()`, concentrated in the Telegram HTTP client, the job
+> queue, config loading, message rendering, media handling, the installer, and
+> both daemon main loops. The supporting libraries that *are* finished — engine
+> spawning and stream parsing, soul composition, skill loading, the keyboard,
+> command dispatch, persisted state, and the config registry — are covered by
+> tests but have no daemon driving them. Do not follow the install instructions
+> below with the Rust binary; they will not work.
+>
+> The Rust side additionally gains a config registry that the Node bridge does
+> not have: custom engines, agents, skills, commands, and prompt overrides
+> loaded from the config directory. See "Config registry" in the
+> [README](../README.md) — it is likewise not yet reachable at runtime.
+
 A private Telegram control plane for Claude Code and Codex across an always-on Linux machine and a Mac, built into stackhour as the `stackhour bridge` subcommand.
 
 The Linux coordinator owns the Telegram connection and can run either agent locally. The Mac worker polls the coordinator over outbound SSH, runs work locally, and returns the result. The Mac needs no open port and jobs remain queued while it sleeps.
