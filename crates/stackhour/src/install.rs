@@ -3,9 +3,11 @@
 //! Unit text byte-exact (systemdQuote with newline rejection, RestartSec 5
 //! server / 10 agent, PATH Environment embedding the running binary's dir).
 //! launchd plist XML-escaped, label com.stackhour.agent, log
-//! /tmp/stackhour-agent.log. Executable = <repoRoot>/bin/stackhour derived
-//! from the running binary + existence check (units must keep pointing at
-//! the stable bin/ path — transition risk). Atomic 0644 unit writes; linux
+//! /tmp/stackhour-agent.log. Executable = the *running* binary, canonicalized:
+//! whichever runtime the user invoked is the one installed. (It previously
+//! walked up to <repoRoot>/bin/stackhour, the Node shim, so installing from
+//! the Rust binary silently deployed Node.) Installing from a cargo build
+//! directory warns, since `cargo clean` would delete it. Atomic 0644 unit writes; linux
 //! systemctl daemon-reload + enable --now pair; darwin agent-only
 //! bootout(ignored)/bootstrap/enable/kickstart order with the gui/<uid>
 //! domain. `runInstall('server')` installs BOTH roles with exact wording.
@@ -99,24 +101,33 @@ pub fn launchd_plist(exe: &Path, path_dir: &Path) -> String {
     )
 }
 
-/// The stable `<repoRoot>/bin/stackhour` shim the units must point at. The
-/// running binary lives at `<repoRoot>/target/<profile>/stackhour`, so the
-/// repo root is found by walking up until a `bin/stackhour` appears.
+/// The executable the installed service units must point at.
+///
+/// This is the *running* binary. An earlier version walked up the tree looking
+/// for `<repoRoot>/bin/stackhour`, but that path is the Node shim — so
+/// installing from the Rust binary silently deployed the Node implementation
+/// under systemd/launchd. Whatever runtime the user invoked is the runtime that
+/// gets installed.
 fn service_executable() -> Result<PathBuf> {
     let exe = std::env::current_exe()
         .map_err(|e| Error::msg(format!("cannot locate the running binary: {e}")))?;
-    let mut dir = exe.parent();
-    while let Some(d) = dir {
-        let candidate = d.join("bin").join("stackhour");
-        if candidate.exists() {
-            return Ok(candidate);
+    // Resolve symlinks so the unit records a stable, unambiguous path.
+    Ok(std::fs::canonicalize(&exe).unwrap_or(exe))
+}
+
+/// True when `path` sits inside a cargo build directory, i.e. `cargo clean`
+/// would delete it out from under an installed service.
+fn is_ephemeral_build_path(path: &Path) -> bool {
+    let mut components = path.components().peekable();
+    while let Some(c) = components.next() {
+        if c.as_os_str() == "target" {
+            return matches!(
+                components.peek().map(|n| n.as_os_str()),
+                Some(p) if p == "debug" || p == "release"
+            );
         }
-        dir = d.parent();
     }
-    Err(Error::msg(format!(
-        "Stackhour executable not found: {}",
-        exe.parent().unwrap_or(&exe).join("bin/stackhour").display()
-    )))
+    false
 }
 
 fn run_cmd(program: &str, args: &[&str]) -> Result<()> {
@@ -136,6 +147,14 @@ fn run_cmd(program: &str, args: &[&str]) -> Result<()> {
 /// Install + start one role's service.
 pub fn install_service(role: &str) -> Result<Installed> {
     let exe = service_executable()?;
+    if is_ephemeral_build_path(&exe) {
+        eprintln!(
+            "warning: installing {}, which is inside a cargo build directory.\n\
+             `cargo clean` or a profile switch will delete it and the service will fail to start.\n\
+             Copy the binary somewhere stable (e.g. ~/.local/bin/stackhour) and install from there.",
+            exe.display()
+        );
+    }
     let home = PathBuf::from(std::env::var("HOME").unwrap_or_default());
     let exe_dir = std::env::current_exe()
         .ok()
@@ -332,5 +351,39 @@ mod tests {
         let err = run_install_into(&argv(&[]), &mut out, &|_| Ok(())).unwrap_err();
         assert_eq!(err.message(), "usage: stackhour install <server|agent>");
         assert!(out.is_empty());
+    }
+
+    #[test]
+    fn service_executable_is_the_running_binary_not_the_node_shim() {
+        // Regression: this used to walk up to <repoRoot>/bin/stackhour, which is
+        // a /bin/sh shim that execs the Node implementation. Installing from the
+        // Rust binary therefore put Node under systemd without saying so.
+        let exe = service_executable().unwrap();
+        let running = std::fs::canonicalize(std::env::current_exe().unwrap())
+            .unwrap_or_else(|_| std::env::current_exe().unwrap());
+        assert_eq!(exe, running);
+        assert!(
+            !exe.ends_with("bin/stackhour"),
+            "must not point at the Node shim: {}",
+            exe.display()
+        );
+    }
+
+    #[test]
+    fn ephemeral_build_paths_are_recognised() {
+        for p in [
+            "/home/u/stackhour/target/debug/stackhour",
+            "/home/u/stackhour/target/release/stackhour",
+        ] {
+            assert!(is_ephemeral_build_path(Path::new(p)), "{p}");
+        }
+        for p in [
+            "/usr/local/bin/stackhour",
+            "/home/u/.local/bin/stackhour",
+            "/home/u/target-practice/bin/stackhour",
+            "/home/u/stackhour/target/stackhour",
+        ] {
+            assert!(!is_ephemeral_build_path(Path::new(p)), "{p}");
+        }
     }
 }
