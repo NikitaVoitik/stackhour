@@ -787,7 +787,10 @@ mod tests {
             insert_heartbeats(&mut db, &[row.clone(), row.clone()]).expect("i1"),
             1
         );
-        assert_eq!(insert_heartbeats(&mut db, &[row.clone()]).expect("i2"), 0);
+        assert_eq!(
+            insert_heartbeats(&mut db, std::slice::from_ref(&row)).expect("i2"),
+            0
+        );
         // actor differs -> a distinct row (hb_dedupe2 includes actor).
         let mut agent = row.clone();
         agent["actor"] = json!("agent");

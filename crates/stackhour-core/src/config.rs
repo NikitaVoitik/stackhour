@@ -206,7 +206,7 @@ fn truthy(v: &Value) -> bool {
     match v {
         Value::Null => false,
         Value::Bool(b) => *b,
-        Value::Number(n) => n.as_f64().map_or(false, |f| f != 0.0 && !f.is_nan()),
+        Value::Number(n) => n.as_f64().is_some_and(|f| f != 0.0 && !f.is_nan()),
         Value::String(s) => !s.is_empty(),
         _ => true,
     }

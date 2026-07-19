@@ -6,7 +6,7 @@
 //! with backspace; Ctrl-C -> 'Setup cancelled.'; find_executable PATH
 //! search); config validation-before-write; timestamped 0600 backups.
 //! Runtime install = copy the running stackhour binary into the runtime dir
-//! + write claim.mjs/return.mjs/tg-send.mjs shims (0755): each shim is a
+//! and writes claim.mjs/return.mjs/tg-send.mjs shims (0755): each shim is a
 //! VALID NODE SCRIPT (child_process.spawnSync of the adjacent stackhour
 //! binary with the matching hidden verb, stdio inherit, exit-code forward)
 //! because the JS worker invokes `<remoteNode> <remoteDir>/claim.mjs` with
