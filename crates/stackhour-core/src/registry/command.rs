@@ -643,26 +643,25 @@ pub fn effective_table(user: &IndexMap<String, CommandDef>) -> IndexMap<String, 
 /// Returns `(command name, error)` pairs, one per collision, in table order.
 /// The loader attaches the file and drops the offending command.
 pub fn alias_conflicts(table: &IndexMap<String, CommandDef>) -> Vec<(String, FieldError)> {
-    let mut owner: IndexMap<&str, &str> = IndexMap::new();
-    let mut out: Vec<(String, FieldError)> = Vec::new();
-
-    for def in table.values() {
-        owner.insert(def.command.as_str(), def.command.as_str());
+    // Seed the namespace with the SHIPPED aliases, so `/start -> /help` is
+    // already accounted for and a user claiming it collides with /help rather
+    // than tripping a special reserved-word rule.
+    let mut owner: IndexMap<String, String> = IndexMap::new();
+    for def in builtin_commands().values() {
+        for alias in &def.aliases {
+            owner.insert(alias.clone(), def.command.clone());
+        }
     }
+    // Command names always win over an inherited alias binding.
+    for def in table.values() {
+        owner.insert(def.command.clone(), def.command.clone());
+    }
+
+    let mut out: Vec<(String, FieldError)> = Vec::new();
     for def in table.values() {
         for alias in &def.aliases {
-            if RESERVED.contains(&alias.as_str()) {
-                out.push((
-                    def.command.clone(),
-                    FieldError::key(
-                        "aliases",
-                        format!("'{alias}' is a reserved built-in command"),
-                    ),
-                ));
-                continue;
-            }
-            match owner.get(alias.as_str()) {
-                Some(other) if *other != def.command.as_str() => out.push((
+            match owner.get(alias) {
+                Some(other) if *other != def.command => out.push((
                     def.command.clone(),
                     FieldError::key(
                         "aliases",
@@ -671,7 +670,7 @@ pub fn alias_conflicts(table: &IndexMap<String, CommandDef>) -> Vec<(String, Fie
                 )),
                 Some(_) => {}
                 None => {
-                    owner.insert(alias.as_str(), def.command.as_str());
+                    owner.insert(alias.clone(), def.command.clone());
                 }
             }
         }
