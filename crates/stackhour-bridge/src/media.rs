@@ -553,7 +553,7 @@ pub struct MediaCtx<'a> {
 ///
 /// The file is NOT deleted afterwards: the engine is still reading the path
 /// it was handed in the prompt, so only the 7-day prune removes it.
-pub fn handle_media_message<T: MediaTransport + MediaChat + ?Sized>(
+pub fn handle_media_message<T: MediaTransport + MediaChat>(
     tg: &T,
     ctx: &MediaCtx,
     message_id: i64,
@@ -581,7 +581,7 @@ pub fn handle_media_message<T: MediaTransport + MediaChat + ?Sized>(
 /// a fresh message when the placeholder never made it — and returns the FULL
 /// untruncated transcript for the caller to route as plain text with no media
 /// object. The audio file is unlinked on every path, success or failure.
-pub fn handle_voice_message<T: MediaTransport + MediaChat + ?Sized>(
+pub fn handle_voice_message<T: MediaTransport + MediaChat>(
     tg: &T,
     ctx: &MediaCtx,
     message_id: i64,
@@ -1229,11 +1229,14 @@ mod tests {
         dir: tempfile::TempDir,
         prompts: PromptStore,
         eleven: ElevenLabs,
-        logs: std::sync::Mutex<Vec<String>>,
+        logs: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+        log_fn: Box<dyn Fn(&str)>,
     }
 
     impl Harness {
         fn new() -> Self {
+            let logs = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            let sink = logs.clone();
             Harness {
                 dir: tempfile::tempdir().unwrap(),
                 prompts: store(),
@@ -1242,7 +1245,8 @@ mod tests {
                     endpoint: "http://127.0.0.1:1/never".into(),
                     model_id: ELEVENLABS_MODEL.into(),
                 },
-                logs: std::sync::Mutex::new(Vec::new()),
+                logs,
+                log_fn: Box::new(move |m: &str| sink.lock().unwrap().push(m.to_string())),
             }
         }
         fn ctx(&self) -> MediaCtx<'_> {
@@ -1251,7 +1255,7 @@ mod tests {
                 media_dir: self.dir.path(),
                 max_bytes: u64::MAX,
                 eleven: &self.eleven,
-                log: &|m| self.logs.lock().unwrap().push(m.to_string()),
+                log: self.log_fn.as_ref(),
             }
         }
     }
@@ -1320,7 +1324,10 @@ mod tests {
     fn a_voice_message_edits_the_placeholder_and_routes_the_full_transcript() {
         let mut h = Harness::new();
         h.eleven.api_key = "fake".into();
-        let long = "word ".repeat(1000); // > 3400 UTF-16 units
+        // > 3400 UTF-16 units. The trailing space is trimmed off by
+        // transcribeAudio, so the routed text is the trimmed form.
+        let long = "word ".repeat(1000);
+        let expected = long.trim().to_string();
         let body = serde_json::to_vec(&json!({ "text": &long })).unwrap();
         h.eleven.endpoint = mock_json(200, body);
 
@@ -1330,7 +1337,7 @@ mod tests {
         };
         let transcript = handle_voice_message(&w, &h.ctx(), 7, &voice_att()).unwrap();
 
-        assert_eq!(transcript, long, "routing gets the UNTRUNCATED transcript");
+        assert_eq!(transcript, expected, "routing gets the UNTRUNCATED transcript");
         let calls = w.chat.log();
         assert_eq!(calls[0], "react 7");
         assert_eq!(calls[1], "send 🎙️ Transcribing voice message…");
@@ -1341,7 +1348,7 @@ mod tests {
 
         assert_eq!(
             h.logs.lock().unwrap().clone(),
-            vec![format!("voice: transcribed 7 bytes to {} chars", long.len())]
+            vec![format!("voice: transcribed 7 bytes to {} chars", expected.len())]
         );
         assert_no_files_left(&h);
     }

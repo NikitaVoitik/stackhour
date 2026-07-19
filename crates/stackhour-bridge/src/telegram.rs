@@ -545,10 +545,14 @@ mod tests {
         );
     }
 
+    /// Otherwise reqwest aborts every single poll. Checked at compile time so
+    /// it cannot be broken by editing the constants.
+    const _: () = assert!(DEFAULT_LONG_POLL_READ_TIMEOUT_SECS > DEFAULT_LONG_POLL_SECS);
+
     #[test]
-    fn the_long_poll_read_timeout_exceeds_the_long_poll_itself() {
-        // Otherwise reqwest aborts every single poll.
-        assert!(DEFAULT_LONG_POLL_READ_TIMEOUT_SECS > DEFAULT_LONG_POLL_SECS);
+    fn a_configured_read_timeout_must_still_outlast_its_long_poll() {
+        let cfg = TgConfig::new("t", 1);
+        assert!(cfg.long_poll_read_timeout_secs > cfg.long_poll_secs);
     }
 
     #[test]

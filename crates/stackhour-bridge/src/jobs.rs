@@ -40,9 +40,12 @@ pub fn worker_alive(dir: &Path) -> bool {
 }
 
 /// Delete media files older than 7 days (best-effort).
+///
+/// The sweep itself lives in [`crate::media::prune_media`] alongside the rest
+/// of the attachment lifecycle; this is the fixed-horizon alias the
+/// coordinator and worker startup paths call.
 pub fn prune_media(dir: &Path) {
-    let _ = dir;
-    todo!()
+    crate::media::prune_media(dir, crate::media::PRUNE_MAX_AGE);
 }
 
 /// The strict claim/return UUID validation gate.

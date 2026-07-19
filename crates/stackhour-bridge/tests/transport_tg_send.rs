@@ -167,7 +167,7 @@ fn a_parse_error_disables_html_for_this_and_every_later_chunk() {
         .into_iter()
         .map(|r| r.body.get("parse_mode").is_some())
         .collect();
-    assert_eq!(modes[0], true, "the first attempt is HTML");
+    assert!(modes[0], "the first attempt is HTML");
     assert!(
         modes[1..].iter().all(|m| !m),
         "every later send must be plain: {modes:?}"

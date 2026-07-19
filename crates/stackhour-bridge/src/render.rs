@@ -205,6 +205,14 @@ pub fn rewrite_tables(text: &str) -> String {
 /// today and is preserved deliberately.
 ///
 /// Always returns at least one element, even for an empty input.
+///
+/// The one place this cannot match the reference exactly: when a hard cut
+/// lands in the MIDDLE of a surrogate pair (a limit-sized run of emoji with no
+/// newline), JS produces two chunks each holding half of the pair, while Rust
+/// has no way to represent a lone surrogate in a `String` and substitutes
+/// U+FFFD. The split OFFSET is identical either way, so chunk boundaries and
+/// chunk counts still agree; only that one broken glyph differs, and it was
+/// already broken in the Node.
 pub fn chunk_text(text: &str, limit: usize) -> Vec<String> {
     let units: Vec<u16> = text.encode_utf16().collect();
     let mut out = Vec::new();
@@ -462,6 +470,18 @@ mod tests {
         let parts = chunk_text(&text, 10);
         assert_eq!(parts[0].chars().count(), 10);
         assert_eq!(parts[0], "ab\nccccccc");
+    }
+
+    #[test]
+    fn chunk_text_cuts_at_the_same_utf16_offset_even_mid_surrogate_pair() {
+        // Verified against the Node by differential test: the boundaries and
+        // the chunk count agree; only the half-pair glyph differs, because
+        // Rust cannot hold a lone surrogate.
+        let parts = chunk_text(&"🚀".repeat(10), 7);
+        assert_eq!(parts.len(), 3);
+        assert_eq!(parts[0].encode_utf16().count(), 7);
+        assert_eq!(parts[1].encode_utf16().count(), 7);
+        assert_eq!(parts[2].encode_utf16().count(), 6);
     }
 
     #[test]
