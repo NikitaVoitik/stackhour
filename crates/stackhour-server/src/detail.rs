@@ -180,7 +180,15 @@ fn now_seconds() -> f64 {
     chrono::Utc::now().timestamp_millis() as f64 / 1000.0
 }
 
-async fn detail(State(app): State<App>, RawQuery(raw): RawQuery) -> Result<Response, ApiError> {
+async fn detail(
+    State(app): State<App>,
+    headers: axum::http::HeaderMap,
+    RawQuery(raw): RawQuery,
+) -> Result<Response, ApiError> {
+    // /api/detail leaks the most: per-heartbeat absolute file paths.
+    if let Some(denied) = crate::read_api::read_guard(&app, &headers, raw.as_deref()) {
+        return Ok(denied);
+    }
     let q = Query::parse(raw.as_deref());
     let Some((dimension, value)) = selector(&q) else {
         return Ok(crate::json_error(

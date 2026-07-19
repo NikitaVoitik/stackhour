@@ -93,8 +93,18 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
 })[c]);
 let activeDetail = null;
 
+// When the server has tokens configured, its read APIs require one. A browser
+// cannot set an Authorization header on a plain navigation, so the dashboard
+// carries the key it was opened with (`/?api_key=…`) onto every API call.
+const API_KEY = new URLSearchParams(location.search).get('api_key');
+
+function withKey(url) {
+  if (!API_KEY) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'api_key=' + encodeURIComponent(API_KEY);
+}
+
 async function getJson(url) {
-  const res = await fetch(url);
+  const res = await fetch(withKey(url));
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
   return res.json();
 }

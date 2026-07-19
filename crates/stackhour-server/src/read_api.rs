@@ -107,6 +107,33 @@ fn group_by(raw: Option<&str>) -> Vec<&'static str> {
 // handlers
 // ---------------------------------------------------------------------------
 
+
+/// Reject an unauthenticated read when tokens ARE configured.
+///
+/// Node left every read route open, and this port faithfully copied that: on
+/// the default `0.0.0.0:4040` bind, any host that could route to the port read
+/// the whole activity corpus — `/api/recent` and `/api/detail` return absolute
+/// source-file paths as `entity`, plus project names and branches, and
+/// `/api/agent-status` returns the machine inventory. Setting `server.tokens`
+/// did NOT close it: tokens gated writes only, so a fully tokenized deployment
+/// was still wide open to read.
+///
+/// Deliberately conditional on [`crate::has_configured_tokens`]: a tokenless
+/// local install (the documented single-machine setup) keeps working with no
+/// credentials, exactly as before. Configuring a token is now the one action
+/// that closes reads too, which is what a user configuring a token already
+/// believes they are doing.
+pub(crate) fn read_guard(app: &App, headers: &HeaderMap, raw: Option<&str>) -> Option<Response> {
+    if !crate::has_configured_tokens(app.cfg()) {
+        return None;
+    }
+    let server_cfg = app.cfg().raw.get("server").cloned().unwrap_or(Value::Null);
+    match authenticate(headers, raw.unwrap_or(""), &server_cfg) {
+        Some(_) => None,
+        None => Some(json_error(StatusCode::UNAUTHORIZED, "unauthorized")),
+    }
+}
+
 /// GET /api/health — no auth, `{"ok":true,"version":"0.1.0"}`.
 async fn health() -> Response {
     json_response(StatusCode::OK, &json!({ "ok": true, "version": VERSION }))
@@ -136,14 +163,28 @@ async fn auth_check(
 }
 
 /// GET /api/agent-status — no auth, ordered by machine ASC.
-async fn agent_status(State(app): State<App>) -> Result<Response, ApiError> {
+async fn agent_status(
+    State(app): State<App>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
+) -> Result<Response, ApiError> {
+    if let Some(denied) = read_guard(&app, &headers, raw.as_deref()) {
+        return Ok(denied);
+    }
     let now = now_seconds();
     let rows = app.with_db(move |db| list_agent_status(db, now)).await?;
     Ok(json_response(StatusCode::OK, &Value::Array(rows)))
 }
 
 /// GET /api/summary.
-async fn summary(State(app): State<App>, RawQuery(raw): RawQuery) -> Result<Response, ApiError> {
+async fn summary(
+    State(app): State<App>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
+) -> Result<Response, ApiError> {
+    if let Some(denied) = read_guard(&app, &headers, raw.as_deref()) {
+        return Ok(denied);
+    }
     let q = Query::parse(raw.as_deref());
     let days = number_param(q.get("days"), 1.0, Some(1.0), Some(366.0));
     let to = number_param(q.get("to"), now_seconds(), None, None);
@@ -211,7 +252,14 @@ fn summary_body(
 }
 
 /// GET /api/now — what is active right now.
-async fn now(State(app): State<App>, RawQuery(raw): RawQuery) -> Result<Response, ApiError> {
+async fn now(
+    State(app): State<App>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
+) -> Result<Response, ApiError> {
+    if let Some(denied) = read_guard(&app, &headers, raw.as_deref()) {
+        return Ok(denied);
+    }
     let q = Query::parse(raw.as_deref());
     let window_s = number_param(q.get("window"), 150.0, Some(1.0), Some(86400.0));
     // There is no `to` param: the upper bound is always the server clock.
@@ -264,7 +312,14 @@ fn now_rows(rows: &[Heartbeat]) -> Vec<Value> {
 }
 
 /// GET /api/timeline.
-async fn timeline(State(app): State<App>, RawQuery(raw): RawQuery) -> Result<Response, ApiError> {
+async fn timeline(
+    State(app): State<App>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
+) -> Result<Response, ApiError> {
+    if let Some(denied) = read_guard(&app, &headers, raw.as_deref()) {
+        return Ok(denied);
+    }
     let q = Query::parse(raw.as_deref());
     // min is one second (1/60 of an hour), max is 14 days.
     let hours = number_param(q.get("hours"), 24.0, Some(1.0 / 60.0), Some(24.0 * 14.0));
@@ -291,7 +346,14 @@ async fn timeline(State(app): State<App>, RawQuery(raw): RawQuery) -> Result<Res
 
 /// GET /api/recent — the newest N raw rows, reattributed against a context
 /// window and mapped back by id.
-async fn recent(State(app): State<App>, RawQuery(raw): RawQuery) -> Result<Response, ApiError> {
+async fn recent(
+    State(app): State<App>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
+) -> Result<Response, ApiError> {
+    if let Some(denied) = read_guard(&app, &headers, raw.as_deref()) {
+        return Ok(denied);
+    }
     let q = Query::parse(raw.as_deref());
     // `integer: true` in the JS is a floor applied AFTER the clamp.
     let limit = number_param(q.get("limit"), 50.0, Some(1.0), Some(500.0)).floor() as i64;
@@ -335,7 +397,14 @@ fn recent_with_context(db: &Connection, limit: i64, window: f64) -> Result<Vec<H
 }
 
 /// GET /api/wakatime-days — raw rows, `ORDER BY date`.
-async fn wakatime_days(State(app): State<App>) -> Result<Response, ApiError> {
+async fn wakatime_days(
+    State(app): State<App>,
+    headers: HeaderMap,
+    RawQuery(raw): RawQuery,
+) -> Result<Response, ApiError> {
+    if let Some(denied) = read_guard(&app, &headers, raw.as_deref()) {
+        return Ok(denied);
+    }
     let rows = app.with_db(select_wakatime_days).await?;
     Ok(json_response(StatusCode::OK, &Value::Array(rows)))
 }
@@ -826,5 +895,122 @@ mod tests {
     #[test]
     fn routes_builds() {
         let _: Router<App> = routes();
+    }
+
+    /// Read APIs must close when tokens are configured, and stay open when
+    /// they are not.
+    ///
+    /// Before this, `server.tokens` gated WRITES only: on the default
+    /// `0.0.0.0:4040` bind, any LAN peer could read `/api/recent` and
+    /// `/api/detail` (absolute source-file paths as `entity`, project names,
+    /// branches) and `/api/agent-status` (the machine inventory) with no
+    /// credentials, even on a fully tokenized deployment.
+    mod read_gate {
+        use super::*;
+        use axum::body::Body;
+        use axum::http::Request;
+        use stackhour_core::config::load_config;
+        use tower::ServiceExt as _;
+
+        /// Every read route that returns activity data or machine inventory.
+        const GATED: &[&str] = &[
+            "/api/summary?days=1",
+            "/api/now",
+            "/api/timeline",
+            "/api/recent",
+            "/api/wakatime-days",
+            "/api/agent-status",
+        ];
+
+        fn harness(user_cfg: Value) -> (tempfile::TempDir, Router) {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let db_path = dir.path().join("stackhour.db");
+            let cfg_path = dir.path().join("config.json");
+            let mut raw = user_cfg;
+            raw["server"]["db"] = json!(db_path.to_string_lossy());
+            std::fs::write(&cfg_path, raw.to_string()).expect("write config");
+            let cfg = load_config(&cfg_path).expect("load config");
+            let db = stackhour_store::open_db(&db_path).expect("open db");
+            let app = crate::make_app(cfg, db, None);
+            let router = routes()
+                .merge(crate::detail::routes())
+                .with_state(app);
+            (dir, router)
+        }
+
+        async fn status(router: &Router, uri: &str) -> StatusCode {
+            router
+                .clone()
+                .oneshot(Request::get(uri).body(Body::empty()).expect("request"))
+                .await
+                .expect("response")
+                .status()
+        }
+
+        #[tokio::test]
+        async fn configured_tokens_close_every_read_route() {
+            let (_d, router) = harness(json!({ "server": { "tokens": { "mac": "s3cret" } } }));
+            for uri in GATED {
+                assert_eq!(
+                    status(&router, uri).await,
+                    StatusCode::UNAUTHORIZED,
+                    "{uri} was readable without a token"
+                );
+                // …and readable WITH one.
+                let sep = if uri.contains('?') { '&' } else { '?' };
+                assert_eq!(
+                    status(&router, &format!("{uri}{sep}api_key=s3cret")).await,
+                    StatusCode::OK,
+                    "{uri} rejected a valid token"
+                );
+            }
+            // /api/detail leaks per-heartbeat absolute file paths.
+            assert_eq!(
+                status(&router, "/api/detail?dimension=project&value=x").await,
+                StatusCode::UNAUTHORIZED
+            );
+            assert_eq!(
+                status(
+                    &router,
+                    "/api/detail?dimension=project&value=x&api_key=s3cret"
+                )
+                .await,
+                StatusCode::OK
+            );
+            // /api/health stays open: it carries no data and is what probes hit.
+            assert_eq!(status(&router, "/api/health").await, StatusCode::OK);
+        }
+
+        /// Backward compatibility: the documented tokenless single-machine
+        /// install keeps working with no credentials at all.
+        #[tokio::test]
+        async fn a_tokenless_server_stays_open() {
+            let (_d, router) = harness(json!({ "server": {} }));
+            for uri in GATED {
+                assert_eq!(
+                    status(&router, uri).await,
+                    StatusCode::OK,
+                    "{uri} broke a tokenless install"
+                );
+            }
+            assert_eq!(
+                status(&router, "/api/detail?dimension=project&value=x").await,
+                StatusCode::OK
+            );
+        }
+
+        /// A wrong token is not a way in.
+        #[tokio::test]
+        async fn a_wrong_token_is_still_unauthorized() {
+            let (_d, router) = harness(json!({ "server": { "token": "right" } }));
+            assert_eq!(
+                status(&router, "/api/recent?api_key=wrong").await,
+                StatusCode::UNAUTHORIZED
+            );
+            assert_eq!(
+                status(&router, "/api/recent?api_key=right").await,
+                StatusCode::OK
+            );
+        }
     }
 }

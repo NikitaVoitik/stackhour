@@ -86,6 +86,29 @@ impl Env {
         format!("http://127.0.0.1:{}{path}", self.port)
     }
 
+    /// The token `init server` wrote for this machine. Read APIs are gated
+    /// once tokens exist, so every assertion below must present it.
+    fn token(&self) -> String {
+        let cfg: Value = serde_json::from_str(
+            &std::fs::read_to_string(
+                self.home
+                    .path()
+                    .join(".config")
+                    .join("stackhour")
+                    .join("config.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        cfg["server"]["tokens"]["box"].as_str().unwrap().to_string()
+    }
+
+    /// An authenticated read URL.
+    fn auth_url(&self, path: &str) -> String {
+        let sep = if path.contains('?') { '&' } else { '?' };
+        format!("{}{sep}api_key={}", self.url(path), self.token())
+    }
+
     /// Start `stackhour serve` and wait until it answers.
     fn serve(&self) -> Server {
         let child = self
@@ -190,7 +213,7 @@ fn heartbeats_queue_while_the_server_is_down_and_drain_when_it_returns() {
     );
 
     // --- 3. The server actually recorded it. ---
-    let summary = get(&env.url("/api/summary?days=1")).expect("summary");
+    let summary = get(&env.auth_url("/api/summary?days=1")).expect("summary");
     assert!(
         summary["total"].as_f64().unwrap() > 0.0,
         "server recorded no time: {summary}"
@@ -198,7 +221,7 @@ fn heartbeats_queue_while_the_server_is_down_and_drain_when_it_returns() {
     assert_eq!(summary["totals"][0]["project"], "proj");
 
     // --- 4. And the health report arrived. ---
-    let statuses = get(&env.url("/api/agent-status")).expect("agent-status");
+    let statuses = get(&env.auth_url("/api/agent-status")).expect("agent-status");
     let local = statuses
         .as_array()
         .unwrap()
@@ -216,7 +239,7 @@ fn heartbeats_queue_while_the_server_is_down_and_drain_when_it_returns() {
     let out = env.run(&["agent", "--once"]);
     assert!(out.status.success());
     assert!(!env.queue_path().exists());
-    let summary = get(&env.url("/api/summary?days=1")).expect("summary");
+    let summary = get(&env.auth_url("/api/summary?days=1")).expect("summary");
     assert!(summary["total"].as_f64().unwrap() > 0.0);
 
     server.stop();
