@@ -10,10 +10,6 @@
 //! stderr stays clean on success. NO tokio here — the server crate builds
 //! its own runtime.
 
-// Scaffold phase: the bin modules are not yet wired into `main`'s dispatch,
-// so everything reads as dead code. REMOVE this allow when implementing main.
-#![allow(dead_code)]
-
 use std::process::ExitCode;
 
 mod args;
@@ -22,6 +18,7 @@ mod doctor_checks;
 mod init;
 mod install;
 mod status;
+mod token;
 
 /// The help text body (everything before the trailing dynamic
 /// `config: <path>` line). Byte-exact vs tests-fixtures/help.txt.
@@ -60,13 +57,62 @@ const HELP: &str = concat!(
     "\n",
 );
 
+/// Node's `try { runX(argv) } catch (err) { console.error(...); exitCode = 1 }`
+/// wrapper: the message is prefixed with `stackhour <cmd>: ` and the exit code
+/// is DEFERRED (the process still runs to completion), never an immediate
+/// `process.exit`.
+fn deferred(cmd: &str, result: stackhour_core::Result<()>) -> ExitCode {
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("stackhour {cmd}: {}", err.message());
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args().collect();
     let cmd = argv.get(1).map(String::as_str).unwrap_or("");
+    // `process.argv.slice(3)` — every verb parses its own tail.
+    let tail: Vec<String> = argv.iter().skip(2).cloned().collect();
 
     match cmd {
-        // Node: `const cfg = loadConfig()` runs BEFORE the switch, so a
-        // corrupt config.json fails here rather than inside the verb.
+        // ---------------------------------------------------------------
+        // Verbs Node dispatches BEFORE `loadConfig()`. These must keep
+        // working when config.json is missing or corrupt — `init` in
+        // particular exists precisely to create that file.
+        // ---------------------------------------------------------------
+        "doctor" => {
+            let code = doctor::run_doctor(&tail);
+            if code == 0 {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
+        "init" => deferred("init", init::run_init(&tail)),
+        "token" => deferred("token", token::run_token(&tail)),
+        "install" => deferred("install", install::run_install(&tail)),
+        "data" | "backup" => {
+            // These two DO need a config, but Node still dispatches them
+            // before the shared `loadConfig()` so they own their own error
+            // prefix; a load failure surfaces as `stackhour data: <msg>`.
+            let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+            let result = stackhour_core::config::load_config(&paths.config_path).and_then(|cfg| {
+                if cmd == "data" {
+                    stackhour_store::data::run_data(&cfg, &tail)
+                } else {
+                    stackhour_store::backup::run_backup_cli(&cfg, &tail)
+                }
+            });
+            deferred(cmd, result)
+        }
+
+        // ---------------------------------------------------------------
+        // Verbs below the `const cfg = loadConfig()` line: a corrupt
+        // config.json fails HERE rather than inside the verb.
+        // ---------------------------------------------------------------
         "serve" => {
             let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
             let cfg = match stackhour_core::config::load_config(&paths.config_path) {
@@ -84,10 +130,24 @@ fn main() -> ExitCode {
                 }
             }
         }
+        "status" => {
+            let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+            let cfg = match stackhour_core::config::load_config(&paths.config_path) {
+                Ok(cfg) => cfg,
+                Err(err) => {
+                    eprintln!("stackhour status: {err}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            if status::run_status(&cfg) == 0 {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
         // Verbs that exist in the Node CLI but are not ported yet. Kept
         // distinct from the help path so we never silently claim parity.
-        "agent" | "import-wakatime" | "status" | "doctor" | "init" | "token" | "data"
-        | "backup" | "install" | "bridge" => {
+        "agent" | "import-wakatime" | "bridge" => {
             eprintln!("stackhour: `{cmd}` is not implemented in the Rust port yet");
             ExitCode::FAILURE
         }

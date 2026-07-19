@@ -34,7 +34,7 @@ use crate::{Error, Result};
 /// Zs) plus LineTerminator (LF CR LS PS). Rust's `char::is_whitespace`
 /// matches except it also strips U+0085 NEL (JS does not) and misses U+FEFF
 /// ZWNBSP (JS strips it).
-fn js_trim(s: &str) -> &str {
+pub fn js_trim(s: &str) -> &str {
     s.trim_matches(|c: char| c == '\u{FEFF}' || (c.is_whitespace() && c != '\u{0085}'))
 }
 
@@ -185,7 +185,7 @@ fn read_server_config(cfg_path: &Path) -> Result<LoadedConfig> {
 /// `writeConfig(configPath, config)`: `JSON.stringify(config, null, 2)+'\n'`,
 /// written via the atomic 0600 ritual (wx tmp, fsync, rename, chmod,
 /// best-effort dir fsync).
-fn write_raw_config(cfg_path: &Path, config: &Value) -> Result<()> {
+pub fn write_raw_config(cfg_path: &Path, config: &Value) -> Result<()> {
     let mut text = serde_json::to_string_pretty(config)?;
     text.push('\n');
     crate::fsutil::atomic_write_0600(cfg_path, text.as_bytes())?;
