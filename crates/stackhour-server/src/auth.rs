@@ -265,21 +265,18 @@ mod tests {
     #[test]
     fn open_mode_when_nothing_configured() {
         let cfg = json!({ "token": "", "tokens": {} });
+        assert_eq!(authenticate(&headers(None), "", &cfg), Some(Principal::Open));
         assert_eq!(
-            authenticate(&headers(None), "", &cfg),
+            authenticate(&headers(None), "", &json!({})),
             Some(Principal::Open)
         );
-        assert_eq!(authenticate(&headers(None), "", &json!({})), Some(Principal::Open));
     }
 
     #[test]
     fn malformed_tokens_map_is_ignored() {
         // An array (or any non-object) tokens field does not enable auth.
         let cfg = json!({ "token": "", "tokens": ["a", "b"] });
-        assert_eq!(
-            authenticate(&headers(None), "", &cfg),
-            Some(Principal::Open)
-        );
+        assert_eq!(authenticate(&headers(None), "", &cfg), Some(Principal::Open));
         // …but a legacy token alongside it still gates requests.
         let cfg = json!({ "token": "legacy", "tokens": "nonsense" });
         assert_eq!(authenticate(&headers(None), "", &cfg), None);

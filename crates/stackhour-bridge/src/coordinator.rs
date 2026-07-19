@@ -84,7 +84,10 @@ impl CoordCtx {
 
     /// The current registry snapshot (a cheap Arc clone).
     pub fn registry(&self) -> Arc<Registry> {
-        self.reg.read().map(|g| g.clone()).unwrap_or_else(|e| e.into_inner().clone())
+        self.reg
+            .read()
+            .map(|g| g.clone())
+            .unwrap_or_else(|e| e.into_inner().clone())
     }
 
     /// Install a freshly reloaded registry.
@@ -246,7 +249,11 @@ impl Runtime {
     }
 
     /// Build the planning environment from live state.
-    fn env<'a>(&self, reg: &'a Registry, labels: &'a IndexMap<String, String>) -> crate::commands::CommandEnv<'a> {
+    fn env<'a>(
+        &self,
+        reg: &'a Registry,
+        labels: &'a IndexMap<String, String>,
+    ) -> crate::commands::CommandEnv<'a> {
         crate::commands::CommandEnv {
             reg,
             target_labels: labels,
@@ -471,7 +478,11 @@ impl Runtime {
                 return;
             }
         };
-        let body = String::from_utf8_lossy(if out.stdout.is_empty() { &out.stderr } else { &out.stdout });
+        let body = String::from_utf8_lossy(if out.stdout.is_empty() {
+            &out.stderr
+        } else {
+            &out.stdout
+        });
         let text = body.trim();
         let text = if text.is_empty() {
             self.ctx.prompt("no-output", &[])
@@ -558,13 +569,9 @@ impl Runtime {
                 }
             } else if let Some(att) = att {
                 let caption = m.get("caption").and_then(Value::as_str).unwrap_or_default();
-                if let Some((caption, media)) = crate::media::handle_media_message(
-                    self.tg.as_ref(),
-                    &mctx,
-                    message_id,
-                    caption,
-                    &att,
-                ) {
+                if let Some((caption, media)) =
+                    crate::media::handle_media_message(self.tg.as_ref(), &mctx, message_id, caption, &att)
+                {
                     let prompt = crate::media::media_prompt(&reg.prompts, &caption, &media);
                     self.route_prompt(&prompt, None, None);
                 }
@@ -627,8 +634,8 @@ pub fn run_coordinator(runtime_dir: &Path) -> ! {
         log_line(&log_path, &format!("registry: {err}"));
     }
 
-    let mut tg_cfg = crate::telegram::TgConfig::new(cfg.token.clone(), cfg.chat_id)
-        .with_log_path(Some(log_path.clone()));
+    let mut tg_cfg =
+        crate::telegram::TgConfig::new(cfg.token.clone(), cfg.chat_id).with_log_path(Some(log_path.clone()));
     if let Some(root) = &cfg.api_root {
         tg_cfg = tg_cfg.with_api_root(root.clone());
     }

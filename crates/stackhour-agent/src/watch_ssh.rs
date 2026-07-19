@@ -48,10 +48,7 @@ fn foreground_cwd(pts: &str) -> Option<String> {
             Some((pid, stat.contains('+')))
         })
         .collect();
-    let pick = procs
-        .iter()
-        .find(|(_, fg)| *fg)
-        .or_else(|| procs.last())?;
+    let pick = procs.iter().find(|(_, fg)| *fg).or_else(|| procs.last())?;
     std::fs::read_link(format!("/proc/{}/cwd", pick.0))
         .ok()
         .map(|p| p.to_string_lossy().into_owned())
@@ -93,10 +90,7 @@ impl Watcher for SshWatcher {
     }
 
     fn run(&mut self, cfg: &Config, _state: &mut Value, now: f64) -> Result<Vec<Value>> {
-        let pts_dir = self
-            .pts_dir
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("/dev/pts"));
+        let pts_dir = self.pts_dir.clone().unwrap_or_else(|| PathBuf::from("/dev/pts"));
         let Ok(entries) = std::fs::read_dir(&pts_dir) else {
             // No /dev/pts (a container without devpts) is not an error.
             return Ok(Vec::new());

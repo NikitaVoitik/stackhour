@@ -45,7 +45,11 @@ fn pid_is_alive(pid: u32) -> bool {
 fn stored_pid(path: &Path) -> Option<u32> {
     let text = std::fs::read_to_string(path).ok()?;
     // `Number.parseInt` semantics: leading digits win, trailing junk ignored.
-    let digits: String = text.trim_start().chars().take_while(char::is_ascii_digit).collect();
+    let digits: String = text
+        .trim_start()
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
     digits.parse::<u32>().ok().filter(|p| *p > 0)
 }
 
@@ -68,10 +72,7 @@ fn try_acquire(path: &Path, pid: u32, may_retry: bool) -> Result<AgentLock> {
                 // Never leave a lock file we could not stamp with our pid —
                 // it would look like a live foreign lock forever.
                 let _ = std::fs::remove_file(path);
-                return Err(Error::msg(format!(
-                    "cannot write {}: {e}",
-                    path.display()
-                )));
+                return Err(Error::msg(format!("cannot write {}: {e}", path.display())));
             }
             Ok(AgentLock {
                 path: path.to_path_buf(),
@@ -98,10 +99,7 @@ fn try_acquire(path: &Path, pid: u32, may_retry: bool) -> Result<AgentLock> {
             let _ = std::fs::remove_file(path);
             try_acquire(path, pid, false)
         }
-        Err(e) => Err(Error::msg(format!(
-            "cannot create {}: {e}",
-            path.display()
-        ))),
+        Err(e) => Err(Error::msg(format!("cannot create {}: {e}", path.display()))),
     }
 }
 
@@ -167,10 +165,7 @@ mod tests {
         // pid 1 always exists and is not us.
         std::fs::write(lock_path(tmp.path()), "1").unwrap();
         let err = acquire(tmp.path()).unwrap_err();
-        assert_eq!(
-            err.message(),
-            "stackhour agent already running (pid 1)"
-        );
+        assert_eq!(err.message(), "stackhour agent already running (pid 1)");
         assert!(
             lock_path(tmp.path()).exists(),
             "a live foreign lock must not be deleted"

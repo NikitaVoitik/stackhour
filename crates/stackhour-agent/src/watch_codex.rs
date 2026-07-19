@@ -91,10 +91,7 @@ impl Watcher for CodexWatcher {
     }
 
     fn run(&mut self, cfg: &Config, state: &mut Value, now: f64) -> Result<Vec<Value>> {
-        let sessions_dir = self
-            .sessions_dir
-            .clone()
-            .unwrap_or_else(default_sessions_dir);
+        let sessions_dir = self.sessions_dir.clone().unwrap_or_else(default_sessions_dir);
         if !sessions_dir.exists() {
             return Ok(Vec::new());
         }
@@ -106,10 +103,7 @@ impl Watcher for CodexWatcher {
             &|name: &str| name.starts_with("rollout-") && name.ends_with(".jsonl"),
             &mut files,
         );
-        let live: HashSet<String> = files
-            .iter()
-            .map(|f| f.to_string_lossy().into_owned())
-            .collect();
+        let live: HashSet<String> = files.iter().map(|f| f.to_string_lossy().into_owned()).collect();
 
         let mut rows = Vec::new();
         for file in &files {
@@ -143,8 +137,7 @@ impl Watcher for CodexWatcher {
             if need_meta && md.len() > 0 {
                 if let Some(first) = tail::read_first_json_line(file, tail::MAX_HEAD_LINE) {
                     let body = payload(&first).clone();
-                    let is_session_meta =
-                        first.get("type").and_then(Value::as_str) == Some("session_meta");
+                    let is_session_meta = first.get("type").and_then(Value::as_str) == Some("session_meta");
                     if is_session_meta || truthy_str(&body, "cwd").is_some() {
                         if let Some(cwd) = truthy_str(&body, "cwd") {
                             meta.insert("cwd".into(), json!(cwd));
@@ -217,41 +210,40 @@ impl Watcher for CodexWatcher {
 
                 // Per-turn usage rides on token_count events. `last_token_usage`
                 // is the turn; the delta form is the fallback for older Codex.
-                let token_fields = (body.get("type").and_then(Value::as_str)
-                    == Some("token_count"))
-                .then(|| {
-                    body.pointer("/info/last_token_usage")
-                        .filter(|v| v.is_object())
-                        .or_else(|| {
-                            body.pointer("/info/total_token_usage_delta")
-                                .filter(|v| v.is_object())
-                        })
-                })
-                .flatten()
-                .map(|tu| {
-                    let n = |k: &str| tu.get(k).and_then(Value::as_f64).unwrap_or(0.0);
-                    let output = n("output_tokens") + n("reasoning_output_tokens");
-                    let cached = n("cached_input_tokens");
-                    (
-                        n("input_tokens"),
-                        output,
-                        cost_of(
-                            meta.get("model").and_then(Value::as_str).unwrap_or("gpt-5"),
-                            &Usage {
-                                // Cached input is billed at the cache-read
-                                // rate, so it must come OUT of `input`.
-                                input: (n("input_tokens") - cached).max(0.0),
-                                cache_read: cached,
-                                cache_write: 0.0,
-                                output,
-                            },
-                            cfg.pricing.as_ref(),
-                        ),
-                    )
-                });
+                let token_fields = (body.get("type").and_then(Value::as_str) == Some("token_count"))
+                    .then(|| {
+                        body.pointer("/info/last_token_usage")
+                            .filter(|v| v.is_object())
+                            .or_else(|| {
+                                body.pointer("/info/total_token_usage_delta")
+                                    .filter(|v| v.is_object())
+                            })
+                    })
+                    .flatten()
+                    .map(|tu| {
+                        let n = |k: &str| tu.get(k).and_then(Value::as_f64).unwrap_or(0.0);
+                        let output = n("output_tokens") + n("reasoning_output_tokens");
+                        let cached = n("cached_input_tokens");
+                        (
+                            n("input_tokens"),
+                            output,
+                            cost_of(
+                                meta.get("model").and_then(Value::as_str).unwrap_or("gpt-5"),
+                                &Usage {
+                                    // Cached input is billed at the cache-read
+                                    // rate, so it must come OUT of `input`.
+                                    input: (n("input_tokens") - cached).max(0.0),
+                                    cache_read: cached,
+                                    cache_write: 0.0,
+                                    output,
+                                },
+                                cfg.pricing.as_ref(),
+                            ),
+                        )
+                    });
 
-                let is_human_prompt = kind == "event_msg"
-                    && body.get("type").and_then(Value::as_str) == Some("user_message");
+                let is_human_prompt =
+                    kind == "event_msg" && body.get("type").and_then(Value::as_str) == Some("user_message");
 
                 // A patch event names the files it touched; prefer those over
                 // a single opaque app row.
@@ -336,10 +328,7 @@ mod tests {
         );
         assert_eq!(source_from_originator(Some(&json!("vscode"))), "codex-ide");
         assert_eq!(source_from_originator(Some(&json!("some-IDE"))), "codex-ide");
-        assert_eq!(
-            source_from_originator(Some(&json!("codex_cli_rs"))),
-            "codex-cli"
-        );
+        assert_eq!(source_from_originator(Some(&json!("codex_cli_rs"))), "codex-cli");
         assert_eq!(source_from_originator(None), "codex-cli");
     }
 
@@ -411,10 +400,7 @@ mod tests {
         );
         assert_eq!(rows[2]["cost"].as_f64().unwrap(), expected);
 
-        let mut files: Vec<&str> = rows[3..]
-            .iter()
-            .map(|r| r["entity"].as_str().unwrap())
-            .collect();
+        let mut files: Vec<&str> = rows[3..].iter().map(|r| r["entity"].as_str().unwrap()).collect();
         files.sort_unstable();
         assert_eq!(files, ["/w/proj/a.rs", "/w/proj/b.rs"]);
         assert_eq!(rows[3]["is_write"], 1);
@@ -470,9 +456,7 @@ mod tests {
             Gate::Run
         );
         assert_eq!(
-            CodexWatcher::default().gate(&crate::test_config(
-                json!({"agent": {"watch": {"codex": false}}})
-            )),
+            CodexWatcher::default().gate(&crate::test_config(json!({"agent": {"watch": {"codex": false}}}))),
             Gate::Skipped {
                 enabled: false,
                 available: false,

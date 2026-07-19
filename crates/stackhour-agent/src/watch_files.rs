@@ -172,13 +172,7 @@ impl Watcher for FilesWatcher {
         for root in &cfg.agent.project_roots {
             let root_path = Path::new(root);
             let mut files = Vec::new();
-            walk(
-                root_path,
-                &cfg.agent.ignore_dirs,
-                0,
-                max_depth,
-                &mut files,
-            );
+            walk(root_path, &cfg.agent.ignore_dirs, 0, max_depth, &mut files);
             for file in files {
                 let Ok(md) = std::fs::metadata(&file) else {
                     continue;
@@ -283,10 +277,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let root = tmp.path().join("proj");
         std::fs::create_dir(&root).unwrap();
-        assert_eq!(
-            FilesWatcher.gate(&config_with_roots(&tmp, &[&root])),
-            Gate::Run
-        );
+        assert_eq!(FilesWatcher.gate(&config_with_roots(&tmp, &[&root])), Gate::Run);
 
         // No roots -> skipped with the exact reason doctor surfaces.
         let cfg = config_with_roots(&tmp, &[]);

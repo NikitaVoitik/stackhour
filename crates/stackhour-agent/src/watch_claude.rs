@@ -128,10 +128,7 @@ impl Watcher for ClaudeWatcher {
     }
 
     fn run(&mut self, cfg: &Config, state: &mut Value, now: f64) -> Result<Vec<Value>> {
-        let projects_dir = self
-            .projects_dir
-            .clone()
-            .unwrap_or_else(default_projects_dir);
+        let projects_dir = self.projects_dir.clone().unwrap_or_else(default_projects_dir);
         if !projects_dir.exists() {
             return Ok(Vec::new());
         }
@@ -145,10 +142,7 @@ impl Watcher for ClaudeWatcher {
         );
 
         let mut rows = Vec::new();
-        let live: HashSet<String> = files
-            .iter()
-            .map(|f| f.to_string_lossy().into_owned())
-            .collect();
+        let live: HashSet<String> = files.iter().map(|f| f.to_string_lossy().into_owned()).collect();
 
         for file in &files {
             // Cheap skip. Note this deliberately does NOT apply tail.rs's
@@ -185,9 +179,7 @@ impl Watcher for ClaudeWatcher {
                     .filter(|s| !s.is_empty())
                     .unwrap_or("unknown")
                     .to_string();
-                let source = if line.get("entrypoint").and_then(Value::as_str)
-                    == Some("claude-desktop")
-                {
+                let source = if line.get("entrypoint").and_then(Value::as_str) == Some("claude-desktop") {
                     "claude-desktop"
                 } else {
                     "claude-code"
@@ -210,18 +202,13 @@ impl Watcher for ClaudeWatcher {
                 // the running max per id and charge only the positive delta;
                 // without this every partial write would be billed again.
                 let usage = line.pointer("/message/usage").filter(|v| v.is_object());
-                let usage_id = usage.and(
-                    line.pointer("/message/id")
-                        .map(stackhour_core::jsnum::js_display),
-                );
+                let usage_id = usage.and(line.pointer("/message/id").map(stackhour_core::jsnum::js_display));
                 let mut token_fields: Option<(f64, f64, f64)> = None;
                 if let Some(usage) = usage {
                     let current = read_usage(usage);
                     let previous = usage_id
                         .as_deref()
-                        .map(|id| {
-                            read_previous(crate::state::access::usage_by_id_mut(state), id)
-                        })
+                        .map(|id| read_previous(crate::state::access::usage_by_id_mut(state), id))
                         .unwrap_or([0.0; 4]);
                     let delta: Vec<f64> = current
                         .iter()
@@ -232,9 +219,7 @@ impl Watcher for ClaudeWatcher {
                         let maxed: Map<String, Value> = USAGE_KEYS
                             .iter()
                             .enumerate()
-                            .map(|(i, (key, _))| {
-                                ((*key).to_string(), json!(current[i].max(previous[i])))
-                            })
+                            .map(|(i, (key, _))| ((*key).to_string(), json!(current[i].max(previous[i]))))
                             .collect();
                         let map = crate::state::access::usage_by_id_mut(state);
                         map.insert(id.to_string(), Value::Object(maxed));
@@ -305,9 +290,7 @@ impl Watcher for ClaudeWatcher {
                             obj.insert("entity_type".into(), json!("file"));
                             obj.insert(
                                 "is_write".into(),
-                                json!(i32::from(
-                                    lowered.contains("edit") || lowered.contains("write")
-                                )),
+                                json!(i32::from(lowered.contains("edit") || lowered.contains("write"))),
                             );
                         }
                         // Tokens ride on the FIRST file row only, so a turn
@@ -552,9 +535,6 @@ mod tests {
         let mut w = ClaudeWatcher {
             projects_dir: Some(tmp.path().join("nope")),
         };
-        assert!(w
-            .run(&cfg(), &mut json!({}), 1_800_000_000.0)
-            .unwrap()
-            .is_empty());
+        assert!(w.run(&cfg(), &mut json!({}), 1_800_000_000.0).unwrap().is_empty());
     }
 }

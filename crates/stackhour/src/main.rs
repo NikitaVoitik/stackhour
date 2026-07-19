@@ -192,6 +192,31 @@ fn main() -> ExitCode {
             // configured token. Two pollers on one token silently steal each
             // other's messages, so the Node coordinator MUST be stopped first
             // — `bridge migrate` says so on the way out.
+            // The two halves of the Mac worker's on-disk protocol. Both are
+            // invoked over SSH by the worker (directly, or through the
+            // node shims the installer writes), touch no network, and are
+            // safe to run beside the live Node coordinator: `claim` only
+            // renames files the worker is entitled to take, `return` only
+            // publishes a result the worker produced.
+            Some(verb @ ("claim" | "return")) => {
+                let paths = match runtime_dir_from(&tail[1..]) {
+                    Ok(dir) => dir,
+                    Err(msg) => {
+                        eprintln!("stackhour bridge {verb}: {msg}");
+                        return ExitCode::FAILURE;
+                    }
+                };
+                let code = if verb == "claim" {
+                    stackhour_bridge::jobs::run_claim(&paths)
+                } else {
+                    // `argv[2]` in return.mjs: the first positional after the
+                    // verb, ignoring the --runtime-dir pair. A missing id is
+                    // exit 2 with the reference's own message.
+                    let id = positional_after(&tail[1..]).unwrap_or_default();
+                    stackhour_bridge::jobs::run_return(&paths, &id)
+                };
+                ExitCode::from(code as u8)
+            }
             Some(role @ ("coordinator" | "worker")) => {
                 let paths = match runtime_dir_from(&tail[1..]) {
                     Ok(dir) => dir,
@@ -247,9 +272,47 @@ fn runtime_dir_from(args: &[String]) -> Result<std::path::PathBuf, String> {
     Ok(stackhour_bridge::BridgePaths::resolve(&|k| std::env::var(k).ok(), &home).runtime_dir)
 }
 
+/// The first positional argument, skipping the `--runtime-dir <dir>` pair.
+///
+/// `return.mjs` reads a bare `argv[2]`; the Rust verb additionally accepts the
+/// runtime-dir flag either side of the id.
+fn positional_after(args: &[String]) -> Option<String> {
+    let mut it = args.iter();
+    while let Some(arg) = it.next() {
+        if arg == "--runtime-dir" {
+            let _ = it.next();
+            continue;
+        }
+        if arg.starts_with("--") {
+            continue;
+        }
+        return Some(arg.clone());
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{runtime_dir_from, HELP};
+    use super::{positional_after, runtime_dir_from, HELP};
+
+    fn argv(parts: &[&str]) -> Vec<String> {
+        parts.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn the_return_id_is_found_around_the_runtime_dir_flag() {
+        assert_eq!(positional_after(&argv(&["abc"])).as_deref(), Some("abc"));
+        assert_eq!(
+            positional_after(&argv(&["--runtime-dir", "/tmp/rt", "abc"])).as_deref(),
+            Some("abc")
+        );
+        assert_eq!(
+            positional_after(&argv(&["abc", "--runtime-dir", "/tmp/rt"])).as_deref(),
+            Some("abc")
+        );
+        assert_eq!(positional_after(&argv(&["--runtime-dir", "/tmp/rt"])), None);
+        assert_eq!(positional_after(&argv(&[])), None);
+    }
 
     #[test]
     fn an_explicit_runtime_dir_beats_the_environment() {

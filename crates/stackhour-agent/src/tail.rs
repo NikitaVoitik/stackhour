@@ -256,10 +256,7 @@ mod tests {
         assert_eq!(offsets[&key(&file)], json!(0));
 
         append(&file, "1}\n");
-        assert_eq!(
-            read_new_lines(&file, &mut offsets),
-            vec![json!({"partial": 1})]
-        );
+        assert_eq!(read_new_lines(&file, &mut offsets), vec![json!({"partial": 1})]);
     }
 
     /// One malformed complete line is dropped silently and must not block the

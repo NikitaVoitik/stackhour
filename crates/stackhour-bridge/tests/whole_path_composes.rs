@@ -148,19 +148,15 @@ fn fixture() -> Fixture {
     paths.ensure_dirs().expect("ensure dirs");
     let cfg = stackhour_bridge::config::load_coordinator_cfg(&paths.config_path).expect("config loads");
 
-    let reg = stackhour_core::registry::load_with(
-        config.path(),
-        stackhour_core::registry::EnvSource::fixed(&[]),
-    );
+    let reg =
+        stackhour_core::registry::load_with(config.path(), stackhour_core::registry::EnvSource::fixed(&[]));
     assert!(
         reg.errors.is_empty(),
         "the fixture config must be valid: {:?}",
         reg.errors
     );
 
-    let tg = Tg::with_config(
-        TgConfig::new(TOKEN, CHAT).with_api_root(&api.base),
-    );
+    let tg = Tg::with_config(TgConfig::new(TOKEN, CHAT).with_api_root(&api.base));
     let rt = Runtime::new(cfg, paths, tg, RegistryCtx::from_registry(reg));
 
     Fixture {
@@ -212,10 +208,7 @@ fn a_telegram_update_reaches_a_config_declared_command_and_comes_back_rendered()
     //    message being edited is the whole point of the status lifecycle.
     let sends = methods.iter().filter(|m| *m == "sendMessage").count();
     let edits = methods.iter().filter(|m| *m == "editMessageText").count();
-    assert!(
-        edits >= 1,
-        "the status message was never edited; saw {methods:?}"
-    );
+    assert!(edits >= 1, "the status message was never edited; saw {methods:?}");
     assert!(
         sends <= 2,
         "status should be edited, not resent: {sends} sendMessage calls in {methods:?}"
@@ -228,7 +221,12 @@ fn a_telegram_update_reaches_a_config_declared_command_and_comes_back_rendered()
         .api
         .requests()
         .iter()
-        .filter(|r| matches!(r.method.as_str(), "sendMessage" | "editMessageText" | "sendRichMessage"))
+        .filter(|r| {
+            matches!(
+                r.method.as_str(),
+                "sendMessage" | "editMessageText" | "sendRichMessage"
+            )
+        })
         .map(|r| {
             let v = &r.body;
             v["text"]
