@@ -186,6 +186,28 @@ fn main() -> ExitCode {
             // starts no poller, so it is safe to run beside the live Node
             // coordinator.
             Some("migrate") => bridge_migrate::run(&tail[1..]),
+            // The two daemons. Both long-poll or long-run and never return;
+            // `--runtime-dir <dir>` beats $STACKHOUR_BRIDGE_HOME, which beats
+            // the default, matching cli.mjs.
+            //
+            // `bridge coordinator` opens a getUpdates long-poll against the
+            // configured token. Two pollers on one token silently steal each
+            // other's messages, so the Node coordinator MUST be stopped first
+            // — `bridge migrate` says so on the way out.
+            Some(role @ ("coordinator" | "worker")) => {
+                let paths = match runtime_dir_from(&tail[1..]) {
+                    Ok(dir) => dir,
+                    Err(msg) => {
+                        eprintln!("stackhour bridge {role}: {msg}");
+                        return ExitCode::FAILURE;
+                    }
+                };
+                if role == "coordinator" {
+                    stackhour_bridge::coordinator::run_coordinator(&paths)
+                } else {
+                    stackhour_bridge::worker::run_worker(&paths)
+                }
+            }
             _ => {
                 eprintln!("stackhour: `{cmd}` is not implemented in the Rust port yet");
                 ExitCode::FAILURE
@@ -207,9 +229,43 @@ fn main() -> ExitCode {
     }
 }
 
+/// Resolve the bridge runtime dir for a daemon verb.
+///
+/// `--runtime-dir <dir>` comes from argv so it is the caller's job, exactly as
+/// in cli.mjs; everything below it is [`BridgePaths::resolve`]'s.
+fn runtime_dir_from(args: &[String]) -> Result<std::path::PathBuf, String> {
+    let mut it = args.iter();
+    while let Some(arg) = it.next() {
+        if arg == "--runtime-dir" {
+            return match it.next() {
+                Some(v) if !v.trim().is_empty() => Ok(std::path::PathBuf::from(v)),
+                _ => Err("--runtime-dir needs a directory".to_string()),
+            };
+        }
+    }
+    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+    Ok(stackhour_bridge::BridgePaths::resolve(&|k| std::env::var(k).ok(), &home).runtime_dir)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::HELP;
+    use super::{runtime_dir_from, HELP};
+
+    #[test]
+    fn an_explicit_runtime_dir_beats_the_environment() {
+        let args: Vec<String> = ["--runtime-dir", "/tmp/rt"].iter().map(|s| s.to_string()).collect();
+        assert_eq!(runtime_dir_from(&args).unwrap(), std::path::Path::new("/tmp/rt"));
+    }
+
+    /// A bare `--runtime-dir` must not silently resolve to the default and
+    /// point a daemon at the wrong jobs directory.
+    #[test]
+    fn a_runtime_dir_flag_without_a_value_is_an_error() {
+        let args = vec!["--runtime-dir".to_string()];
+        assert!(runtime_dir_from(&args).is_err());
+        let args = vec!["--runtime-dir".to_string(), "  ".to_string()];
+        assert!(runtime_dir_from(&args).is_err());
+    }
 
     /// The usage banner is a user-visible contract shared with the Node CLI.
     /// `tests-fixtures/help.txt` is a capture of `node bin/stackhour` with a
