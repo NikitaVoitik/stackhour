@@ -44,6 +44,11 @@ pub struct CoordinatorCfg {
     /// MOCK during parity testing. Absent in every real config, where the
     /// public `https://api.telegram.org` is used.
     pub api_root: Option<String>,
+    /// Speech-to-text endpoint (JSON key `elevenLabsEndpoint`), the same kind
+    /// of seam as [`Self::api_root`]: it exists so a parity run can point the
+    /// voice lane at a LOCAL MOCK instead of api.elevenlabs.io. Absent in
+    /// every real config, where [`crate::media::ELEVENLABS_ENDPOINT`] is used.
+    pub eleven_labs_endpoint: Option<String>,
 }
 
 /// `<runtime_dir>/worker-config.json` — the mac worker config.
@@ -108,11 +113,7 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
     let token = truthy_str(&raw, "token");
     let chat_id = safe_integer(raw.get("chatId"));
     let targets_of = |name: &str| raw.get("targets").and_then(|t| t.get(name));
-    if token.is_none()
-        || chat_id.is_none()
-        || targets_of("gcp").is_none()
-        || targets_of("mac").is_none()
-    {
+    if token.is_none() || chat_id.is_none() || targets_of("gcp").is_none() || targets_of("mac").is_none() {
         return Err(stackhour_core::Error::msg(
             "config.json must define token, an integer chatId, and gcp/mac targets.",
         ));
@@ -128,7 +129,11 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
                     label: truthy_str(t, "label").unwrap_or_else(|| name.clone()),
                     // The JSON key is `type`; `kind` is the Rust-side name.
                     kind: truthy_str(t, "type").unwrap_or_else(|| {
-                        if name == "gcp" { "local".into() } else { "remote".into() }
+                        if name == "gcp" {
+                            "local".into()
+                        } else {
+                            "remote".into()
+                        }
                     }),
                     cwd: truthy_str(t, "cwd"),
                     claude_bin: truthy_str(t, "claudeBin"),
@@ -161,6 +166,7 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
         targets,
         default_agent: truthy_str(&raw, "defaultAgent"),
         api_root: truthy_str(&raw, "apiRoot").map(|r| r.trim_end_matches('/').to_string()),
+        eleven_labs_endpoint: truthy_str(&raw, "elevenLabsEndpoint"),
         raw,
     })
 }
@@ -180,11 +186,7 @@ pub fn load_worker_cfg(path: &Path) -> Result<WorkerCfg> {
         truthy_str(&raw, "claudeBin"),
         truthy_str(&raw, "cwd"),
     );
-    if gcp_key.is_none()
-        || gcp_ssh.is_none()
-        || remote_dir.is_none()
-        || claude_bin.is_none()
-        || cwd.is_none()
+    if gcp_key.is_none() || gcp_ssh.is_none() || remote_dir.is_none() || claude_bin.is_none() || cwd.is_none()
     {
         return Err(stackhour_core::Error::msg(
             "worker-config.json must define gcpKey, gcpSsh, remoteDir, claudeBin, and cwd.",
@@ -221,7 +223,10 @@ pub fn validate_coordinator_config(v: &Value) -> Vec<String> {
     if safe_integer(v.get("chatId")).is_none() {
         errors.push("chatId must be an integer".into());
     }
-    if !matches!(v.get("defaultTarget").and_then(Value::as_str), Some("gcp" | "mac")) {
+    if !matches!(
+        v.get("defaultTarget").and_then(Value::as_str),
+        Some("gcp" | "mac")
+    ) {
         errors.push("defaultTarget must be gcp or mac".into());
     }
     for name in ["gcp", "mac"] {
@@ -230,7 +235,11 @@ pub fn validate_coordinator_config(v: &Value) -> Vec<String> {
         }
     }
     if let Some(local) = v.get("targets").and_then(|t| t.get("gcp")) {
-        for (key, label) in [("cwd", "cwd"), ("claudeBin", "claudeBin"), ("codexBin", "codexBin")] {
+        for (key, label) in [
+            ("cwd", "cwd"),
+            ("claudeBin", "claudeBin"),
+            ("codexBin", "codexBin"),
+        ] {
             if truthy_str(local, key).is_none() {
                 errors.push(format!("targets.gcp.{label} is required"));
             }
@@ -250,7 +259,15 @@ pub fn validate_worker_config(v: &Value) -> Vec<String> {
     if !v.is_object() {
         return vec!["config must be an object".into()];
     }
-    for key in ["gcpSsh", "gcpKey", "remoteDir", "remoteNode", "claudeBin", "codexBin", "cwd"] {
+    for key in [
+        "gcpSsh",
+        "gcpKey",
+        "remoteDir",
+        "remoteNode",
+        "claudeBin",
+        "codexBin",
+        "cwd",
+    ] {
         if truthy_str(v, key).is_none() {
             errors.push(format!("{key} is required"));
         }
@@ -501,7 +518,10 @@ mod tests {
 
     #[test]
     fn a_non_object_config_is_a_single_error() {
-        assert_eq!(validate_coordinator_config(&json!("nope")), ["config must be an object"]);
+        assert_eq!(
+            validate_coordinator_config(&json!("nope")),
+            ["config must be an object"]
+        );
         assert_eq!(validate_worker_config(&json!(7)), ["config must be an object"]);
     }
 
@@ -510,10 +530,15 @@ mod tests {
     fn an_invalid_permission_mode_is_rejected_but_an_absent_one_is_not() {
         let mut c = coordinator_fixture();
         c["targets"]["gcp"]["permissionMode"] = json!("yolo");
-        assert!(validate_coordinator_config(&c).contains(&"targets.gcp.permissionMode is invalid".to_string()));
+        assert!(
+            validate_coordinator_config(&c).contains(&"targets.gcp.permissionMode is invalid".to_string())
+        );
 
         let mut c = coordinator_fixture();
-        c["targets"]["gcp"].as_object_mut().unwrap().remove("permissionMode");
+        c["targets"]["gcp"]
+            .as_object_mut()
+            .unwrap()
+            .remove("permissionMode");
         assert!(validate_coordinator_config(&c).is_empty(), "absent means default");
     }
 
@@ -560,6 +585,36 @@ mod tests {
         assert_eq!(cfg.targets["gcp"].claude_bin.as_deref(), Some("/bin/claude"));
     }
 
+    /// Both endpoint seams are absent from every real config, and absent must
+    /// mean "the public endpoint" — a blank string is not a valid override
+    /// either, or a stray `"elevenLabsEndpoint": ""` would silently point
+    /// transcription at nowhere.
+    #[test]
+    fn the_endpoint_seams_default_to_the_public_services() {
+        let tmp = tempfile::tempdir().unwrap();
+        let p = write(tmp.path(), "config.json", &coordinator_fixture());
+        let cfg = load_coordinator_cfg(&p).unwrap();
+        assert_eq!(cfg.api_root, None);
+        assert_eq!(cfg.eleven_labs_endpoint, None);
+        assert_eq!(
+            crate::media::ElevenLabs::from_cfg(&cfg).endpoint,
+            crate::media::ELEVENLABS_ENDPOINT
+        );
+
+        let mut v = coordinator_fixture();
+        v["elevenLabsEndpoint"] = json!("");
+        let p = write(tmp.path(), "blank.json", &v);
+        assert_eq!(load_coordinator_cfg(&p).unwrap().eleven_labs_endpoint, None);
+
+        v["elevenLabsEndpoint"] = json!("http://127.0.0.1:9/v1/speech-to-text");
+        let p = write(tmp.path(), "mock.json", &v);
+        let cfg = load_coordinator_cfg(&p).unwrap();
+        assert_eq!(
+            crate::media::ElevenLabs::from_cfg(&cfg).endpoint,
+            "http://127.0.0.1:9/v1/speech-to-text"
+        );
+    }
+
     /// Unknown keys and key ORDER must survive a load, because migrate/install
     /// rewrite the file from `raw`.
     #[test]
@@ -571,7 +626,10 @@ mod tests {
         let cfg = load_coordinator_cfg(&p).unwrap();
         assert_eq!(cfg.raw["somethingNew"]["keep"], json!(true));
         let keys: Vec<&str> = cfg.raw.as_object().unwrap().keys().map(String::as_str).collect();
-        assert_eq!(keys, ["token", "chatId", "defaultTarget", "targets", "somethingNew"]);
+        assert_eq!(
+            keys,
+            ["token", "chatId", "defaultTarget", "targets", "somethingNew"]
+        );
     }
 
     /// The loose gate is coordinator.mjs's, and its message is the contract.
@@ -667,7 +725,10 @@ mod tests {
             "/usr/bin:/bin",
         )
         .unwrap();
-        assert!(unit.contains(r#"ExecStart="/usr/local/bin/stackhour" bridge coordinator"#), "{unit}");
+        assert!(
+            unit.contains(r#"ExecStart="/usr/local/bin/stackhour" bridge coordinator"#),
+            "{unit}"
+        );
         assert!(unit.contains("WantedBy=default.target"));
         assert!(unit.contains(r#"Environment="HOME=/home/me""#));
         assert!(unit.contains(r#"Environment="PATH=/usr/bin:/bin""#));
@@ -695,13 +756,21 @@ mod tests {
 
     #[test]
     fn the_launch_agent_escapes_xml_and_execs_the_binary() {
-        let plist = render_launch_agent("/opt/node&tools/stackhour", "/Users/me/A & B", "/Users/me", "/usr/bin:/bin");
+        let plist = render_launch_agent(
+            "/opt/node&tools/stackhour",
+            "/Users/me/A & B",
+            "/Users/me",
+            "/usr/bin:/bin",
+        );
         assert!(plist.contains(LAUNCHD_LABEL));
         assert!(plist.contains("node&amp;tools"), "{plist}");
         assert!(plist.contains("A &amp; B"), "{plist}");
         assert!(plist.contains("<string>bridge</string>"));
         assert!(plist.contains("<string>worker</string>"));
-        assert!(plist.contains("/Users/me/A &amp; B/worker.launchd.out.log"), "{plist}");
+        assert!(
+            plist.contains("/Users/me/A &amp; B/worker.launchd.out.log"),
+            "{plist}"
+        );
         for bad in ["__HOME__", "__NODE__", "worker.mjs"] {
             assert!(!plist.contains(bad), "{bad} leaked:\n{plist}");
         }

@@ -136,12 +136,16 @@ pub struct ElevenLabs {
 }
 
 impl ElevenLabs {
-    /// Pull the key off the coordinator config; endpoint and model take the
-    /// hardcoded JS values.
+    /// Pull the key off the coordinator config; the model takes the hardcoded
+    /// JS value and the endpoint does too unless the config carries the
+    /// `elevenLabsEndpoint` test seam (absent in every real config).
     pub fn from_cfg(cfg: &CoordinatorCfg) -> Self {
         ElevenLabs {
             api_key: cfg.eleven_labs_api_key.clone(),
-            endpoint: ELEVENLABS_ENDPOINT.to_string(),
+            endpoint: cfg
+                .eleven_labs_endpoint
+                .clone()
+                .unwrap_or_else(|| ELEVENLABS_ENDPOINT.to_string()),
             model_id: ELEVENLABS_MODEL.to_string(),
         }
     }

@@ -21,13 +21,17 @@ const copy = join(scratchDir, 'coordinator.mjs');
 copyFileSync(source, copy);
 
 const REAL = 'https://api.telegram.org';
+// The voice lane posts to ElevenLabs. It is redirected to the same local mock
+// so a parity run never leaves the loopback interface and never spends (or
+// even sees) a real speech-to-text key.
+const REAL_STT = 'https://api.elevenlabs.io';
 const realFetch = globalThis.fetch;
 globalThis.fetch = (input, init) => {
   const url = typeof input === 'string' ? input : input.url;
-  if (!url.startsWith(REAL)) {
-    throw new Error(`parity harness blocked a non-mock request: ${url}`);
+  for (const host of [REAL, REAL_STT]) {
+    if (url.startsWith(host)) return realFetch(mockBase + url.slice(host.length), init);
   }
-  return realFetch(mockBase + url.slice(REAL.length), init);
+  throw new Error(`parity harness blocked a non-mock request: ${url}`);
 };
 
 await import(pathToFileURL(copy).href);

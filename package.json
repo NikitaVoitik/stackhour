@@ -9,7 +9,8 @@
   },
   "scripts": {
     "test": "node --experimental-sqlite --no-warnings --test",
-    "test:parity": "node test/parity/command-surface.mjs"
+    "test:parity": "node test/parity/command-surface.mjs && node test/parity/media-and-voice.mjs",
+    "test:parity:media": "node test/parity/media-and-voice.mjs"
   },
   "engines": {
     "node": ">=22"
