@@ -322,6 +322,11 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
         &agent_files,
         &mut errors,
     );
+    // Inheritance BEFORE cross-reference: an agent inherits the engine and
+    // skills its references are checked against, so an `extends` child that
+    // declares neither must be flattened first or it is rejected for an
+    // engine it does in fact have.
+    agent_def::resolve_inheritance(&mut agents, &mut errors);
     let engine_names = keys_of(&engines);
     let skill_names = keys_of(&skills);
     cross_reference_agents(

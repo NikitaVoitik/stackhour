@@ -173,9 +173,7 @@ pub fn apply_agent(def: &EngineDef, agent: Option<&AgentDef>, reg: &Registry, re
 /// (engines are swappable; an agent should not break when moved to one that
 /// has no such flag).
 pub fn agent_effort<'a>(def: &EngineDef, agent: Option<&'a AgentDef>) -> Option<&'a str> {
-    if def.effort_args.is_none() {
-        return None;
-    }
+    def.effort_args.as_ref()?;
     agent.and_then(|a| a.effort.as_deref())
 }
 
