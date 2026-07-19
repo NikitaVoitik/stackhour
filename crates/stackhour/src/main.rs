@@ -25,7 +25,40 @@ mod status;
 
 /// The help text body (everything before the trailing dynamic
 /// `config: <path>` line). Byte-exact vs tests-fixtures/help.txt.
-const HELP: &str = "REPLACED-BY-IMPLEMENTATION: pin to tests-fixtures/help.txt";
+const HELP: &str = concat!(
+    "stackhour — self-hosted coding time tracker\n",
+    "\n",
+    "usage: stackhour <command>\n",
+    "\n",
+    "  serve             run the server (ingest API + dashboard) on this machine\n",
+    "  agent [--once]    run the watcher agent (files, claude, codex, mac apps)\n",
+    "  import-wakatime [--days=365]   backfill history from wakatime.com\n",
+    "  status            print today's totals from the server\n",
+    "  doctor [--json]   check config, inputs, database, server, and services\n",
+    "  init server [--public-url=URL] [--project-root=PATH ...] [--install]\n",
+    "                    configure the server and its local agent\n",
+    "  init agent --enrollment=CODE [--project-root=PATH ...] [--install]\n",
+    "                    enroll and optionally install an agent service\n",
+    "  token create MACHINE [--force] [--raw] [--server-url=URL]\n",
+    "                    enroll a machine and print its copy-paste command\n",
+    "  token list                       list enrolled machines (never secrets)\n",
+    "  token revoke MACHINE             revoke a machine token\n",
+    "  data stats [--json]              inspect local database size and coverage\n",
+    "  data export --output=FILE [--from=TIME] [--to=TIME] [--force]\n",
+    "                                   atomically export JSONL\n",
+    "  data prune --before=TIME [--confirm]\n",
+    "                                   preview or confirm retention pruning\n",
+    "  backup create [--output=FILE] [--force]\n",
+    "                                   create and verify a consistent snapshot\n",
+    "  backup verify FILE               integrity-check a backup\n",
+    "  backup restore FILE [--confirm]  preview or restore, preserving old DB\n",
+    "  install <server|agent>           install and start user service(s)\n",
+    "  bridge install <coordinator|worker> [--reconfigure] [--no-start]\n",
+    "                                   set up the Telegram Claude/Codex bridge\n",
+    "  bridge doctor|status|restart <coordinator|worker>\n",
+    "                                   operate the bridge service\n",
+    "\n",
+);
 
 fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args().collect();
@@ -51,10 +84,40 @@ fn main() -> ExitCode {
                 }
             }
         }
-        // Remaining verbs are still scaffold; see the module stubs.
-        other => {
-            eprintln!("stackhour: `{other}` is not implemented in the Rust port yet");
+        // Verbs that exist in the Node CLI but are not ported yet. Kept
+        // distinct from the help path so we never silently claim parity.
+        "agent" | "import-wakatime" | "status" | "doctor" | "init" | "token" | "data"
+        | "backup" | "install" | "bridge" => {
+            eprintln!("stackhour: `{cmd}` is not implemented in the Rust port yet");
             ExitCode::FAILURE
         }
+        // Node's `default:` case — an unknown verb (or none) prints usage and
+        // exits 0. `loadConfig()` runs BEFORE the switch in cli.js, so a
+        // corrupt config.json must fail here rather than print help.
+        _ => {
+            let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+            if let Err(err) = stackhour_core::config::load_config(&paths.config_path) {
+                eprintln!("stackhour: {err}");
+                return ExitCode::FAILURE;
+            }
+            print!("{HELP}");
+            println!("config: {}", paths.config_path.display());
+            ExitCode::SUCCESS
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HELP;
+
+    /// The usage banner is a user-visible contract shared with the Node CLI.
+    /// `tests-fixtures/help.txt` is a capture of `node bin/stackhour` with a
+    /// trailing dynamic `config: <path>` line; HELP is everything before it.
+    #[test]
+    fn help_body_matches_the_node_fixture() {
+        let fixture = include_str!("../../../tests-fixtures/help.txt");
+        let body = &fixture[..fixture.rfind("config: ").expect("fixture has a config: line")];
+        assert_eq!(HELP, body);
     }
 }
