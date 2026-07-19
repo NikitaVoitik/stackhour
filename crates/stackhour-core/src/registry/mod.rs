@@ -647,8 +647,7 @@ impl Registry {
     /// A full rebuild is deliberate: it is cheap (a handful of small files)
     /// and it cannot drift, which incremental reload always eventually does.
     pub fn reload_if_changed(&mut self) -> bool {
-        let current = stat_dir_mtimes(&self.root);
-        if current == self.mtimes {
+        if !self.changed_on_disk() {
             return false;
         }
         let root = self.root.clone();
@@ -657,9 +656,23 @@ impl Registry {
         true
     }
 
+    /// Six `stat` calls: has anything the loader watches changed since this
+    /// registry was built? Pure — makes no change. Exposed so a caller that
+    /// shares the registry behind an `Arc` (and therefore cannot take `&mut`)
+    /// can still decide whether a rebuild is needed.
+    pub fn changed_on_disk(&self) -> bool {
+        stat_dir_mtimes(&self.root) != self.mtimes
+    }
+
     /// The registry root (= config dir).
     pub fn root(&self) -> &Path {
         &self.root
+    }
+
+    /// The env layer this registry was loaded with, so a caller rebuilding it
+    /// from scratch reproduces the same precedence.
+    pub fn env_source(&self) -> &EnvSource {
+        &self.env
     }
 }
 

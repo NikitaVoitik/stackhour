@@ -212,7 +212,13 @@ impl CommandDef {
     /// Parse a `commands/<name>.toml` document written by a USER: `kind =
     /// "builtin"` is rejected and [`RESERVED`] names are refused.
     pub fn parse(name: &str, v: &toml::Value) -> Result<Self, FieldError> {
-        let def = Self::parse_inner(name, v)?;
+        if RESERVED.contains(&name) {
+            return Err(FieldError::file_level(format!(
+                "'{name}' is a reserved built-in command and cannot be redefined (reserved: {})",
+                RESERVED.join(", ")
+            )));
+        }
+        let def = Self::parse_inner(name, v, true)?;
         if def.kind == CommandKind::Builtin {
             return Err(FieldError::key(
                 "kind",
@@ -228,7 +234,7 @@ impl CommandDef {
         Self::parse(name, v).map_err(|e| e.message())
     }
 
-    fn parse_inner(name: &str, v: &toml::Value) -> Result<Self, FieldError> {
+    fn parse_inner(name: &str, v: &toml::Value, user: bool) -> Result<Self, FieldError> {
         let table = toml_util::root_table(v, "command file")?;
 
         if !valid_command_name(name) {
@@ -237,13 +243,6 @@ impl CommandDef {
                  letters, digits, or underscores"
             )));
         }
-        if RESERVED.contains(&name) {
-            return Err(FieldError::file_level(format!(
-                "'{name}' is a reserved built-in command and cannot be redefined (reserved: {})",
-                RESERVED.join(", ")
-            )));
-        }
-
         let description = toml_util::req_string(table, "description")?;
 
         let kind_str = toml_util::req_string(table, "kind")?;
@@ -282,7 +281,7 @@ impl CommandDef {
             }
         };
 
-        validate_aliases(name, &aliases)?;
+        validate_aliases(name, &aliases, user)?;
         let args = args::parse_arg_specs(table)?;
 
         // Wherever a target appears (kind=target or a pre-switch), it must
@@ -468,7 +467,7 @@ impl CommandDef {
 /// Alias rules checkable from ONE file: valid name, not the command's own
 /// name, not reserved, not listed twice. Cross-file collisions are
 /// [`alias_conflicts`].
-fn validate_aliases(name: &str, aliases: &[String]) -> Result<(), FieldError> {
+fn validate_aliases(name: &str, aliases: &[String], user: bool) -> Result<(), FieldError> {
     for (i, alias) in aliases.iter().enumerate() {
         if !valid_command_name(alias) {
             return Err(FieldError::key(
@@ -485,7 +484,9 @@ fn validate_aliases(name: &str, aliases: &[String]) -> Result<(), FieldError> {
                 format!("'{alias}' duplicates the command's own name"),
             ));
         }
-        if RESERVED.contains(&alias.as_str()) {
+        // The shipped table legitimately aliases /start to /help; only USER
+        // files are forbidden from claiming a reserved verb.
+        if user && RESERVED.contains(&alias.as_str()) {
             return Err(FieldError::key(
                 "aliases",
                 format!("'{alias}' is a reserved built-in command"),
@@ -611,7 +612,7 @@ pub fn builtin_commands() -> IndexMap<String, CommandDef> {
         let value: toml::Value = text
             .parse()
             .unwrap_or_else(|e| panic!("embedded command '{name}' is not valid TOML: {e}"));
-        let def = CommandDef::parse_inner(name, &value)
+        let def = CommandDef::parse_inner(name, &value, false)
             .unwrap_or_else(|e| panic!("embedded command '{name}' is invalid: {e}"));
         out.insert(def.command.clone(), def);
     }
