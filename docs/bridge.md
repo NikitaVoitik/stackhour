@@ -774,6 +774,136 @@ declares no tool allow/deny flag templates. The values are computed and
 exposed (`souls::agent_effort`, `souls::tool_policy`) so that connecting them
 is a change in the engine runner alone.
 
+### Prompt templates
+
+Every string the bridge sends to Telegram, and every prompt it composes for an
+engine, is a **named template**. There is no user-facing text hardcoded in the
+runtime: the shipped bodies live in one flat, reviewable table
+(`registry/prompt_defaults.rs`) and any single one of them can be replaced by
+dropping a file into `prompts/`.
+
+```
+~/.config/stackhour/prompts/
+  status.md      # replaces the shipped template named "status"
+  deploy.md      # a NEW template, referenced by commands and skills
+```
+
+The file stem is the template name. A stem matching a shipped template
+overrides it; any other stem defines a new template that commands
+(`kind = "prompt"`, `template = `) and skills (`template = `) may reference by
+name — those references are cross-checked at load time, so a typo names the
+file and key rather than failing silently at send time.
+
+Delete an override and the shipped body comes back, byte for byte. With no
+`prompts/` directory at all every message is exactly what the Node bridge
+sends today; that is asserted template by template in the tests.
+
+#### Substitution
+
+`{{placeholder}}` is a literal, single-pass string replacement. There is no
+logic, no loops, no conditionals, no escaping, and **unknown placeholders are
+left verbatim** rather than blanked — a typo shows up in the message instead of
+quietly deleting a word. Values are pasted as-is, so a template rendered into
+a Telegram HTML message escapes its own inputs upstream, not here.
+
+Substitution is sequential in the order the runtime passes its values, so a
+value that itself contains a later placeholder will be substituted again by
+that later value. This is deliberate dumb-template behaviour; do not build
+anything on it.
+
+#### Documented placeholders
+
+Each shipped template documents its slots: the key, what the value means, and
+whether dropping it loses information.
+
+```
+$ stackhour bridge doctor
+✗ prompts/status.md: drops required placeholder {{session}}
+```
+
+That check is the point of the documentation. A user who rewrites `/where` and
+forgets `{{session}}` would otherwise lose the session id from every status
+reply with no error anywhere. Optional placeholders (`{{duration}}` in the
+result footer, say) are a matter of taste and are never reported.
+
+Programmatically: `PromptStore::placeholders(name)` returns the documented
+slots, `missing_required(name)` the required ones an override drops, and
+`lint()` every broken override at once.
+
+#### The catalogue
+
+| Template | What it is | Placeholders (**bold** = required) |
+| --- | --- | --- |
+| `system` | the composed agent system prompt | **soul**, **skills** |
+| `agent-turn` | system text prepended to a turn for engines that take no system-prompt flag | **system**, **prompt** |
+| `status-line` | the live status message while a job runs | **engine**, **target**, **activity** |
+| `status-working` | the initial `activity` value | — |
+| `status-queued` | the `activity` value for a Mac job queued while the Mac sleeps | — |
+| `activity-tool` | one tool-use line inside the status message | **name**, detail |
+| `status` | the `/where` reply | **engine**, **target**, **session**, **worker**, **busy** |
+| `session-none` | the `session` value when there is no session | — |
+| `final` | the answer plus its `— Engine · Target · duration` footer | **text**, **engine**, **target**, duration |
+| `no-output` | the engine exited cleanly having said nothing | — |
+| `empty-chunk` | placeholder for an empty HTML fallback chunk | — |
+| `help` | the `/help` body | commands, engine, target |
+| `menu` | the `/menu` header | **engine**, **target** |
+| `online` | the startup banner | **engine**, **target**, **worker** |
+| `switch-engine` | reply to `/claude`, `/codex` | **engine**, **target**, session |
+| `switch-target` | reply to `/mac`, `/gcp` | **target**, **engine**, session |
+| `session-resuming` / `session-new` | the `session` clause of those two replies | — |
+| `session-reset` | reply to `/new` | **engine**, **target** |
+| `stop-local` | `/stop` killed the local job | — |
+| `stop-cancelled` | `/stop` removed queued Mac jobs | **count** |
+| `stop-claimed` | `/stop` could not reach already-claimed Mac jobs | **count** |
+| `stop-idle` | `/stop` with nothing running | — |
+| `cancelled` | status message of a job cancelled while queued | — |
+| `unknown-command` | a `/slash` that matched nothing | **help** |
+| `toast-engine`, `toast-target`, `toast-new`, `toast-stop` | inline-keyboard toasts | **engine** / **target** / — / — |
+| `media-image`, `media-video` | the engine prompt for an attachment | **request**, kind, mime, name, **path** |
+| `media-request-image`, `media-request-video` | the `request` value when there is no caption | — |
+| `transcribing` | shown while a voice message is transcribed | — |
+| `transcript` | the transcript echoed back | **transcript** |
+| `error-media-size`, `error-media-limit` | attachment rejected on size | **size**, **limit** |
+| `error-media` | attachment could not be processed | **error** |
+| `error-transcribe` | transcription failed | **error** |
+| `error-run` | the engine failed to start or errored | **error** |
+| `error-exit` | the engine exited non-zero locally | **engine**, **code**, stderr |
+| `error-mac`, `error-exit-mac` | the Mac worker reported a failure | **error** / **engine**, **code** |
+| `error-generic` | an unexpected coordinator-side failure | **error** |
+
+`builtin_names()` returns these in table order, so anything that lists
+templates is stable across runs.
+
+#### `help` and `{{commands}}`
+
+The shipped `help` body is the Node bridge's frozen HTML blob, with no
+`{{commands}}` in it — that is what keeps `/help` byte-identical for a user who
+has configured nothing. An override that *does* use `{{commands}}` gets the
+generated command table instead, one `/usage — description` line per visible
+command, HTML-escaped. See [Generated help](#generated-help).
+
+#### A worked example
+
+`~/.config/stackhour/prompts/status.md` — a terser `/where`, one line instead
+of five, keeping every required placeholder:
+
+```markdown
+<!--
+  Overrides the shipped "status" template (the /where reply).
+  Placeholders: {{engine}} {{target}} {{session}} {{worker}} {{busy}}
+  Dropping any of them is reported by `stackhour bridge doctor`.
+-->
+{{engine}} on {{target}} · session {{session}} · worker {{worker}} · busy {{busy}}
+```
+
+Save it and the next `/where` uses it — prompt files are re-stat'd on every
+render and re-read when their mtime moves, so there is no reload and no
+restart. Delete it and the five-line reply comes back unchanged.
+
+`prompts/help.md` and `prompts/deploy.md` in the starter tree
+(`stackhour bridge init --config-dir`) are the other two shapes: overriding a
+shipped template, and defining a brand new one that a command references.
+
 ## Security
 
 This is intentionally a remote-execution bridge. Protect the Telegram account, bot token, SSH key, and agent credentials as privileged access.
