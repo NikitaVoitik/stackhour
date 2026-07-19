@@ -354,8 +354,7 @@ description = "free-text note"
 
     #[test]
     fn duplicate_names_are_rejected() {
-        let e =
-            parse_arg_specs(&t("[[args]]\nname = \"a\"\n\n[[args]]\nname = \"a\"\n")).unwrap_err();
+        let e = parse_arg_specs(&t("[[args]]\nname = \"a\"\n\n[[args]]\nname = \"a\"\n")).unwrap_err();
         assert_eq!(e.key, "args[1].name");
         assert_eq!(e.msg, "duplicate argument name 'a'");
     }
@@ -392,19 +391,14 @@ description = "free-text note"
 
     #[test]
     fn required_plus_default_is_contradictory() {
-        let e = parse_arg_specs(&t(
-            "[[args]]\nname = \"env\"\nrequired = true\ndefault = \"x\"\n",
-        ))
-        .unwrap_err();
+        let e =
+            parse_arg_specs(&t("[[args]]\nname = \"env\"\nrequired = true\ndefault = \"x\"\n")).unwrap_err();
         assert_eq!(e.key, "args[0].default");
     }
 
     #[test]
     fn rest_cannot_have_choices() {
-        let e = parse_arg_specs(&t(
-            "[[args]]\nname = \"n\"\nrest = true\nchoices = [\"a\"]\n",
-        ))
-        .unwrap_err();
+        let e = parse_arg_specs(&t("[[args]]\nname = \"n\"\nrest = true\nchoices = [\"a\"]\n")).unwrap_err();
         assert_eq!(e.key, "args[0].choices");
     }
 
@@ -426,9 +420,8 @@ description = "free-text note"
 
     #[test]
     fn binds_positionally_and_keeps_rest_verbatim() {
-        let s = specs(
-            "[[args]]\nname = \"env\"\nrequired = true\n\n[[args]]\nname = \"note\"\nrest = true\n",
-        );
+        let s =
+            specs("[[args]]\nname = \"env\"\nrequired = true\n\n[[args]]\nname = \"note\"\nrest = true\n");
         let bound = bind_args(&s, "prod  ship   it now").unwrap();
         assert_eq!(bound["env"], "prod");
         assert_eq!(bound["note"], "ship   it now");
@@ -450,10 +443,7 @@ description = "free-text note"
         let s = specs("[[args]]\nname = \"env\"\nrequired = true\ndescription = \"where to deploy\"\n");
         let e = bind_args(&s, "   ").unwrap_err();
         assert_eq!(e.key, "env");
-        assert_eq!(
-            e.msg,
-            "missing required argument 'env' (where to deploy)"
-        );
+        assert_eq!(e.msg, "missing required argument 'env' (where to deploy)");
     }
 
     #[test]
@@ -480,10 +470,7 @@ description = "free-text note"
         let s = specs("[[args]]\nname = \"env\"\nrequired = true\n");
         let e = bind_args(&s, "prod extra stuff").unwrap_err();
         assert_eq!(e.key, "args");
-        assert_eq!(
-            e.msg,
-            "unexpected extra argument 'extra' (usage: <env>)"
-        );
+        assert_eq!(e.msg, "unexpected extra argument 'extra' (usage: <env>)");
     }
 
     #[test]

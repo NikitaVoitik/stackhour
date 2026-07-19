@@ -158,7 +158,10 @@ mod tests {
 
     #[test]
     fn nested_and_under_compose_dotted_keys() {
-        assert_eq!(FieldError::nested("resume", "subcommand", "x").key, "resume.subcommand");
+        assert_eq!(
+            FieldError::nested("resume", "subcommand", "x").key,
+            "resume.subcommand"
+        );
         assert_eq!(FieldError::key("name", "x").under("args[0]").key, "args[0].name");
         assert_eq!(FieldError::file_level("x").under("hooks").key, "hooks");
     }

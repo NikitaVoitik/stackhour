@@ -149,7 +149,8 @@ mod tests {
     fn bump_mtime(dir: &Path) {
         let f = std::fs::File::open(dir).unwrap();
         let future = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
-        f.set_times(std::fs::FileTimes::new().set_modified(future)).unwrap();
+        f.set_times(std::fs::FileTimes::new().set_modified(future))
+            .unwrap();
     }
 
     #[test]

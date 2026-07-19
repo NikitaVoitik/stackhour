@@ -21,5 +21,10 @@
     "idleSeconds": 120
   },
   "summary": { "capSeconds": 120, "lastEventCreditSeconds": 60 },
-  "wakatime": { "apiKey": "waka_xxx (only needed for import-wakatime)" }
+  "wakatime": { "apiKey": "waka_xxx (only needed for import-wakatime)" },
+  "bridge": {
+    "defaultAgent": "reviewer",
+    "defaultEngine": "claude",
+    "defaultTarget": "gcp"
+  }
 }

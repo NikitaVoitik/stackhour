@@ -234,7 +234,11 @@ mod tests {
                 if path.is_dir() {
                     stack.push(path);
                 } else {
-                    let rel = path.strip_prefix(&root).unwrap().to_string_lossy().replace('\\', "/");
+                    let rel = path
+                        .strip_prefix(&root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace('\\', "/");
                     found.push(rel);
                 }
             }

@@ -968,10 +968,7 @@ effort_args = ["--reasoning-effort", "{{effort}}"]
     #[test]
     fn effort_args_are_omitted_when_the_agent_sets_no_effort() {
         let def = effort_engine();
-        assert_eq!(
-            def.assemble_argv(&ArgvVars::default()),
-            vec!["run", "-"]
-        );
+        assert_eq!(def.assemble_argv(&ArgvVars::default()), vec!["run", "-"]);
     }
 
     #[test]
@@ -994,11 +991,7 @@ effort_args = ["--reasoning-effort", "{{effort}}"]
 
     #[test]
     fn effort_args_default_to_none_when_absent_from_toml() {
-        let def = EngineDef::from_toml(
-            "x",
-            &"bin = \"x\"\n".parse::<toml::Value>().unwrap(),
-        )
-        .unwrap();
+        let def = EngineDef::from_toml("x", &"bin = \"x\"\n".parse::<toml::Value>().unwrap()).unwrap();
         assert_eq!(def.effort_args, None);
     }
 

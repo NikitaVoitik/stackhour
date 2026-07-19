@@ -486,19 +486,30 @@ fn resolve_defaults(
                         kind: RegistryEntityKind::Registry,
                         name: String::new(),
                         file: Some(config_json.clone()),
-                        message: FieldError::key(
-                            format!("bridge.{key}"),
-                            "must be a non-empty string",
-                        )
-                        .message(),
-                        });
+                        message: FieldError::key(format!("bridge.{key}"), "must be a non-empty string")
+                            .message(),
+                    });
                     None
                 }
             }
         };
         let (agent, engine, target) = (take("defaultAgent"), take("defaultEngine"), take("defaultTarget"));
-        apply_default_agent(&mut out, agent, agents, &config_json, "bridge.defaultAgent", errors);
-        apply_default_engine(&mut out, engine, engines, &config_json, "bridge.defaultEngine", errors);
+        apply_default_agent(
+            &mut out,
+            agent,
+            agents,
+            &config_json,
+            "bridge.defaultAgent",
+            errors,
+        );
+        apply_default_engine(
+            &mut out,
+            engine,
+            engines,
+            &config_json,
+            "bridge.defaultEngine",
+            errors,
+        );
         apply_default_target(&mut out, target, &config_json, "bridge.defaultTarget", errors);
     }
 
@@ -546,8 +557,7 @@ fn apply_default_agent(
     let known = keys_of(agents);
     errors.push(defaults_error(
         file,
-        FieldError::key(key, format!("references unknown agent '{name}'"))
-            .with_known(&known_slice(&known)),
+        FieldError::key(key, format!("references unknown agent '{name}'")).with_known(&known_slice(&known)),
     ));
 }
 
@@ -567,8 +577,7 @@ fn apply_default_engine(
     let known = keys_of(engines);
     errors.push(defaults_error(
         file,
-        FieldError::key(key, format!("references unknown engine '{name}'"))
-            .with_known(&known_slice(&known)),
+        FieldError::key(key, format!("references unknown engine '{name}'")).with_known(&known_slice(&known)),
     ));
 }
 
@@ -612,7 +621,10 @@ fn read_bridge_object(
         Ok(t) => t,
         Err(e) if e.kind() == ErrorKind::NotFound => return None,
         Err(e) => {
-            errors.push(defaults_error(path, FieldError::file_level(format!("cannot read file: {e}"))));
+            errors.push(defaults_error(
+                path,
+                FieldError::file_level(format!("cannot read file: {e}")),
+            ));
             return None;
         }
     };
@@ -1361,10 +1373,7 @@ mod tests {
         assert!(reg.errors.is_empty(), "{:?}", reg.errors);
         assert!(reg.agents.is_empty());
         assert!(reg.skills.is_empty());
-        assert_eq!(
-            reg.engines.keys().collect::<Vec<_>>(),
-            vec!["claude", "codex"]
-        );
+        assert_eq!(reg.engines.keys().collect::<Vec<_>>(), vec!["claude", "codex"]);
         assert_eq!(reg.defaults, ResolvedDefaults::default());
     }
 
@@ -1520,11 +1529,7 @@ mod tests {
     #[test]
     fn an_agent_naming_an_unknown_engine_is_dropped_with_a_file_and_key() {
         let dir = tmpdir();
-        write(
-            dir.path(),
-            "agents/reviewer/agent.toml",
-            "engine = \"gpt5\"\n",
-        );
+        write(dir.path(), "agents/reviewer/agent.toml", "engine = \"gpt5\"\n");
         let reg = load_with(dir.path(), EnvSource::fixed(&[]));
         assert!(reg.agents.is_empty(), "a broken agent must be skipped");
         assert_eq!(reg.errors.len(), 1);
@@ -1553,7 +1558,10 @@ mod tests {
             "bin = \"g\"\nkind = \"plain-lines\"\n",
         );
         let reg = load_with(dir.path(), EnvSource::fixed(&[]));
-        assert!(reg.engines.contains_key("good"), "one bad file must not stop the scan");
+        assert!(
+            reg.engines.contains_key("good"),
+            "one bad file must not stop the scan"
+        );
         assert!(!reg.engines.contains_key("bad"));
         assert_eq!(reg.errors.len(), 1);
         assert_eq!(reg.errors[0].name, "bad");
@@ -1578,11 +1586,7 @@ mod tests {
     #[test]
     fn the_bridge_object_sets_the_scalar_defaults() {
         let dir = tmpdir();
-        write(
-            dir.path(),
-            "agents/reviewer/agent.toml",
-            "engine = \"claude\"\n",
-        );
+        write(dir.path(), "agents/reviewer/agent.toml", "engine = \"claude\"\n");
         write(dir.path(), "agents/reviewer/soul.md", "x\n");
         fs::write(
             dir.path().join("config.json"),
@@ -1614,8 +1618,10 @@ mod tests {
                 "key `bridge.defaultTarget`: must be \"gcp\" or \"mac\" (got 'moon')",
             ]
         );
-        assert!(reg.errors.iter().all(|e| e.file.as_deref()
-            == Some(dir.path().join("config.json").as_path())));
+        assert!(reg
+            .errors
+            .iter()
+            .all(|e| e.file.as_deref() == Some(dir.path().join("config.json").as_path())));
         assert_eq!(reg.defaults, ResolvedDefaults::default());
     }
 

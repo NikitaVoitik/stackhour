@@ -42,9 +42,7 @@ pub fn opt_string(table: &Table, key: &str) -> Result<Option<String>, FieldError
 pub fn opt_nonempty_string(table: &Table, key: &str) -> Result<Option<String>, FieldError> {
     match opt_string(table, key)? {
         None => Ok(None),
-        Some(s) if s.trim().is_empty() => {
-            Err(FieldError::key(key, "must be a non-empty string"))
-        }
+        Some(s) if s.trim().is_empty() => Err(FieldError::key(key, "must be a non-empty string")),
         Some(s) => Ok(Some(s)),
     }
 }
@@ -69,9 +67,7 @@ pub fn opt_u64(table: &Table, key: &str, default: u64) -> Result<u64, FieldError
     match table.get(key) {
         None => Ok(default),
         Some(toml::Value::Integer(i)) if *i >= 0 => Ok(*i as u64),
-        Some(toml::Value::Integer(_)) => {
-            Err(FieldError::key(key, "must be a non-negative integer"))
-        }
+        Some(toml::Value::Integer(_)) => Err(FieldError::key(key, "must be a non-negative integer")),
         Some(other) => Err(type_error(key, "a non-negative integer", other)),
     }
 }
@@ -108,7 +104,10 @@ pub fn req_string_list(table: &Table, key: &str) -> Result<Vec<String>, FieldErr
     match opt_string_list(table, key)? {
         Some(v) if !v.is_empty() => Ok(v),
         Some(_) => Err(FieldError::key(key, "must not be empty")),
-        None => Err(FieldError::key(key, "is required and must be a non-empty array of strings")),
+        None => Err(FieldError::key(
+            key,
+            "is required and must be a non-empty array of strings",
+        )),
     }
 }
 
@@ -164,11 +163,7 @@ pub fn string_map(table: &Table, key: &str) -> Result<IndexMap<String, String>, 
 
 /// A string key constrained to a closed set of allowed values.
 /// Missing -> `None`; not a member -> an error listing the allowed values.
-pub fn opt_enum(
-    table: &Table,
-    key: &str,
-    allowed: &[&str],
-) -> Result<Option<String>, FieldError> {
+pub fn opt_enum(table: &Table, key: &str, allowed: &[&str]) -> Result<Option<String>, FieldError> {
     let Some(s) = opt_string(table, key)? else {
         return Ok(None);
     };

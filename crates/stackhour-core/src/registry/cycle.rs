@@ -43,10 +43,7 @@ where
     F: Fn(&str) -> Vec<String>,
 {
     let known: IndexSet<String> = nodes.into_iter().map(str::to_string).collect();
-    let mut colour: IndexMap<String, Colour> = known
-        .iter()
-        .map(|n| (n.clone(), Colour::White))
-        .collect();
+    let mut colour: IndexMap<String, Colour> = known.iter().map(|n| (n.clone(), Colour::White)).collect();
     let mut cycles: Vec<Vec<String>> = Vec::new();
     let mut seen_cycles: IndexSet<String> = IndexSet::new();
 
@@ -149,9 +146,7 @@ where
     F: Fn(&T) -> Vec<String>,
 {
     let known: IndexSet<String> = entries.keys().cloned().collect();
-    let edge_fn = |name: &str| -> Vec<String> {
-        entries.get(name).map(&edges_of).unwrap_or_default()
-    };
+    let edge_fn = |name: &str| -> Vec<String> { entries.get(name).map(&edges_of).unwrap_or_default() };
 
     let mut out: Vec<(String, FieldError)> = Vec::new();
     let mut dropped: IndexSet<String> = IndexSet::new();
@@ -187,11 +182,7 @@ where
     out
 }
 
-fn filtered_edges<F>(
-    known: &IndexSet<String>,
-    edges_of: &F,
-    node: &str,
-) -> std::vec::IntoIter<String>
+fn filtered_edges<F>(known: &IndexSet<String>, edges_of: &F, node: &str) -> std::vec::IntoIter<String>
 where
     F: Fn(&str) -> Vec<String>,
 {
@@ -229,12 +220,7 @@ mod tests {
     fn graph(pairs: &[(&str, &[&str])]) -> IndexMap<String, Vec<String>> {
         pairs
             .iter()
-            .map(|(n, e)| {
-                (
-                    n.to_string(),
-                    e.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
-                )
-            })
+            .map(|(n, e)| (n.to_string(), e.iter().map(|s| s.to_string()).collect::<Vec<_>>()))
             .collect()
     }
 
