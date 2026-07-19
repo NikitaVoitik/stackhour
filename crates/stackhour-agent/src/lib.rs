@@ -65,10 +65,25 @@ pub trait Watcher {
 
 /// The watcher set, in the FIXED order the tick runs them.
 ///
-/// Only `files` is ported so far; the other five remain scaffolds and are
-/// deliberately absent rather than silently reporting healthy.
+/// The order matches `src/agent/index.js` and is part of the contract: it
+/// decides the order rows land in the queue, and the order `watcherHealth`
+/// keys are created in.
+///
+/// EVERY watcher is registered unconditionally, including ones that cannot
+/// run on this platform. A watcher that is off or unavailable still writes an
+/// `{enabled, available, reason}` health entry, which is what lets `doctor`
+/// say "macApps: requires macOS" instead of silently omitting the check. A
+/// missing registration is invisible: the agent starts, logs normally, exits
+/// 0, and collects nothing.
 fn default_watchers() -> Vec<Box<dyn Watcher>> {
-    vec![Box::new(watch_files::FilesWatcher)]
+    vec![
+        Box::new(watch_files::FilesWatcher),
+        Box::new(watch_claude::ClaudeWatcher::default()),
+        Box::new(watch_codex::CodexWatcher::default()),
+        Box::new(watch_mac::MacWatcher::default()),
+        Box::new(watch_ssh::SshWatcher::default()),
+        Box::new(watch_zed::ZedWatcher::default()),
+    ]
 }
 
 /// Node's `setTimeout` ceiling, `TIMEOUT_MAX` = 2^31-1 milliseconds (~24.8
@@ -336,9 +351,66 @@ pub fn run_agent(cfg: &Config, once: bool) -> Result<Value> {
     }
 }
 
+/// Build a `Config` from a raw JSON body, for watcher unit tests.
+///
+/// Goes through the real `load_config` (temp file) rather than constructing
+/// the struct directly, so tests exercise the same defaulting and coercion
+/// the agent sees in production.
+#[cfg(test)]
+pub(crate) fn test_config(raw: serde_json::Value) -> Config {
+    let dir = tempfile::TempDir::new().expect("tempdir");
+    let path = dir.path().join("config.json");
+    std::fs::write(&path, serde_json::to_string(&raw).unwrap()).unwrap();
+    let cfg = stackhour_core::config::load_config(&path).expect("config loads");
+    // The TempDir must outlive load_config, not the returned Config.
+    drop(dir);
+    cfg
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Regression: every watcher the Node agent runs must be REGISTERED, in
+    /// the same order.
+    ///
+    /// This is the check that would have caught the port shipping with only
+    /// `files` wired up: the agent still starts, logs normally and exits 0,
+    /// but every Claude/Codex/Zed heartbeat — and with it every token count
+    /// and cost figure — is silently absent, and doctor emits no
+    /// `watcher-claude` check to go red.
+    #[test]
+    fn every_node_watcher_is_registered_in_the_node_order() {
+        let watchers = default_watchers();
+        let names: Vec<&str> = watchers.iter().map(|w| w.name()).collect();
+        assert_eq!(names, ["files", "claude", "codex", "macApps", "ssh", "zed"]);
+    }
+
+    /// A watcher that is disabled or unavailable must still REPORT itself,
+    /// so `state.watcherHealth` (and the /api/agent-status `watchers` field,
+    /// and doctor's `watcher-<name>` checks) has an entry for all six.
+    #[test]
+    fn disabled_and_unavailable_watchers_still_report_health() {
+        let cfg = test_config(serde_json::json!({
+            "agent": { "watch": {
+                "files": false, "claude": false, "codex": false,
+                "macApps": false, "ssh": false, "zed": false
+            }}
+        }));
+        let mut state = json!({});
+        let mut watchers = default_watchers();
+        let rows = run_watchers(&cfg, &mut state, &mut watchers);
+        assert!(rows.is_empty());
+
+        let health = state["watcherHealth"].as_object().expect("health map");
+        let mut keys: Vec<&str> = health.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["claude", "codex", "files", "macApps", "ssh", "zed"]);
+        for (name, entry) in health {
+            assert_eq!(entry["enabled"], false, "{name}");
+            assert_eq!(entry["reason"], "disabled in config", "{name}");
+        }
+    }
 
     /// Regression: `agent.intervalSeconds` is an unvalidated JS `Number()`
     /// coercion, so a config typo like `1e20` used to reach
@@ -374,18 +446,3 @@ mod tests {
     }
 }
 
-/// Build a `Config` from a raw JSON body, for watcher unit tests.
-///
-/// Goes through the real `load_config` (temp file) rather than constructing
-/// the struct directly, so tests exercise the same defaulting and coercion
-/// the agent sees in production.
-#[cfg(test)]
-pub(crate) fn test_config(raw: serde_json::Value) -> Config {
-    let dir = tempfile::TempDir::new().expect("tempdir");
-    let path = dir.path().join("config.json");
-    std::fs::write(&path, serde_json::to_string(&raw).unwrap()).unwrap();
-    let cfg = stackhour_core::config::load_config(&path).expect("config loads");
-    // The TempDir must outlive load_config, not the returned Config.
-    drop(dir);
-    cfg
-}
