@@ -371,3 +371,91 @@ fn a_broken_file_never_takes_the_bridge_down() {
     ));
     assert!(!commands::help_text(&reg).is_empty());
 }
+
+/// A broken user override must REVERT to the shipped command, not delete it.
+///
+/// `Registry.commands` is documented as "the shipped table with user files
+/// substituted in place", and the loader's cross-reference pass used to
+/// `shift_remove` the rejected entry from the merged table — deleting the
+/// built-in the user was overriding. It looked fine only because every
+/// current consumer redundantly re-applied `effective_table`.
+#[test]
+fn a_broken_user_override_reverts_to_the_shipped_command_rather_than_deleting_it() {
+    let shipped = stackhour_core::registry::command::builtin_commands();
+    let victim = shipped
+        .keys()
+        .next()
+        .expect("there is at least one shipped command")
+        .clone();
+
+    // A user file overriding a shipped command, pointing at a template that
+    // does not exist — rejected by cross-reference.
+    let rel = format!("commands/{victim}.toml");
+    let (_d, reg) = write_config(&[(
+        rel.as_str(),
+        "description = \"Mine\"\nkind = \"prompt\"\ntemplate = \"nope-missing\"\n",
+    )]);
+
+    assert!(
+        !reg.errors.is_empty(),
+        "the broken override should have been reported"
+    );
+    assert!(
+        reg.commands.contains_key(&victim),
+        "/{victim} vanished from Registry.commands instead of reverting; keys = {:?}",
+        reg.commands.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        reg.commands[&victim].description, shipped[&victim].description,
+        "/{victim} must be the SHIPPED definition, not the rejected user one"
+    );
+    assert_ne!(
+        reg.commands[&victim].description, "Mine",
+        "the rejected user definition survived"
+    );
+    // Every shipped command still present, in the shipped order.
+    assert_eq!(
+        reg.commands.keys().take(shipped.len()).collect::<Vec<_>>(),
+        shipped.keys().collect::<Vec<_>>(),
+        "the restored command lost its slot in the shipped order"
+    );
+}
+
+/// Agents get the same NAMED cycle path that skills and commands get.
+///
+/// `agent_extends` was a stub returning `Vec::new()`, so the shared cycle
+/// checker was a permanent no-op for agents and a 3-agent loop produced three
+/// identical "unresolvable inheritance chain" messages with no path.
+#[test]
+fn an_agent_extends_cycle_reports_the_named_path() {
+    let (_d, reg) = write_config(&[
+        (
+            "engines/e.toml",
+            "label = \"E\"\nbin = \"true\"\nprompt_arg = \"-p\"\n",
+        ),
+        (
+            "agents/a/agent.toml",
+            "label = \"A\"\nengine = \"e\"\nextends = \"b\"\n",
+        ),
+        (
+            "agents/b/agent.toml",
+            "label = \"B\"\nengine = \"e\"\nextends = \"a\"\n",
+        ),
+    ]);
+
+    let lines: Vec<String> = reg
+        .errors
+        .iter()
+        .filter(|e| e.kind == RegistryEntityKind::Agent)
+        .map(ToString::to_string)
+        .collect();
+    assert!(!lines.is_empty(), "the cycle was not reported at all");
+    assert!(
+        lines.iter().any(|l| l.contains("a -> b -> a") || l.contains("b -> a -> b")),
+        "expected a named cycle path like `a -> b -> a`, got: {lines:#?}"
+    );
+    assert!(
+        !reg.agents.contains_key("a") && !reg.agents.contains_key("b"),
+        "agents on a cycle must be dropped"
+    );
+}

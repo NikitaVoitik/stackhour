@@ -379,6 +379,13 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
         &prompts,
         &mut errors,
     );
+    // Both passes above `shift_remove` a rejected entry from the MERGED
+    // table. For a USER file that is right, but when the user file was
+    // overriding a shipped command it would delete `/gcp` outright instead of
+    // reverting to the built-in — the exact opposite of the documented "a
+    // broken user command leaves the shipped one it would have replaced
+    // intact". Put the built-ins back, in their original slots.
+    restore_dropped_builtin_commands(&mut commands);
 
     // ------------------------------------------------------------------
     // Layers 2 and 4: config.json's `bridge` object, then env.
@@ -407,11 +414,36 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
 // returns the names this entity composes IN, in declaration order.
 // ---------------------------------------------------------------------------
 
-/// Agents compose via `extends`. Owned by the AGENTS pillar; returns nothing
-/// until `AgentDef::extends` lands, at which point this becomes
-/// `def.extends.clone().into_iter().collect()`.
-fn agent_extends(_def: &AgentDef) -> Vec<String> {
-    Vec::new()
+/// Re-insert any shipped command that validation dropped, restoring both the
+/// definition and its slot in the shipped order.
+///
+/// `Registry.commands` must always be the EFFECTIVE table a consumer can act
+/// on. Leaving a hole here made the field a trap: it happened to look right
+/// only because both current consumers redundantly re-applied
+/// `command::effective_table`, and the next consumer (a doctor listing the
+/// effective table, say) would have silently lost `/gcp`.
+fn restore_dropped_builtin_commands(commands: &mut IndexMap<String, CommandDef>) {
+    let builtins = command::builtin_commands();
+    if builtins.keys().all(|name| commands.contains_key(name)) {
+        return;
+    }
+    // Rebuild rather than patch, so the restored entry lands back in its
+    // shipped position instead of being appended after the user's commands.
+    let mut rebuilt = builtins;
+    for (name, def) in commands.iter() {
+        rebuilt.insert(name.clone(), def.clone());
+    }
+    *commands = rebuilt;
+}
+
+/// Agents compose via `extends` (AGENTS pillar).
+///
+/// `resolve_inheritance` would also catch a cycle, but only as the generic
+/// "unresolvable inheritance chain" — running it through the shared cycle
+/// checker is what gets agents the same named `a -> b -> a` path that skills
+/// and commands report.
+fn agent_extends(def: &AgentDef) -> Vec<String> {
+    def.extends.clone().into_iter().collect()
 }
 
 /// Skills compose via `uses` (SKILLS pillar).
