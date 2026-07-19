@@ -20,7 +20,7 @@ use axum::Router;
 use indexmap::IndexMap;
 use rusqlite::Connection;
 use serde_json::{json, Map, Value};
-use stackhour_core::{js_round, json_num, number_param, Error, Result, VERSION};
+use stackhour_core::{js_round, js_round_f64, json_num, number_param, Error, Result, VERSION};
 use stackhour_store::reattribute::{reattribute_file_saves, reattributed_range};
 use stackhour_store::summarize::{build_segments, day_buckets, totals_by, Credited, GROUP_FIELDS};
 use stackhour_store::{compute_credits, list_agent_status, recent_page, rows_in_range, Heartbeat};
@@ -79,7 +79,7 @@ fn now_seconds() -> f64 {
 
 /// `Math.round(x * 100) / 100`, with JS `Math.round` tie-breaking.
 fn round2(x: f64) -> f64 {
-    js_round(x * 100.0) as f64 / 100.0
+    js_round_f64(x * 100.0) / 100.0
 }
 
 /// `(url.searchParams.get('groupBy') || 'project').split(',').filter(...)`,

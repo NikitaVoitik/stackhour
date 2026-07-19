@@ -930,9 +930,14 @@ mod tests {
                 assert_eq!(status, StatusCode::ACCEPTED, "{path}");
                 assert_eq!(
                     body,
+                    // `time` echoes back as an integer, not 1.0: Node's
+                    // JSON.parse collapses 1.0 to 1 and JSON.stringify then
+                    // prints "1". Verified against the real server:
+                    //   curl -XPOST .../heartbeats -d '{"time":1.0,...}'
+                    //   -> {"responses":[[{"data":{...,"time":1}},201]]}
                     json!({ "responses": [
-                        [{ "data": { "id": null, "entity": "/a.js", "time": 1.0 } }, 201],
-                        [{ "data": { "id": null, "entity": "/b.js", "time": 2.0 } }, 201],
+                        [{ "data": { "id": null, "entity": "/a.js", "time": 1 } }, 201],
+                        [{ "data": { "id": null, "entity": "/b.js", "time": 2 } }, 201],
                     ] }),
                     "{path}"
                 );
@@ -950,8 +955,9 @@ mod tests {
             assert_eq!(status, StatusCode::ACCEPTED);
             assert_eq!(
                 body,
+                // Integer, not 1.0 — see the bulk test above.
                 json!({ "responses": [
-                    [{ "data": { "id": null, "entity": "/a.js", "time": 1.0 } }, 201],
+                    [{ "data": { "id": null, "entity": "/a.js", "time": 1 } }, 201],
                 ] })
             );
             assert_eq!(h.heartbeat_count(), 1);

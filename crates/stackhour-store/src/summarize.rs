@@ -24,7 +24,7 @@ use crate::Heartbeat;
 use chrono::{NaiveDate, TimeDelta};
 use indexmap::{IndexMap, IndexSet};
 use serde_json::{Map, Value};
-use stackhour_core::{js_round, json_num};
+use stackhour_core::{js_round, js_round_f64, json_num};
 
 /// The 8 groupable fields, in the JS declaration order (`src/server.js`).
 /// This order is observable: `/api/detail` emits one `breakdowns` key per
@@ -116,7 +116,7 @@ fn labels(row: &Heartbeat, keys: &[&str]) -> Vec<String> {
 /// JS `Math.round` semantics (ties toward +infinity) rather than Rust's
 /// half-away-from-zero `f64::round`.
 fn round2(x: f64) -> f64 {
-    js_round(x * 100.0) as f64 / 100.0
+    js_round_f64(x * 100.0) / 100.0
 }
 
 #[derive(Default)]

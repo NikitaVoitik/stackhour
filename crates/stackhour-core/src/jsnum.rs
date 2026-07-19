@@ -210,6 +210,58 @@ fn js_f64_to_string(f: f64) -> String {
     }
 }
 
+/// `JSON.stringify(v)` for a JSON value.
+///
+/// serde_json cannot be used directly for this: it formats floats with ryu,
+/// whose decimal/exponential switchover is NOT the one ECMA-262 specifies.
+/// The two disagree over the ranges `[1e-6, 1e-5)` and `[1e20, 1e21)`, e.g.
+///   6.155428829675274e-6 -> Node "0.000006155428829675274", ryu "6.155428829675274e-6"
+///   1e20                 -> Node "100000000000000000000",   ryu "1e+20"
+/// Numbers therefore go through [`js_f64_to_string`], which implements the
+/// spec's `Number::toString`. Everything else (string escaping, key order,
+/// separators) already matches, so it is delegated to serde_json.
+pub fn to_js_json(v: &Value) -> String {
+    let mut out = String::new();
+    write_js_json(v, &mut out);
+    out
+}
+
+fn write_js_json(v: &Value, out: &mut String) {
+    match v {
+        // Integral values are already exact as JSON integers; only the f64
+        // arm can hit the ryu/ECMA divergence.
+        Value::Number(n) => match n.as_f64() {
+            Some(f) if n.is_f64() => out.push_str(&js_f64_to_string(f)),
+            _ => out.push_str(&n.to_string()),
+        },
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                write_js_json(item, out);
+            }
+            out.push(']');
+        }
+        Value::Object(map) => {
+            out.push('{');
+            for (i, (k, val)) in map.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                // Key escaping is identical between the two, so reuse it.
+                out.push_str(&Value::String(k.clone()).to_string());
+                out.push(':');
+                write_js_json(val, out);
+            }
+            out.push('}');
+        }
+        // null / bool / string: serde_json already matches JSON.stringify.
+        other => out.push_str(&other.to_string()),
+    }
+}
+
 /// JS `String(v)` for a JSON value: numbers via [`js_f64_to_string`], arrays
 /// join their elements with ',' (null elements become '', per
 /// `Array.prototype.toString`), plain objects become "[object Object]",
@@ -258,17 +310,34 @@ pub fn js_number(v: &Value) -> f64 {
 /// `floor(f + 0.5)`, which is wrong for e.g. 0.49999999999999994 (the addition
 /// rounds up to exactly 1.0; JS returns 0).
 ///
-/// The i64 return matches every call site (credit sums, token counts); NaN
-/// maps to 0 and out-of-i64-range values saturate — both unreachable through
-/// the guarded callers ([`nonneg`] pre-filters non-finite input).
-pub fn js_round(f: f64) -> i64 {
+/// This is the faithful form: JS `Math.round` yields a Number (f64), so any
+/// call site whose input can exceed i64 range MUST use this rather than
+/// [`js_round`]. Rounding cents (`Math.round(x*100)/100`) is exactly such a
+/// site — a cost sum of 1e20 makes `x*100` 1e22, far past i64::MAX.
+pub fn js_round_f64(f: f64) -> f64 {
     if f.is_nan() {
-        return 0;
+        return 0.0;
+    }
+    // Values this large are already integral, and floor/compare on them is a
+    // no-op; return early so infinities pass through as JS leaves them.
+    if !f.is_finite() {
+        return f;
     }
     let floor = f.floor();
     // f - floor(f) is exact (Sterbenz), so the tie comparison is reliable.
-    let rounded = if f - floor >= 0.5 { floor + 1.0 } else { floor };
-    rounded as i64 // saturating cast for the (unreachable) out-of-range case
+    if f - floor >= 0.5 {
+        floor + 1.0
+    } else {
+        floor
+    }
+}
+
+/// The i64 form, for call sites whose magnitude is structurally bounded
+/// (credit-second sums, token counts). NaN maps to 0; out-of-i64-range input
+/// saturates, so do NOT use this where the input can be large — see
+/// [`js_round_f64`].
+pub fn js_round(f: f64) -> i64 {
+    js_round_f64(f) as i64
 }
 
 /// `nonnegativeNumber(value, {integer})` from src/db.js:
@@ -324,9 +393,11 @@ pub fn number_param(raw: Option<&str>, default: f64, min: Option<f64>, max: Opti
 }
 
 /// Convert an f64 into a `serde_json::Number` the way `JSON.stringify` would
-/// print it: integral values become JSON integers (70, not 70.0); other finite
-/// values serialize shortest-roundtrip (serde_json uses ryu), matching JS for
-/// every value stackhour produces.
+/// print it: integral values become JSON integers (70, not 70.0).
+///
+/// Non-integral values still need [`to_js_json`] to reach the wire unchanged:
+/// serde_json would format them with ryu, whose decimal/exponential switchover
+/// is not the one ECMA-262 specifies. This only normalises the integral case.
 ///
 /// Integer emission is limited to |x| <= 2^53: above that, JS prints the
 /// shortest-roundtrip digits zero-padded (e.g. `2**63` prints
@@ -399,6 +470,43 @@ mod tests {
         }
     }
 
+    /// Golden output captured from real Node:
+    ///   node -e 'console.log(JSON.stringify({v:[...]}))'
+    /// The 1e-6..1e-5 and 1e20..1e21 entries are the ones serde_json's ryu
+    /// formatting gets wrong; the rest guard against regressing the cases it
+    /// happens to agree on.
+    #[test]
+    fn to_js_json_matches_node_json_stringify_for_floats() {
+        let v = json!({ "v": [
+            6.155428829675274e-6f64, 1e-6, 9.9e-7, 1e-7, 1e20,
+            1.2345678901234568e20, 1e21, 0.1, 1.0 / 3.0,
+            -6.155428829675274e-6f64, 5e-324, 1e308, 0.0000123, 1e-5,
+        ]});
+        assert_eq!(
+            to_js_json(&v),
+            "{\"v\":[0.000006155428829675274,0.000001,9.9e-7,1e-7,\
+             100000000000000000000,123456789012345680000,1e+21,0.1,\
+             0.3333333333333333,-0.000006155428829675274,5e-324,1e+308,\
+             0.0000123,0.00001]}"
+        );
+    }
+
+    /// Non-number shapes must still round-trip exactly as serde_json emits
+    /// them: key order (preserve_order), escaping, and separators.
+    #[test]
+    fn to_js_json_leaves_non_numeric_shapes_untouched() {
+        let v = json!({
+            "z": "quote\" back\\ nl\n tab\t ctrl\u{1}",
+            "a": [null, true, false, {}, []],
+            "unicode": "héllo → 世界",
+            "int": 70,
+            "neg": -3,
+        });
+        assert_eq!(to_js_json(&v), serde_json::to_string(&v).expect("serialize"));
+        // and key insertion order is preserved, not sorted
+        assert!(to_js_json(&v).starts_with("{\"z\":"));
+    }
+
     /// Golden: Number([]) = 0, Number([5]) = 5, Number([1,2]) = NaN,
     /// Number({}) = NaN, Number(true) = 1, Number(false) = 0, Number(null) = 0.
     #[test]
@@ -415,6 +523,25 @@ mod tests {
         assert_eq!(js_number(&json!(70)), 70.0);
         assert_eq!(js_number(&json!(70.5)), 70.5);
         assert_eq!(js_number(&json!(-3)), -3.0);
+    }
+
+    /// Cost sums can exceed i64 range, where the old `js_round -> i64` path
+    /// saturated and pinned every large total to i64::MAX/100
+    /// (92233720368547760). Golden values from real Node:
+    ///   node -e 'const r2=x=>Math.round(x*100)/100; console.log(r2(1e20))'
+    #[test]
+    fn js_round_f64_does_not_saturate_on_large_cost_sums() {
+        let round2 = |x: f64| js_round_f64(x * 100.0) / 100.0;
+        assert_eq!(round2(1e20), 1e20);
+        assert_eq!(round2(9.5e20), 9.5e20);
+        assert_eq!(round2(3.860653024027428e22), 3.860653024027428e22);
+        assert_eq!(round2(1e18), 1e18);
+        // and the ordinary cases, including JS's ties-toward-+inf on negatives
+        assert_eq!(round2(0.615), 0.62);
+        assert_eq!(round2(-0.615), -0.61);
+        // the saturating i64 form is what used to corrupt these
+        assert_eq!(js_round(1e20 * 100.0), i64::MAX);
+        assert_eq!(js_round_f64(1e20 * 100.0), 1e22);
     }
 
     /// Golden: `Math.round` under Node v22 — ties toward +infinity, and the

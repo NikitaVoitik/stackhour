@@ -13,7 +13,7 @@ use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
 use serde_json::{Map, Value};
-use stackhour_core::{js_round, json_num, number_param};
+use stackhour_core::{js_round, js_round_f64, json_num, number_param};
 use stackhour_store::summarize::{build_segments, totals_by, Credited, GROUP_FIELDS};
 use stackhour_store::{compute_credits, reattribute::reattributed_range, Heartbeat};
 
@@ -172,7 +172,7 @@ fn build_body(
 
 /// `Math.round(x * 100) / 100`.
 fn round2(x: f64) -> f64 {
-    js_round(x * 100.0) as f64 / 100.0
+    js_round_f64(x * 100.0) / 100.0
 }
 
 /// `Date.now() / 1000` — the default for `to`.

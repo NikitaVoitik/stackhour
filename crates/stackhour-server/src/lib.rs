@@ -89,9 +89,9 @@ impl App {
 /// A JSON response with exactly the header src/server.js sets
 /// (`content-type: application/json`, no charset suffix).
 pub fn json_response(status: StatusCode, body: &Value) -> Response {
-    // serde_json only fails here on non-string map keys, which a Value cannot
-    // hold — but avoid unwrap regardless.
-    let bytes = serde_json::to_vec(body).unwrap_or_else(|_| b"{}".to_vec());
+    // Not serde_json::to_vec: its float formatting diverges from
+    // JSON.stringify (see stackhour_core::jsnum::to_js_json).
+    let bytes = stackhour_core::jsnum::to_js_json(body).into_bytes();
     (status, [(header::CONTENT_TYPE, "application/json")], bytes).into_response()
 }
 
