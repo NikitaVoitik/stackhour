@@ -135,7 +135,7 @@ pub const USER_KINDS: &[&str] = &[
 ];
 
 /// The irreducible bridge verbs `kind = "builtin"` may name.
-pub const BUILTIN_VERBS: &[&str] = &["help", "menu", "where", "new", "stop"];
+pub const BUILTIN_VERBS: &[&str] = &["help", "menu", "where", "new", "stop", "ship"];
 
 // ---------------------------------------------------------------------------
 // CommandDef
@@ -158,6 +158,13 @@ pub struct CommandDef {
     pub button: Option<String>,
     /// Keyboard sort key; buttons are laid out two per row in this order.
     pub button_order: Option<i64>,
+    /// The `answerCallbackQuery` toast shown when this command's button is
+    /// tapped, e.g. `"Using Claude Code"`. The JS coordinator hardcoded six
+    /// of these and they deliberately do NOT match `label()` / `engineLabel()`
+    /// ("Using Claude Code", not "Using Claude"), so they cannot be derived —
+    /// they belong in the table beside the button they answer for. `None`
+    /// falls back to the `toast-*` prompt templates.
+    pub toast: Option<String>,
     pub kind: CommandKind,
     /// kind=prompt: prompt template name.
     pub template: Option<String>,
@@ -193,6 +200,7 @@ impl Default for CommandDef {
             keyboard: false,
             button: None,
             button_order: None,
+            toast: None,
             kind: CommandKind::Prompt,
             template: None,
             agent: None,
@@ -259,6 +267,7 @@ impl CommandDef {
         let skill = nonempty("skill")?;
         let builtin = nonempty("builtin")?;
         let button = nonempty("button")?;
+        let toast = nonempty("toast")?;
 
         let argv = toml_util::opt_string_list(table, "argv")?;
         let steps = toml_util::string_list(table, "steps")?;
@@ -361,6 +370,7 @@ impl CommandDef {
             keyboard,
             button,
             button_order,
+            toast,
             kind,
             template,
             agent,
@@ -505,6 +515,7 @@ engine = "claude"
 keyboard = true
 button = "🧠 Claude"
 button_order = 10
+toast = "Using Claude Code"
 "#,
     ),
     (
@@ -515,6 +526,7 @@ engine = "codex"
 keyboard = true
 button = "🛠 Codex"
 button_order = 11
+toast = "Using Codex"
 "#,
     ),
     (
@@ -526,6 +538,7 @@ aliases = ["local"]
 keyboard = true
 button = "🖥️ Mac"
 button_order = 20
+toast = "On the Mac 🖥️"
 "#,
     ),
     (
@@ -537,6 +550,19 @@ aliases = ["remote"]
 keyboard = true
 button = "☁️ GCP"
 button_order = 21
+toast = "On the GCP box ☁️"
+"#,
+    ),
+    (
+        "ship",
+        r#"description = "Ship a Blort task 🚀"
+kind = "builtin"
+builtin = "ship"
+
+[[args]]
+name = "task"
+rest = true
+description = "text, ECM-xxxx, or a Slack link"
 "#,
     ),
     (
@@ -559,6 +585,7 @@ aliases = ["reset"]
 keyboard = true
 button = "🆕 New session"
 button_order = 30
+toast = "Fresh session"
 "#,
     ),
     (
@@ -566,6 +593,7 @@ button_order = 30
         r#"description = "Kill/cancel the running job"
 kind = "builtin"
 builtin = "stop"
+toast = "Stopping…"
 "#,
     ),
     (

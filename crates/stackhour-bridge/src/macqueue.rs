@@ -405,12 +405,15 @@ mod tests {
     use stackhour_core::registry::{EngineDef, Registry};
     use std::sync::atomic::{AtomicI64, Ordering};
 
+    /// One recorded `set_session` call: (target, engine, agent, id).
+    type SessionWrite = (String, String, Option<String>, Option<String>);
+
     /// A [`MacContext`] backed by the real registry defaults, so the template
     /// bodies under test are the shipped ones.
     pub(crate) struct FakeCtx {
         pub reg: Registry,
         pub now: AtomicI64,
-        pub sessions: Mutex<Vec<(String, String, Option<String>, Option<String>)>>,
+        pub sessions: Mutex<Vec<SessionWrite>>,
         pub logs: Mutex<Vec<String>>,
         pub stored: Mutex<IndexMap<String, String>>,
         pub label: String,

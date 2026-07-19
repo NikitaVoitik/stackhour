@@ -223,7 +223,7 @@ pub const DEFAULTS: &[PromptDefault] = &[
         // override that DOES use {{commands}} gets the generated table
         // instead — see `stackhour_bridge::commands::help_text`.
         name: "help",
-        body: "<b>Claude + Codex bridge</b> (distributed)\n\n🧠 /claude — use Claude Code\n🛠 /codex — use Codex\n🖥️ /mac — run on the Mac\n☁️ /gcp — run on the GCP box\nℹ️ /where — active engine, target &amp; session\n🆕 /new — fresh session for this engine + target\n⏹ /stop — kill/cancel the running job\n🎛 /menu — tap-button controls\n\n<i>Anything else → selected engine on the active target.</i>",
+        body: "<b>Claude + Codex bridge</b> (distributed)\n\n🧠 /claude — use Claude Code\n🛠 /codex — use Codex\n🖥️ /mac — run on the Mac\n☁️ /gcp — run on the GCP box\n🚀 /ship — ship a Blort task (Notion→PR)\nℹ️ /where — active engine, target &amp; session\n🆕 /new — fresh session for this engine + target\n⏹ /stop — kill/cancel the running job\n🎛 /menu — tap-button controls\n\n<i>Anything else → selected engine on the active target.</i>",
         placeholders: &[
             ph(
                 "commands",
@@ -288,6 +288,28 @@ pub const DEFAULTS: &[PromptDefault] = &[
         name: "session-new",
         body: "(new session)",
         placeholders: NONE,
+    },
+    PromptDefault {
+        // Bare `/ship`, with no task: the coordinator has ALREADY switched to
+        // the ship target/engine by the time this is sent (the JS mutates
+        // state before it checks for a task, and there is no /unship).
+        //
+        // The body is the JS literal, not a rendering of {{engine}}/{{target}}:
+        // it says "Claude on the Blort repo" where the labels would say
+        // "Claude on 🚀 Blort". Both placeholders are offered to an override.
+        name: "ship-empty",
+        body: "🚀 Ship mode: Claude on the Blort repo. Send the task (text, ECM-xxxx, or a Slack link).",
+        placeholders: &[
+            ph("engine", "engine label", false),
+            ph("target", "target label", false),
+        ],
+    },
+    PromptDefault {
+        // `/ship <task>` re-enters the prompt lane with the command word
+        // still attached, so the engine sees the whole instruction.
+        name: "ship-prompt",
+        body: "/ship {{task}}",
+        placeholders: &[ph("task", "the task text, exactly as typed", true)],
     },
     PromptDefault {
         // /new and /reset

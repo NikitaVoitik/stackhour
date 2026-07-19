@@ -57,6 +57,17 @@ impl Default for BridgeState {
 /// a source of truth. A truncated write must cost at most a replayed update,
 /// never a coordinator that will not start.
 pub fn load(dir: &Path) -> BridgeState {
+    load_with_defaults(dir, DEFAULT_TARGET, DEFAULT_ENGINE)
+}
+
+/// [`load`], with the seed target/engine supplied by the caller.
+///
+/// The JS reads `CONFIG.defaultTarget` here (`s.active ||= CONFIG.defaultTarget`)
+/// and hardcodes `'claude'`. The coordinator passes `CoordinatorCfg.default_target`
+/// and the registry's default engine, so changing either in config actually
+/// changes what a fresh state.json starts as — which the hardcoded constant
+/// silently would not.
+pub fn load_with_defaults(dir: &Path, default_target: &str, default_engine: &str) -> BridgeState {
     let raw = std::fs::read_to_string(dir.join("state.json"))
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
@@ -86,8 +97,8 @@ pub fn load(dir: &Path) -> BridgeState {
         // `s.offset ||= 0` — a non-numeric or absent offset restarts the poll
         // from the beginning rather than crashing.
         offset: raw.get("offset").and_then(Value::as_i64).unwrap_or(0),
-        active: nonempty(raw.get("active")).unwrap_or_else(|| DEFAULT_TARGET.to_string()),
-        engine: nonempty(raw.get("engine")).unwrap_or_else(|| DEFAULT_ENGINE.to_string()),
+        active: nonempty(raw.get("active")).unwrap_or_else(|| default_target.to_string()),
+        engine: nonempty(raw.get("engine")).unwrap_or_else(|| default_engine.to_string()),
         agent: nonempty(raw.get("agent")),
         sessions,
         raw,
@@ -113,6 +124,22 @@ impl BridgeState {
     /// `catch (e) { log('saveState err', e.message) }`: losing the poll offset
     /// is recoverable, dying mid-conversation is not.
     pub fn save(&self, dir: &Path) {
+        let _ = self.try_save(dir);
+    }
+
+    /// [`save`](Self::save), reporting the failure to `log` as the JS does:
+    /// `saveState err <message>`. The coordinator uses this so a full disk or
+    /// a read-only runtime dir is visible in coordinator.log instead of
+    /// silently losing every session id.
+    pub fn save_logged(&self, dir: &Path, log: &dyn Fn(&str)) {
+        if let Err(e) = self.try_save(dir) {
+            log(&format!("saveState err {e}"));
+        }
+    }
+
+    /// The fallible form. Still never panics; the caller decides whether a
+    /// failed write is worth a log line.
+    pub fn try_save(&self, dir: &Path) -> std::io::Result<()> {
         let mut out: Map<String, Value> = self
             .raw
             .as_object()
@@ -146,11 +173,10 @@ impl BridgeState {
 
         // Pretty-printed with 2 spaces, matching `JSON.stringify(state, null, 2)`
         // — the file is routinely hand-inspected during support.
-        let Ok(text) = serde_json::to_string_pretty(&Value::Object(out)) else {
-            return;
-        };
-        let _ = std::fs::create_dir_all(dir);
-        let _ = std::fs::write(dir.join("state.json"), text);
+        let text = serde_json::to_string_pretty(&Value::Object(out))
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        std::fs::create_dir_all(dir)?;
+        std::fs::write(dir.join("state.json"), text)
     }
 
     /// '<target>:<engine>' — or '<target>:<engine>@<agent>' when an agent is
@@ -170,9 +196,38 @@ impl BridgeState {
 
     /// Set (or clear, with `None`) the session id for the current
     /// target/engine/agent.
+    ///
+    /// Does NOT persist. The JS `setSession` writes state.json on every call;
+    /// callers here must follow with [`save`](Self::save) or
+    /// [`save_logged`](Self::save_logged) or a restart loses the session.
     pub fn set_session(&mut self, value: Option<String>) {
         let key = Self::session_key(&self.active, &self.engine, self.agent.as_deref());
         self.sessions.insert(key, value);
+    }
+
+    /// The session id for an EXPLICIT target/engine/agent, ignoring what is
+    /// currently active.
+    ///
+    /// Required by the mac lane: a result returning while the user has
+    /// switched to /gcp must still be filed under `mac:<engine>`. Addressing
+    /// it through [`session`](Self::session) would write the returning id onto
+    /// the gcp key and corrupt both sessions.
+    pub fn session_for(&self, target: &str, engine: &str, agent: Option<&str>) -> Option<&str> {
+        self.sessions
+            .get(&Self::session_key(target, engine, agent))
+            .and_then(Option::as_deref)
+    }
+
+    /// [`set_session`](Self::set_session) for an explicit target/engine/agent.
+    pub fn set_session_for(
+        &mut self,
+        target: &str,
+        engine: &str,
+        agent: Option<&str>,
+        value: Option<String>,
+    ) {
+        self.sessions
+            .insert(Self::session_key(target, engine, agent), value);
     }
 }
 
@@ -304,6 +359,67 @@ mod tests {
         let reloaded = load(tmp.path());
         assert_eq!(reloaded.sessions.get("gcp:claude"), Some(&None));
         assert_eq!(reloaded.session(), None);
+    }
+
+    /// `s.active ||= CONFIG.defaultTarget` — the seed comes from config, so a
+    /// user who sets `defaultTarget: "mac"` gets a mac-first fresh state.
+    #[test]
+    fn a_fresh_state_seeds_from_the_supplied_defaults() {
+        let tmp = TempDir::new().unwrap();
+        let s = load_with_defaults(tmp.path(), "mac", "codex");
+        assert_eq!((s.active.as_str(), s.engine.as_str()), ("mac", "codex"));
+        // An existing file still wins over the defaults.
+        write(&tmp, r#"{"active": "gcp", "engine": "claude"}"#);
+        let s = load_with_defaults(tmp.path(), "mac", "codex");
+        assert_eq!((s.active.as_str(), s.engine.as_str()), ("gcp", "claude"));
+    }
+
+    /// pollResults writes `setSession('mac', engine, id)` with an EXPLICIT
+    /// target. If it went through the active-target setter, a user who
+    /// switched to /gcp mid-flight would have the Mac's session written onto
+    /// the gcp key.
+    #[test]
+    fn explicit_session_addressing_ignores_the_active_target() {
+        let mut s = BridgeState::default(); // active = gcp
+        s.set_session(Some("gcp-session".into()));
+        s.set_session_for("mac", "codex", None, Some("mac-session".into()));
+
+        assert_eq!(s.session(), Some("gcp-session"), "the gcp key was clobbered");
+        assert_eq!(s.session_for("mac", "codex", None), Some("mac-session"));
+        assert_eq!(s.session_for("mac", "claude", None), None);
+        assert_eq!(s.sessions.len(), 2);
+    }
+
+    /// A failed write must be reportable, not silent: losing every session id
+    /// with no log line is the hard-to-notice regression.
+    #[test]
+    fn a_failed_save_is_reported_to_the_log() {
+        let tmp = TempDir::new().unwrap();
+        // A FILE where the runtime dir should be: create_dir_all fails.
+        let blocked = tmp.path().join("not-a-dir");
+        std::fs::write(&blocked, "x").unwrap();
+
+        let mut lines: Vec<String> = Vec::new();
+        {
+            let sink = std::cell::RefCell::new(&mut lines);
+            BridgeState::default().save_logged(&blocked, &|l: &str| {
+                sink.borrow_mut().push(l.to_string())
+            });
+        }
+        assert_eq!(lines.len(), 1, "expected one log line, got {lines:?}");
+        assert!(
+            lines[0].starts_with("saveState err "),
+            "wrong prefix: {}",
+            lines[0]
+        );
+        // ...and the happy path stays quiet.
+        let mut ok: Vec<String> = Vec::new();
+        {
+            let sink = std::cell::RefCell::new(&mut ok);
+            BridgeState::default()
+                .save_logged(tmp.path(), &|l: &str| sink.borrow_mut().push(l.to_string()));
+        }
+        assert!(ok.is_empty(), "a successful save logged: {ok:?}");
     }
 
     #[test]
