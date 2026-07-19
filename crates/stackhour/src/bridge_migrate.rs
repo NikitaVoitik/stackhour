@@ -97,9 +97,8 @@ pub fn run(args: &[String]) -> ExitCode {
     let opts = MigrateOptions {
         from: from.clone(),
         to: to.unwrap_or(storage.config_dir),
-        runtime_dir: runtime_dir.unwrap_or_else(|| {
-            BridgePaths::resolve(&|k| std::env::var(k).ok(), &home).runtime_dir
-        }),
+        runtime_dir: runtime_dir
+            .unwrap_or_else(|| BridgePaths::resolve(&|k| std::env::var(k).ok(), &home).runtime_dir),
         dry_run,
         force,
         engines,

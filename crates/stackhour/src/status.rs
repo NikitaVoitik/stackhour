@@ -42,10 +42,7 @@ pub fn render_status(summary: &Value, out: &mut dyn Write) -> std::io::Result<()
     let total = js_number(summary.get("total").unwrap_or(&Value::Null));
     writeln!(out, "today: {} total", h(total))?;
     let empty = Vec::new();
-    let totals = summary
-        .get("totals")
-        .and_then(Value::as_array)
-        .unwrap_or(&empty);
+    let totals = summary.get("totals").and_then(Value::as_array).unwrap_or(&empty);
     for t in totals.iter().take(15) {
         let seconds = js_number(t.get("seconds").unwrap_or(&Value::Null));
         let project = js_str(t.get("project"));
@@ -79,7 +76,10 @@ pub fn run_status(cfg: &Config) -> i32 {
             return 1;
         }
     };
-    let summary: Value = match client.get(&url).send().and_then(reqwest::blocking::Response::json)
+    let summary: Value = match client
+        .get(&url)
+        .send()
+        .and_then(reqwest::blocking::Response::json)
     {
         Ok(v) => v,
         Err(e) => {

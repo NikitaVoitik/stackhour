@@ -40,6 +40,10 @@ pub struct CoordinatorCfg {
     pub targets: IndexMap<String, TargetCfg>,
     /// NEW additive key: named agent preselected for the gcp target.
     pub default_agent: Option<String>,
+    /// Bot API root (JSON key `apiRoot`), for pointing the daemon at a LOCAL
+    /// MOCK during parity testing. Absent in every real config, where the
+    /// public `https://api.telegram.org` is used.
+    pub api_root: Option<String>,
 }
 
 /// `<runtime_dir>/worker-config.json` — the mac worker config.
@@ -156,6 +160,7 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
         eleven_labs_api_key: truthy_str(&raw, "elevenLabsApiKey").unwrap_or_default(),
         targets,
         default_agent: truthy_str(&raw, "defaultAgent"),
+        api_root: truthy_str(&raw, "apiRoot").map(|r| r.trim_end_matches('/').to_string()),
         raw,
     })
 }

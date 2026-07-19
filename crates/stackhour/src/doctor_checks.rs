@@ -212,11 +212,7 @@ fn input_checks(cfg: &Config, opts: &DoctorOpts, out: &mut Vec<Check>) {
         if !enabled {
             out.push(Check::new(name, StatusOk, "disabled"));
         } else if !input.exists() {
-            out.push(Check::new(
-                name,
-                Warn,
-                format!("not found: {}", input.display()),
-            ));
+            out.push(Check::new(name, Warn, format!("not found: {}", input.display())));
         } else if std::fs::read_dir(&input).is_err() {
             out.push(Check::new(
                 name,
@@ -435,20 +431,11 @@ fn services_check(out: &mut Vec<Check>) {
         // still prints one status line per unit, so stdout is counted either
         // way rather than treating a nonzero exit as a failure.
         let stdout = std::process::Command::new("systemctl")
-            .args([
-                "--user",
-                "is-active",
-                "stackhour-agent",
-                "stackhour-server",
-            ])
+            .args(["--user", "is-active", "stackhour-agent", "stackhour-server"])
             .output()
             .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
             .unwrap_or_default();
-        let active = stdout
-            .trim()
-            .split('\n')
-            .filter(|line| *line == "active")
-            .count();
+        let active = stdout.trim().split('\n').filter(|line| *line == "active").count();
         out.push(Check::new(
             "services",
             if active > 0 { StatusOk } else { Warn },
@@ -544,20 +531,12 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let opts = opts_for(&tmp);
         let cfg = config_at(&opts.config_path, "{}");
-        std::fs::set_permissions(
-            &opts.config_path,
-            std::fs::Permissions::from_mode(0o644),
-        )
-        .unwrap();
+        std::fs::set_permissions(&opts.config_path, std::fs::Permissions::from_mode(0o644)).unwrap();
         let checks = all_checks(Result::Ok(&cfg), &opts);
         let perms = find(&checks, "config-permissions");
         assert_eq!(perms.len(), 1);
         assert_eq!(perms[0].status, Warn);
-        assert!(
-            perms[0].message.starts_with("644 "),
-            "got {:?}",
-            perms[0].message
-        );
+        assert!(perms[0].message.starts_with("644 "), "got {:?}", perms[0].message);
         assert!(perms[0].message.ends_with(" (recommend 600)"));
     }
 
@@ -568,8 +547,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let opts = opts_for(&tmp);
         let cfg = config_at(&opts.config_path, "{}");
-        std::fs::set_permissions(&opts.config_path, std::fs::Permissions::from_mode(0o600))
-            .unwrap();
+        std::fs::set_permissions(&opts.config_path, std::fs::Permissions::from_mode(0o600)).unwrap();
         let checks = all_checks(Result::Ok(&cfg), &opts);
         let perms = find(&checks, "config-permissions");
         assert_eq!(perms[0].status, StatusOk);
@@ -643,10 +621,7 @@ mod tests {
         let cfg = config_at(&opts.config_path, "{}");
         assert_eq!(token_check(&cfg).status, Warn);
 
-        let cfg = config_at(
-            &opts.config_path,
-            r#"{"server":{"tokens":{"box":"s3cret"}}}"#,
-        );
+        let cfg = config_at(&opts.config_path, r#"{"server":{"tokens":{"box":"s3cret"}}}"#);
         let check = token_check(&cfg);
         assert_eq!(check.status, StatusOk);
         assert_eq!(check.message, "configured (value hidden)");
@@ -836,12 +811,7 @@ mod tests {
     fn clock_skew_warns_only_beyond_thirty_seconds_in_either_direction() {
         let tmp = TempDir::new().unwrap();
         let cfg = cfg_with_machine(&tmp, "box");
-        for (skew, expected) in [
-            (0.0, StatusOk),
-            (30.0, StatusOk),
-            (30.5, Warn),
-            (-31.0, Warn),
-        ] {
+        for (skew, expected) in [(0.0, StatusOk), (30.0, StatusOk), (30.5, Warn), (-31.0, Warn)] {
             let mut out = Vec::new();
             agent_report_checks(
                 &cfg,

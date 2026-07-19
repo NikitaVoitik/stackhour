@@ -23,8 +23,8 @@ fn public_url(cfg_path: &Path, override_url: Option<String>) -> Result<Option<St
         None => {
             let text = std::fs::read_to_string(cfg_path)
                 .map_err(|e| Error::msg(format!("cannot read config: {e}")))?;
-            let config: Value = serde_json::from_str(&text)
-                .map_err(|e| Error::msg(format!("cannot read config: {e}")))?;
+            let config: Value =
+                serde_json::from_str(&text).map_err(|e| Error::msg(format!("cannot read config: {e}")))?;
             config
                 .get("server")
                 .and_then(|s| s.get("publicUrl"))
@@ -116,9 +116,9 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let cfg = tmp.path().join("config.json");
         let body = match public_url {
-            Some(u) => format!(
-                r#"{{"server":{{"host":"0.0.0.0","port":4040,"publicUrl":"{u}","tokens":{{}}}}}}"#
-            ),
+            Some(u) => {
+                format!(r#"{{"server":{{"host":"0.0.0.0","port":4040,"publicUrl":"{u}","tokens":{{}}}}}}"#)
+            }
             None => r#"{"server":{"host":"0.0.0.0","port":4040,"tokens":{}}}"#.to_string(),
         };
         std::fs::write(&cfg, body).unwrap();
@@ -139,9 +139,7 @@ mod tests {
         let out = run(&["create", "laptop", "--token=sekrit"], &cfg).unwrap();
         assert!(out.starts_with("Enrolled laptop. On that machine run:\n\n"));
         assert!(out.contains("  ./bin/stackhour init agent --enrollment="));
-        assert!(out.ends_with(
-            "Add one or more --project-root=/path options before --install if needed.\n"
-        ));
+        assert!(out.ends_with("Add one or more --project-root=/path options before --install if needed.\n"));
         // The raw secret is never printed on this path.
         assert!(!out.contains("sekrit"));
 
@@ -183,8 +181,7 @@ mod tests {
     fn create_persists_the_token_and_requires_force_to_rotate() {
         let (_tmp, cfg) = seeded(Some("http://server.test:4040"));
         run(&["create", "laptop", "--token=one"], &cfg).unwrap();
-        let stored: Value =
-            serde_json::from_str(&std::fs::read_to_string(&cfg).unwrap()).unwrap();
+        let stored: Value = serde_json::from_str(&std::fs::read_to_string(&cfg).unwrap()).unwrap();
         assert_eq!(stored["server"]["tokens"]["laptop"], "one");
 
         let err = run(&["create", "laptop", "--token=two"], &cfg).unwrap_err();

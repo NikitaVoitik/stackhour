@@ -627,10 +627,12 @@ pub fn run_coordinator(runtime_dir: &Path) -> ! {
         log_line(&log_path, &format!("registry: {err}"));
     }
 
-    let tg = Tg::with_config(
-        crate::telegram::TgConfig::new(cfg.token.clone(), cfg.chat_id)
-            .with_log_path(Some(log_path.clone())),
-    );
+    let mut tg_cfg = crate::telegram::TgConfig::new(cfg.token.clone(), cfg.chat_id)
+        .with_log_path(Some(log_path.clone()));
+    if let Some(root) = &cfg.api_root {
+        tg_cfg = tg_cfg.with_api_root(root.clone());
+    }
+    let tg = Tg::with_config(tg_cfg);
     let rt = Arc::new(Runtime::new(cfg, paths, tg, registry));
 
     serve(rt)
@@ -651,7 +653,12 @@ fn serve(rt: Arc<Runtime>) -> ! {
     }
 
     crate::media::prune_media(&rt.ctx.paths.media_dir, MEDIA_MAX_AGE);
-    rt.tg.set_my_commands(crate::commands::my_commands_payload(&reg));
+    // `set_my_commands` adds the `{ "commands": … }` wrapper itself, so it
+    // must be handed the LIST. Passing the wrapped payload here produced
+    // `{"commands":{"commands":[…]}}`, which Telegram rejects with a 400 that
+    // `call()` swallows — the bot ended up with no registered commands and no
+    // error anywhere. Caught by test/parity/command-surface.mjs.
+    rt.tg.set_my_commands(crate::commands::my_commands_list(&reg));
 
     // The online banner. Sent before the loop starts, so a restart is visible.
     {

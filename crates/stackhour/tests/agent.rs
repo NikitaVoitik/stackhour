@@ -259,10 +259,7 @@ fn repeated_offline_ticks_accumulate_the_queue() {
     }
     let queued = env.queued_rows();
     assert_eq!(queued.len(), 3, "queued rows: {queued:?}");
-    let mut entities: Vec<&str> = queued
-        .iter()
-        .map(|r| r["entity"].as_str().unwrap())
-        .collect();
+    let mut entities: Vec<&str> = queued.iter().map(|r| r["entity"].as_str().unwrap()).collect();
     entities.sort_unstable();
     assert!(entities[0].ends_with("/a.rs"));
     assert!(entities[1].ends_with("/b.rs"));
@@ -309,17 +306,12 @@ fn an_unchanged_tree_produces_no_heartbeats_on_the_next_tick() {
 
     std::thread::sleep(Duration::from_millis(1100));
     assert!(env.run(&["agent", "--once"]).status.success());
-    assert_eq!(
-        env.queued_rows().len(),
-        1,
-        "an unchanged tree must not re-report"
-    );
+    assert_eq!(env.queued_rows().len(), 1, "an unchanged tree must not re-report");
 
     // The state file records where the scan got to.
-    let state: Value = serde_json::from_str(
-        &std::fs::read_to_string(env.data_dir().join("agent-state.json")).unwrap(),
-    )
-    .unwrap();
+    let state: Value =
+        serde_json::from_str(&std::fs::read_to_string(env.data_dir().join("agent-state.json")).unwrap())
+            .unwrap();
     assert!(state["filesLastScan"].as_f64().unwrap() > 0.0);
     assert_eq!(state["watcherHealth"]["files"]["consecutiveErrors"], 0);
 }

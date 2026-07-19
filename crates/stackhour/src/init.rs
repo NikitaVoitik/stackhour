@@ -15,9 +15,7 @@ use serde_json::{json, Map, Value};
 use stackhour_core::config::read_existing_raw;
 use stackhour_core::jsnum::js_number;
 use stackhour_core::paths::{expand_home, resolve_storage_paths};
-use stackhour_core::tokens::{
-    generate_token, js_trim, parse_enrollment, valid_url, write_raw_config,
-};
+use stackhour_core::tokens::{generate_token, js_trim, parse_enrollment, valid_url, write_raw_config};
 use stackhour_core::{Error, Result};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -223,11 +221,7 @@ pub fn init_agent(opts: InitAgentOpts) -> Result<InitResult> {
                 ));
             }
             let parsed = parse_enrollment(code)?;
-            (
-                Some(parsed.server_url),
-                Some(parsed.token),
-                Some(parsed.machine),
-            )
+            (Some(parsed.server_url), Some(parsed.token), Some(parsed.machine))
         }
         _ => (opts.server_url.clone(), opts.token.clone(), opts.machine),
     };
@@ -313,20 +307,13 @@ pub fn run_init_into(
             })?;
             let server = result.server.as_ref().expect("init server writes a server");
             let agent = result.agent.as_ref().expect("init server writes an agent");
-            writeln!(
-                out,
-                "Created server config at {}",
-                result.config_path.display()
-            )?;
+            writeln!(out, "Created server config at {}", result.config_path.display())?;
             writeln!(out, "Public URL: {}", str_field(server, "publicUrl"))?;
             writeln!(out, "Local agent enrolled as {}", str_field(agent, "machine"))?;
             if install {
                 installer("server")?;
                 installer("agent")?;
-                writeln!(
-                    out,
-                    "Installed and started stackhour-server and stackhour-agent"
-                )?;
+                writeln!(out, "Installed and started stackhour-server and stackhour-agent")?;
             }
             writeln!(out, "Next: ./bin/stackhour token create <machine>")?;
             Ok(())
@@ -352,11 +339,7 @@ pub fn run_init_into(
                 enrollment,
             })?;
             let agent = result.agent.as_ref().expect("init agent writes an agent");
-            writeln!(
-                out,
-                "Created agent config at {}",
-                result.config_path.display()
-            )?;
+            writeln!(out, "Created agent config at {}", result.config_path.display())?;
             writeln!(
                 out,
                 "Enrolled {} with {}",
@@ -370,9 +353,7 @@ pub fn run_init_into(
             writeln!(out, "Next: ./bin/stackhour doctor")?;
             Ok(())
         }
-        _ => Err(Error::msg(
-            "usage: stackhour init <server|agent> [options]",
-        )),
+        _ => Err(Error::msg("usage: stackhour init <server|agent> [options]")),
     }
 }
 
@@ -554,12 +535,8 @@ mod tests {
     fn init_agent_round_trips_an_enrollment_code() {
         let tmp = TempDir::new().unwrap();
         let cfg = tmp.path().join("config.json");
-        let code = stackhour_core::tokens::create_enrollment(
-            "http://server.test:4040",
-            "laptop",
-            "sekrit",
-        )
-        .unwrap();
+        let code =
+            stackhour_core::tokens::create_enrollment("http://server.test:4040", "laptop", "sekrit").unwrap();
         init_agent(InitAgentOpts {
             config_path: cfg.clone(),
             enrollment: Some(code),
@@ -575,8 +552,7 @@ mod tests {
     #[test]
     fn init_agent_rejects_enrollment_combined_with_explicit_flags() {
         let tmp = TempDir::new().unwrap();
-        let code =
-            stackhour_core::tokens::create_enrollment("http://s.test", "laptop", "sekrit").unwrap();
+        let code = stackhour_core::tokens::create_enrollment("http://s.test", "laptop", "sekrit").unwrap();
         let err = init_agent(InitAgentOpts {
             config_path: tmp.path().join("config.json"),
             enrollment: Some(code),
@@ -661,10 +637,7 @@ mod tests {
             &no_install,
         )
         .unwrap_err();
-        assert_eq!(
-            err.message(),
-            "usage: stackhour init <server|agent> [options]"
-        );
+        assert_eq!(err.message(), "usage: stackhour init <server|agent> [options]");
         assert!(out.is_empty());
     }
 

@@ -109,8 +109,8 @@ pub fn launchd_plist(exe: &Path, path_dir: &Path) -> String {
 /// under systemd/launchd. Whatever runtime the user invoked is the runtime that
 /// gets installed.
 fn service_executable() -> Result<PathBuf> {
-    let exe = std::env::current_exe()
-        .map_err(|e| Error::msg(format!("cannot locate the running binary: {e}")))?;
+    let exe =
+        std::env::current_exe().map_err(|e| Error::msg(format!("cannot locate the running binary: {e}")))?;
     // Resolve symlinks so the unit records a stable, unambiguous path.
     Ok(std::fs::canonicalize(&exe).unwrap_or(exe))
 }
@@ -163,11 +163,7 @@ pub fn install_service(role: &str) -> Result<Installed> {
 
     if cfg!(target_os = "linux") {
         let unit_name = format!("stackhour-{role}.service");
-        let unit_path = home
-            .join(".config")
-            .join("systemd")
-            .join("user")
-            .join(&unit_name);
+        let unit_path = home.join(".config").join("systemd").join("user").join(&unit_name);
         let unit = systemd_unit(role, &exe, &exe_dir)?;
         stackhour_core::fsutil::atomic_write_0644(&unit_path, unit.as_bytes())
             .map_err(|e| Error::msg(format!("cannot write {}: {e}", unit_path.display())))?;
@@ -190,11 +186,8 @@ pub fn install_service(role: &str) -> Result<Installed> {
             .join("Library")
             .join("LaunchAgents")
             .join(format!("{label}.plist"));
-        stackhour_core::fsutil::atomic_write_0644(
-            &plist_path,
-            launchd_plist(&exe, &exe_dir).as_bytes(),
-        )
-        .map_err(|e| Error::msg(format!("cannot write {}: {e}", plist_path.display())))?;
+        stackhour_core::fsutil::atomic_write_0644(&plist_path, launchd_plist(&exe, &exe_dir).as_bytes())
+            .map_err(|e| Error::msg(format!("cannot write {}: {e}", plist_path.display())))?;
         let uid = unsafe { libc::getuid() };
         let domain = format!("gui/{uid}");
         let plist_str = plist_path.to_string_lossy().into_owned();
@@ -233,10 +226,7 @@ pub fn run_install_into(
         "server" => {
             installer("server")?;
             installer("agent")?;
-            writeln!(
-                out,
-                "Installed and started stackhour-server and stackhour-agent"
-            )?;
+            writeln!(out, "Installed and started stackhour-server and stackhour-agent")?;
             Ok(())
         }
         "agent" => {
@@ -259,8 +249,7 @@ mod tests {
 
     #[test]
     fn systemd_unit_is_byte_exact_for_the_server_role() {
-        let unit = systemd_unit("server", Path::new("/repo/bin/stackhour"), Path::new("/usr/bin"))
-            .unwrap();
+        let unit = systemd_unit("server", Path::new("/repo/bin/stackhour"), Path::new("/usr/bin")).unwrap();
         assert_eq!(
             unit,
             "[Unit]\nDescription=Stackhour coding time-tracking server\n\
@@ -274,8 +263,7 @@ mod tests {
     /// The agent differs in three places: description, verb, and RestartSec.
     #[test]
     fn systemd_unit_agent_uses_the_agent_verb_and_restartsec_10() {
-        let unit =
-            systemd_unit("agent", Path::new("/repo/bin/stackhour"), Path::new("/usr/bin")).unwrap();
+        let unit = systemd_unit("agent", Path::new("/repo/bin/stackhour"), Path::new("/usr/bin")).unwrap();
         assert!(unit.contains("Description=Stackhour coding time-tracking agent\n"));
         assert!(unit.contains("ExecStart=\"/repo/bin/stackhour\" agent\n"));
         assert!(unit.contains("RestartSec=10\n"));

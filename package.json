@@ -8,7 +8,8 @@
     "stackhour": "bin/stackhour"
   },
   "scripts": {
-    "test": "node --experimental-sqlite --no-warnings --test"
+    "test": "node --experimental-sqlite --no-warnings --test",
+    "test:parity": "node test/parity/command-surface.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -164,9 +164,7 @@ fn main() -> ExitCode {
             // FIRST occurrence, not the last, then a raw `Number()` coercion
             // (so `--days=abc` yields NaN and imports nothing, exit 0).
             let days = match args::option_values(&tail, "days").first() {
-                Some(raw) => {
-                    stackhour_core::jsnum::js_number(&serde_json::Value::String(raw.clone()))
-                }
+                Some(raw) => stackhour_core::jsnum::js_number(&serde_json::Value::String(raw.clone())),
                 None => 365.0,
             };
             let result = stackhour_core::config::load_config(&paths.config_path)
@@ -243,7 +241,9 @@ fn runtime_dir_from(args: &[String]) -> Result<std::path::PathBuf, String> {
             };
         }
     }
-    let home = std::env::var("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+    let home = std::env::var("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default();
     Ok(stackhour_bridge::BridgePaths::resolve(&|k| std::env::var(k).ok(), &home).runtime_dir)
 }
 
@@ -253,7 +253,10 @@ mod tests {
 
     #[test]
     fn an_explicit_runtime_dir_beats_the_environment() {
-        let args: Vec<String> = ["--runtime-dir", "/tmp/rt"].iter().map(|s| s.to_string()).collect();
+        let args: Vec<String> = ["--runtime-dir", "/tmp/rt"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         assert_eq!(runtime_dir_from(&args).unwrap(), std::path::Path::new("/tmp/rt"));
     }
 

@@ -140,13 +140,7 @@ pub fn write_doctor(report: &Report, json: bool, out: &mut dyn Write) -> std::io
     }
     writeln!(out, "Stackhour doctor {}", stackhour_core::VERSION)?;
     for check in &report.checks {
-        writeln!(
-            out,
-            "{} {}: {}",
-            check.status.icon(),
-            check.name,
-            check.message
-        )?;
+        writeln!(out, "{} {}: {}", check.status.icon(), check.name, check.message)?;
     }
     let warnings = report
         .checks
@@ -199,10 +193,7 @@ mod tests {
     fn exit_code_is_one_only_for_errors() {
         assert_eq!(report(&[]).exit_code(), 0);
         assert_eq!(report(&[CheckStatus::Ok, CheckStatus::Warn]).exit_code(), 0);
-        assert_eq!(
-            report(&[CheckStatus::Warn, CheckStatus::Error]).exit_code(),
-            1
-        );
+        assert_eq!(report(&[CheckStatus::Warn, CheckStatus::Error]).exit_code(), 1);
     }
 
     #[test]
@@ -217,10 +208,7 @@ mod tests {
         let mut out = Vec::new();
         write_doctor(&r, false, &mut out).unwrap();
         let text = String::from_utf8(out).unwrap();
-        assert!(text.starts_with(&format!(
-            "Stackhour doctor {}\n",
-            stackhour_core::VERSION
-        )));
+        assert!(text.starts_with(&format!("Stackhour doctor {}\n", stackhour_core::VERSION)));
         assert!(text.contains("✓ node: v22.0.0 (requires >=22)\n"));
         assert!(text.contains("! config: not found: /x\n"));
         assert!(text.contains("✗ database: /db: broken\n"));

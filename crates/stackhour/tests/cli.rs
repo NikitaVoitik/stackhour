@@ -130,11 +130,7 @@ fn init_server_writes_the_config_with_mode_0600() {
     use std::os::unix::fs::PermissionsExt;
     let sb = Sandbox::new();
     assert!(sb.run(&["init", "server"]).status.success());
-    let mode = std::fs::metadata(sb.config_path())
-        .unwrap()
-        .permissions()
-        .mode()
-        & 0o777;
+    let mode = std::fs::metadata(sb.config_path()).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode, 0o600, "config must not be group/world readable");
 }
 
@@ -290,10 +286,9 @@ fn no_args_prints_the_usage_banner_and_exits_zero() {
         let text = stdout(&out);
         assert!(text.starts_with("stackhour — self-hosted coding time tracker\n"));
         assert!(text.contains("usage: stackhour <command>\n"));
-        assert!(text.trim_end().ends_with(&format!(
-            "config: {}",
-            sb.config_path().display()
-        )));
+        assert!(text
+            .trim_end()
+            .ends_with(&format!("config: {}", sb.config_path().display())));
         assert_eq!(stderr(&out), "", "the help path must keep stderr clean");
     }
 }
