@@ -107,15 +107,17 @@ fn harness() -> Harness {
         Arc::clone(&ctx) as Arc<dyn MacContext>,
         paths.clone(),
     );
-    Harness { api, lane, ctx, dir, paths }
+    Harness {
+        api,
+        lane,
+        ctx,
+        dir,
+        paths,
+    }
 }
 
 fn write_result(paths: &BridgePaths, id: &str, payload: Value) {
-    std::fs::write(
-        paths.results_dir.join(format!("{id}.json")),
-        payload.to_string(),
-    )
-    .unwrap();
+    std::fs::write(paths.results_dir.join(format!("{id}.json")), payload.to_string()).unwrap();
 }
 
 // ---- dispatch ----
@@ -150,11 +152,7 @@ fn dispatch_posts_a_plain_working_status_with_the_stop_button() {
 #[test]
 fn a_stale_heartbeat_changes_the_wording_to_queued() {
     let h = harness();
-    std::fs::write(
-        &h.paths.heartbeat_path,
-        (jobs::now_ms() - 120_000).to_string(),
-    )
-    .unwrap();
+    std::fs::write(&h.paths.heartbeat_path, (jobs::now_ms() - 120_000).to_string()).unwrap();
     h.api.push(Reply::ok(json!({ "message_id": 502 })));
 
     let id = h.lane.dispatch("later", "codex", None, None).unwrap();
@@ -416,10 +414,7 @@ fn a_prompt_survives_dispatch_claim_return_and_delivery() {
         "id": id, "engine": "codex", "text": "42 errors, all the same",
         "sessionId": "codex-session", "code": 0, "error": null,
     });
-    assert_eq!(
-        jobs::run_return_with(h.dir.path(), &id, &payload.to_string()),
-        0
-    );
+    assert_eq!(jobs::run_return_with(h.dir.path(), &id, &payload.to_string()), 0);
     assert!(!h.paths.inprogress_dir.join(format!("{id}.json")).exists());
 
     // --- back on the coordinator ---

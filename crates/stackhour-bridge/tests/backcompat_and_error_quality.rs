@@ -451,7 +451,9 @@ fn an_agent_extends_cycle_reports_the_named_path() {
         .collect();
     assert!(!lines.is_empty(), "the cycle was not reported at all");
     assert!(
-        lines.iter().any(|l| l.contains("a -> b -> a") || l.contains("b -> a -> b")),
+        lines
+            .iter()
+            .any(|l| l.contains("a -> b -> a") || l.contains("b -> a -> b")),
         "expected a named cycle path like `a -> b -> a`, got: {lines:#?}"
     );
     assert!(

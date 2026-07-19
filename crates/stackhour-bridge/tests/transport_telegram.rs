@@ -84,7 +84,10 @@ fn a_409_from_a_duplicate_poller_retries_rather_than_exiting() {
     // does NOT exit, which is exactly how a duplicate poller silently
     // degrades the bridge.
     let api = MockApi::start();
-    api.push_n(5, Reply::err(409, "Conflict: terminated by other getUpdates request"));
+    api.push_n(
+        5,
+        Reply::err(409, "Conflict: terminated by other getUpdates request"),
+    );
     assert!(tg(&api).get_updates(0).is_none());
     assert_eq!(api.request_count(), 5);
 }

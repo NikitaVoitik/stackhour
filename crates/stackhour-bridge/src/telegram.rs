@@ -267,9 +267,7 @@ impl Tg {
                 .and_then(|p| p.get("retry_after"))
                 .and_then(Value::as_u64)
             {
-                return Step::RateLimited(Duration::from_secs(
-                    secs + self.cfg.retry_after_slack_secs,
-                ));
+                return Step::RateLimited(Duration::from_secs(secs + self.cfg.retry_after_slack_secs));
             }
         }
         if description.to_lowercase().contains("not modified") {
@@ -290,12 +288,7 @@ impl Tg {
     /// `sendMessage`. `disable_web_page_preview: true` on EVERY outbound
     /// message; `parse_mode` is omitted entirely when `None` (never sent as
     /// null); `extra` is merged LAST and can override any earlier field.
-    pub fn send_message(
-        &self,
-        text: &str,
-        parse_mode: Option<&str>,
-        extra: Option<&Value>,
-    ) -> Option<Value> {
+    pub fn send_message(&self, text: &str, parse_mode: Option<&str>, extra: Option<&Value>) -> Option<Value> {
         let mut body = json!({
             "chat_id": self.cfg.chat_id,
             "text": text,
@@ -413,10 +406,7 @@ impl Tg {
     /// One attempt, no retry ladder, no timeout — the reference does a bare
     /// `fetch` here and does NOT route it through `tg()`. Callers that need to
     /// stream to disk (media.rs) take the response; [`Tg::download`] buffers.
-    pub fn download_response(
-        &self,
-        file_path: &str,
-    ) -> reqwest::Result<reqwest::blocking::Response> {
+    pub fn download_response(&self, file_path: &str) -> reqwest::Result<reqwest::blocking::Response> {
         self.client.get(self.file_url(file_path)).send()
     }
 
@@ -493,8 +483,7 @@ impl Tg {
 
 /// Merge `extra` over `body`, last-write-wins — the JS object-spread order.
 fn merge_extra(body: &mut Value, extra: Option<&Value>) {
-    let (Some(target), Some(source)) = (body.as_object_mut(), extra.and_then(Value::as_object))
-    else {
+    let (Some(target), Some(source)) = (body.as_object_mut(), extra.and_then(Value::as_object)) else {
         return;
     };
     for (k, v) in source {
@@ -539,10 +528,7 @@ mod tests {
             tg.file_url("photos/file_1.jpg"),
             "https://api.telegram.org/file/botfake-token/photos/file_1.jpg"
         );
-        assert_eq!(
-            tg.api_base(),
-            "https://api.telegram.org/botfake-token"
-        );
+        assert_eq!(tg.api_base(), "https://api.telegram.org/botfake-token");
     }
 
     /// Otherwise reqwest aborts every single poll. Checked at compile time so

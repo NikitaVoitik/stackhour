@@ -140,11 +140,7 @@ impl BridgeState {
     /// The fallible form. Still never panics; the caller decides whether a
     /// failed write is worth a log line.
     pub fn try_save(&self, dir: &Path) -> std::io::Result<()> {
-        let mut out: Map<String, Value> = self
-            .raw
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
+        let mut out: Map<String, Value> = self.raw.as_object().cloned().unwrap_or_default();
         out.insert("offset".into(), json!(self.offset));
         out.insert("active".into(), json!(self.active));
         out.insert("engine".into(), json!(self.engine));
@@ -162,12 +158,7 @@ impl BridgeState {
         let sessions: Map<String, Value> = self
             .sessions
             .iter()
-            .map(|(k, v)| {
-                (
-                    k.clone(),
-                    v.as_ref().map_or(Value::Null, |s| json!(s)),
-                )
-            })
+            .map(|(k, v)| (k.clone(), v.as_ref().map_or(Value::Null, |s| json!(s))))
             .collect();
         out.insert("sessions".into(), Value::Object(sessions));
 
@@ -262,10 +253,7 @@ mod tests {
     #[test]
     fn legacy_session_keys_are_migrated_but_retained() {
         let tmp = TempDir::new().unwrap();
-        write(
-            &tmp,
-            r#"{"sessions": {"gcp": "sess-old", "mac": "mac-old"}}"#,
-        );
+        write(&tmp, r#"{"sessions": {"gcp": "sess-old", "mac": "mac-old"}}"#);
         let s = load(tmp.path());
         assert_eq!(s.sessions["gcp:claude"], Some("sess-old".into()));
         assert_eq!(s.sessions["mac:claude"], Some("mac-old".into()));
@@ -281,10 +269,7 @@ mod tests {
     #[test]
     fn migration_never_overwrites_an_existing_engine_key() {
         let tmp = TempDir::new().unwrap();
-        write(
-            &tmp,
-            r#"{"sessions": {"gcp": "stale", "gcp:claude": "current"}}"#,
-        );
+        write(&tmp, r#"{"sessions": {"gcp": "stale", "gcp:claude": "current"}}"#);
         assert_eq!(load(tmp.path()).sessions["gcp:claude"], Some("current".into()));
     }
 
@@ -328,13 +313,15 @@ mod tests {
                 "somethingElse": {"kept": true}, "sessions": {"mac:codex": "s1"}}"#,
         );
         let mut s = load(tmp.path());
-        assert_eq!((s.offset, s.active.as_str(), s.engine.as_str()), (7, "mac", "codex"));
+        assert_eq!(
+            (s.offset, s.active.as_str(), s.engine.as_str()),
+            (7, "mac", "codex")
+        );
         s.offset = 9;
         s.save(tmp.path());
 
         let raw: Value =
-            serde_json::from_str(&std::fs::read_to_string(tmp.path().join("state.json")).unwrap())
-                .unwrap();
+            serde_json::from_str(&std::fs::read_to_string(tmp.path().join("state.json")).unwrap()).unwrap();
         assert_eq!(raw["somethingElse"]["kept"], true, "an unknown key was dropped");
         assert_eq!(raw["offset"], 9);
         assert_eq!(raw["sessions"]["mac:codex"], "s1");
@@ -402,9 +389,7 @@ mod tests {
         let mut lines: Vec<String> = Vec::new();
         {
             let sink = std::cell::RefCell::new(&mut lines);
-            BridgeState::default().save_logged(&blocked, &|l: &str| {
-                sink.borrow_mut().push(l.to_string())
-            });
+            BridgeState::default().save_logged(&blocked, &|l: &str| sink.borrow_mut().push(l.to_string()));
         }
         assert_eq!(lines.len(), 1, "expected one log line, got {lines:?}");
         assert!(
@@ -416,8 +401,7 @@ mod tests {
         let mut ok: Vec<String> = Vec::new();
         {
             let sink = std::cell::RefCell::new(&mut ok);
-            BridgeState::default()
-                .save_logged(tmp.path(), &|l: &str| sink.borrow_mut().push(l.to_string()));
+            BridgeState::default().save_logged(tmp.path(), &|l: &str| sink.borrow_mut().push(l.to_string()));
         }
         assert!(ok.is_empty(), "a successful save logged: {ok:?}");
     }

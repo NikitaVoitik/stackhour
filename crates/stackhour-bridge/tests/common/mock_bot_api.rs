@@ -50,8 +50,7 @@ impl Reply {
     pub fn err(status: u16, description: &str) -> Reply {
         Reply {
             status,
-            body: json!({ "ok": false, "error_code": status, "description": description })
-                .to_string(),
+            body: json!({ "ok": false, "error_code": status, "description": description }).to_string(),
         }
     }
 

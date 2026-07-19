@@ -117,9 +117,7 @@ impl MediaTransport for Tg {
     }
 
     fn fetch_file(&self, file_path: &str) -> Result<FileResponse, String> {
-        let res = self
-            .download_response(file_path)
-            .map_err(|e| e.to_string())?;
+        let res = self.download_response(file_path).map_err(|e| e.to_string())?;
         Ok(FileResponse {
             status: res.status().as_u16(),
             content_length: res.content_length(),
@@ -417,12 +415,7 @@ fn stream_to_file(body: &mut dyn Read, dest: &Path) -> Result<(), String> {
 /// from [`ElevenLabs`] so a test can point it at a local mock.
 ///
 /// One attempt, no timeout, no retry — parity.
-pub fn transcribe_with(
-    el: &ElevenLabs,
-    path: &Path,
-    mime: &str,
-    name: &str,
-) -> Result<String, String> {
+pub fn transcribe_with(el: &ElevenLabs, path: &Path, mime: &str, name: &str) -> Result<String, String> {
     if el.api_key.is_empty() {
         return Err("ElevenLabs API key is not configured.".into());
     }
@@ -445,9 +438,7 @@ pub fn transcribe_with(
 
     let status = res.status().as_u16();
     // `await res.json().catch(() => ({}))` — an unparseable body is {}.
-    let data: Value = res
-        .json()
-        .unwrap_or_else(|_| Value::Object(Default::default()));
+    let data: Value = res.json().unwrap_or_else(|_| Value::Object(Default::default()));
     if !(200..300).contains(&status) {
         let detail = data
             .get("detail")
@@ -468,12 +459,7 @@ pub fn transcribe_with(
 }
 
 /// Convenience wrapper over [`transcribe_with`] for a coordinator config.
-pub fn transcribe(
-    cfg: &CoordinatorCfg,
-    path: &Path,
-    mime: &str,
-    name: &str,
-) -> Result<String, String> {
+pub fn transcribe(cfg: &CoordinatorCfg, path: &Path, mime: &str, name: &str) -> Result<String, String> {
     transcribe_with(&ElevenLabs::from_cfg(cfg), path, mime, name)
 }
 
@@ -591,20 +577,17 @@ pub fn handle_voice_message<T: MediaTransport + MediaChat>(
     let status = tg.send_plain(&ctx.prompts.render("transcribing", &[]));
 
     let mut saved: Option<SavedMedia> = None;
-    let outcome = download_media(tg, voice, ctx.media_dir, ctx.max_bytes, ctx.prompts).and_then(
-        |media| {
-            let r = transcribe_with(ctx.eleven, &media.path, &media.mime, &media.name);
-            saved = Some(media);
-            r
-        },
-    );
+    let outcome = download_media(tg, voice, ctx.media_dir, ctx.max_bytes, ctx.prompts).and_then(|media| {
+        let r = transcribe_with(ctx.eleven, &media.path, &media.mime, &media.name);
+        saved = Some(media);
+        r
+    });
 
     let result = match outcome {
         Ok(transcript) => {
-            let text = ctx.prompts.render(
-                "transcript",
-                &[("transcript", &transcript_preview(&transcript))],
-            );
+            let text = ctx
+                .prompts
+                .render("transcript", &[("transcript", &transcript_preview(&transcript))]);
             emit(tg, status, &text);
             let size = saved.as_ref().map(|m| m.size).unwrap_or(0);
             let chars: usize = transcript.chars().map(char::len_utf16).sum();
@@ -655,12 +638,7 @@ pub fn media_prompt(prompts: &PromptStore, caption: &str, media: &SavedMedia) ->
 /// request fallback asks "is it an image?", the guidance asks "is it a
 /// video?". So an unrecognised kind gets the VIDEO request text with the
 /// IMAGE guidance.
-pub fn media_prompt_at(
-    prompts: &PromptStore,
-    caption: &str,
-    media: &SavedMedia,
-    local_path: &str,
-) -> String {
+pub fn media_prompt_at(prompts: &PromptStore, caption: &str, media: &SavedMedia, local_path: &str) -> String {
     let caption = caption.trim();
     let request = if !caption.is_empty() {
         caption.to_string()
@@ -847,8 +825,7 @@ mod tests {
         // No extension: ElevenLabs then detects format from the mime alone.
         assert_eq!(a.name.as_deref(), Some("telegram-audio"));
 
-        let m =
-            json!({ "audio": { "file_id": "a", "mime_type": "audio/flac", "file_name": "song.flac" } });
+        let m = json!({ "audio": { "file_id": "a", "mime_type": "audio/flac", "file_name": "song.flac" } });
         let a = extract_voice(&m).unwrap();
         assert_eq!(a.mime.as_deref(), Some("audio/flac"));
         assert_eq!(a.name.as_deref(), Some("song.flac"));
@@ -904,11 +881,7 @@ mod tests {
 
     #[test]
     fn the_image_prompt_is_byte_identical_to_the_js() {
-        let got = media_prompt(
-            &store(),
-            "",
-            &saved("image", "image/jpeg", "telegram-photo.jpg"),
-        );
+        let got = media_prompt(&store(), "", &saved("image", "image/jpeg", "telegram-photo.jpg"));
         assert_eq!(
             got,
             "Please inspect this image and respond.\n\nTelegram attachment (image, image/jpeg, telegram-photo.jpg) is saved locally at: /run/media/1-x.jpg\nUse the available image inspection tool to view it."
@@ -934,10 +907,7 @@ mod tests {
     #[test]
     fn an_unrecognised_kind_gets_the_video_request_and_the_image_guidance() {
         let got = media_prompt(&store(), "", &saved("audio", "audio/ogg", "telegram-voice.ogg"));
-        assert!(
-            got.starts_with("Please inspect this video and respond."),
-            "{got}"
-        );
+        assert!(got.starts_with("Please inspect this video and respond."), "{got}");
         assert!(
             got.ends_with("Use the available image inspection tool to view it."),
             "{got}"
@@ -1006,8 +976,7 @@ mod tests {
     fn a_download_writes_a_0600_file_named_epoch_dash_uuid_dot_ext() {
         let dir = tempfile::tempdir().unwrap();
         let tg = FakeTg::ok("photos/file_7.jpg", b"binary-bytes");
-        let m =
-            download_media(&tg, &att("image"), dir.path(), 512 * 1024 * 1024, &store()).unwrap();
+        let m = download_media(&tg, &att("image"), dir.path(), 512 * 1024 * 1024, &store()).unwrap();
 
         assert_eq!(std::fs::read(&m.path).unwrap(), b"binary-bytes");
         assert_eq!(m.size, 12, "declared size falls back to the getFile size");
@@ -1018,10 +987,7 @@ mod tests {
         assert!(name.ends_with(".jpg"), "{name}");
         let stem = name.trim_end_matches(".jpg");
         let (ms, uuid) = stem.split_once('-').unwrap();
-        assert!(
-            ms.chars().all(|c| c.is_ascii_digit()) && ms.len() >= 13,
-            "{ms}"
-        );
+        assert!(ms.chars().all(|c| c.is_ascii_digit()) && ms.len() >= 13, "{ms}");
         assert_eq!(uuid.len(), 36, "{uuid}");
 
         #[cfg(unix)]
@@ -1264,11 +1230,13 @@ mod tests {
     fn a_media_message_reacts_first_then_hands_back_the_caption_and_the_file() {
         let h = Harness::new();
         let w = Wired {
-            chat: Chat { send_id: Some(9), ..Default::default() },
+            chat: Chat {
+                send_id: Some(9),
+                ..Default::default()
+            },
             tg: FakeTg::ok("photos/f.jpg", b"jpegdata"),
         };
-        let (caption, media) =
-            handle_media_message(&w, &h.ctx(), 77, "what is this", &att("image")).unwrap();
+        let (caption, media) = handle_media_message(&w, &h.ctx(), 77, "what is this", &att("image")).unwrap();
 
         assert_eq!(caption, "what is this");
         assert!(media.path.exists(), "media files are NOT cleaned up after a run");
@@ -1282,7 +1250,13 @@ mod tests {
         let h = Harness::new();
         let mut tg = FakeTg::ok("x.jpg", b"");
         tg.meta = None;
-        let w = Wired { chat: Chat { send_id: Some(9), ..Default::default() }, tg };
+        let w = Wired {
+            chat: Chat {
+                send_id: Some(9),
+                ..Default::default()
+            },
+            tg,
+        };
 
         assert!(handle_media_message(&w, &h.ctx(), 5, "cap", &att("image")).is_none());
         assert_eq!(
@@ -1306,7 +1280,10 @@ mod tests {
         let mut paths = vec![];
         for (i, caption) in ["the album caption", "", "", "", ""].iter().enumerate() {
             let w = Wired {
-                chat: Chat { send_id: Some(1), ..Default::default() },
+                chat: Chat {
+                    send_id: Some(1),
+                    ..Default::default()
+                },
                 tg: FakeTg::ok("photos/f.jpg", b"x"),
             };
             let (cap, media) =
@@ -1332,7 +1309,10 @@ mod tests {
         h.eleven.endpoint = mock_json(200, body);
 
         let w = Wired {
-            chat: Chat { send_id: Some(42), ..Default::default() },
+            chat: Chat {
+                send_id: Some(42),
+                ..Default::default()
+            },
             tg: FakeTg::ok("voice/f.oga", b"oggdata"),
         };
         let transcript = handle_voice_message(&w, &h.ctx(), 7, &voice_att()).unwrap();
@@ -1341,7 +1321,11 @@ mod tests {
         let calls = w.chat.log();
         assert_eq!(calls[0], "react 7");
         assert_eq!(calls[1], "send 🎙️ Transcribing voice message…");
-        assert!(calls[2].starts_with("edit 42 🎙️ Transcript:\nword "), "{}", calls[2]);
+        assert!(
+            calls[2].starts_with("edit 42 🎙️ Transcript:\nword "),
+            "{}",
+            calls[2]
+        );
         // The echoed preview IS truncated.
         assert!(calls[2].ends_with('…'));
         assert_eq!(calls.len(), 3);
@@ -1362,7 +1346,10 @@ mod tests {
         h.eleven.endpoint = mock_json(200, serde_json::to_vec(&json!({ "text": " hi " })).unwrap());
 
         let w = Wired {
-            chat: Chat { send_id: None, ..Default::default() }, // placeholder never landed
+            chat: Chat {
+                send_id: None,
+                ..Default::default()
+            }, // placeholder never landed
             tg: FakeTg::ok("voice/f.oga", b"ogg"),
         };
         let transcript = handle_voice_message(&w, &h.ctx(), 7, &voice_att()).unwrap();
@@ -1384,7 +1371,10 @@ mod tests {
     fn a_transcription_failure_still_unlinks_the_audio_and_edits_the_placeholder() {
         let h = Harness::new(); // api_key is ""
         let w = Wired {
-            chat: Chat { send_id: Some(3), ..Default::default() },
+            chat: Chat {
+                send_id: Some(3),
+                ..Default::default()
+            },
             tg: FakeTg::ok("voice/f.oga", b"ogg"),
         };
         assert!(handle_voice_message(&w, &h.ctx(), 7, &voice_att()).is_none());
@@ -1410,7 +1400,13 @@ mod tests {
         let h = Harness::new();
         let mut tg = FakeTg::ok("x.oga", b"");
         tg.status = 500;
-        let w = Wired { chat: Chat { send_id: Some(3), ..Default::default() }, tg };
+        let w = Wired {
+            chat: Chat {
+                send_id: Some(3),
+                ..Default::default()
+            },
+            tg,
+        };
         assert!(handle_voice_message(&w, &h.ctx(), 7, &voice_att()).is_none());
         assert_eq!(
             w.chat.log()[2],
@@ -1617,10 +1613,7 @@ mod tests {
     }
 
     fn set_mtime(path: &Path, when: SystemTime) {
-        let secs = when
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let secs = when.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as i64;
         let times = [
             libc::timespec {
                 tv_sec: secs,

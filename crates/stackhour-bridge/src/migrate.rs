@@ -138,8 +138,7 @@ impl LegacyConfig {
     /// token is a warning, not a parse failure, because a half-configured
     /// legacy file should still produce a plan the owner can read.
     pub fn parse(text: &str) -> Result<Self, String> {
-        let value: Value =
-            serde_json::from_str(text).map_err(|e| format!("invalid JSON: {e}"))?;
+        let value: Value = serde_json::from_str(text).map_err(|e| format!("invalid JSON: {e}"))?;
         let obj = value
             .as_object()
             .ok_or_else(|| "top level must be a JSON object".to_string())?;
@@ -158,9 +157,8 @@ impl LegacyConfig {
             Some(_) => return Err("targets must be an object".to_string()),
         }
 
-        let string = |key: &str| -> Option<String> {
-            obj.get(key).and_then(Value::as_str).map(str::to_string)
-        };
+        let string =
+            |key: &str| -> Option<String> { obj.get(key).and_then(Value::as_str).map(str::to_string) };
 
         Ok(LegacyConfig {
             token: string("token").unwrap_or_default(),
@@ -175,8 +173,7 @@ impl LegacyConfig {
 
     /// Read and parse, with the path in the error message.
     pub fn read(path: &Path) -> Result<Self, String> {
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+        let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         Self::parse(&text).map_err(|e| format!("{}: {e}", path.display()))
     }
 }
@@ -252,10 +249,7 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
     let mut secret_detail: Vec<String> = Vec::new();
     if !legacy.token.is_empty() {
         secrets.insert("telegramToken".into(), json!(legacy.token));
-        secret_detail.push(format!(
-            "bridge.telegramToken           {}",
-            mask(&legacy.token)
-        ));
+        secret_detail.push(format!("bridge.telegramToken           {}", mask(&legacy.token)));
         consumed.push("token");
     } else {
         warnings.push("'token' is missing or empty in the source; the bridge will not authenticate until you set STACKHOUR_TELEGRAM_TOKEN or edit secrets.json".into());
@@ -265,7 +259,8 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
         secret_detail.push(format!("bridge.chatId                  {}", legacy.chat_id));
         consumed.push("chatId");
     } else {
-        warnings.push("'chatId' is missing in the source; the bridge would accept messages from nobody".into());
+        warnings
+            .push("'chatId' is missing in the source; the bridge would accept messages from nobody".into());
     }
     match legacy.eleven_labs_api_key.as_deref() {
         Some("") => {
@@ -350,7 +345,9 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
         if !body.is_empty() && !body.ends_with('\n') {
             body.push('\n');
         }
-        body.push_str("# written by `stackhour bridge migrate` — this file holds a live bot token\nsecrets.json\n");
+        body.push_str(
+            "# written by `stackhour bridge migrate` — this file holds a live bot token\nsecrets.json\n",
+        );
         files.push(PlannedFile {
             path: gitignore,
             label: ".gitignore".into(),
@@ -454,9 +451,7 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
     let mut rt_targets = Map::new();
     for (name, entry) in &legacy.targets {
         let mut obj = entry.as_object().cloned().unwrap_or_default();
-        if obj.get("type").and_then(Value::as_str) == Some("local")
-            && !obj.contains_key("codexBin")
-        {
+        if obj.get("type").and_then(Value::as_str) == Some("local") && !obj.contains_key("codexBin") {
             obj.insert("codexBin".into(), json!(codex_bin.display().to_string()));
             warnings.push(format!(
                 "target '{name}' had no codexBin and relied on coordinator.mjs:244's hardcoded fallback; materialised as {}",
@@ -489,11 +484,7 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
         mode: 0o600,
         contents: pretty_json(&rt_doc),
         disposition: Disposition::Create,
-        summary: format!(
-            "{} target{}",
-            legacy.targets.len(),
-            plural(legacy.targets.len())
-        ),
+        summary: format!("{} target{}", legacy.targets.len(), plural(legacy.targets.len())),
         detail: Vec::new(),
         merged_existing: false,
     });
@@ -554,9 +545,7 @@ pub fn render_plan(plan: &Plan) -> String {
     if !plan.unmapped.is_empty() {
         out.push('\n');
         for key in &plan.unmapped {
-            out.push_str(&format!(
-                "  warn    legacy key '{key}' reached no destination\n"
-            ));
+            out.push_str(&format!("  warn    legacy key '{key}' reached no destination\n"));
         }
     }
     out.push_str(&format!(
@@ -626,8 +615,7 @@ pub fn apply(plan: &Plan, force: bool) -> Result<Applied, String> {
                     backup.display()
                 ));
             }
-            std::fs::copy(&f.path, &backup)
-                .map_err(|e| format!("{}: {e}", backup.display()))?;
+            std::fs::copy(&f.path, &backup).map_err(|e| format!("{}: {e}", backup.display()))?;
             applied.backups.push((f.path.clone(), backup));
         }
     }
@@ -843,10 +831,7 @@ pub fn engine_toml(def: &EngineDef) -> String {
             out.push_str(&format!("\n[resume]\nflag = {}\n", toml_array(args)));
         }
         ResumeStyle::Subcommand { insert } => {
-            out.push_str(&format!(
-                "\n[resume]\nsubcommand = {}\n",
-                toml_string(insert)
-            ));
+            out.push_str(&format!("\n[resume]\nsubcommand = {}\n", toml_string(insert)));
         }
     }
     if !def.env.is_empty() {
@@ -976,8 +961,7 @@ mod tests {
     use stackhour_core::registry;
 
     const FIXTURE: &str = include_str!("../../../tests-fixtures/bridge/legacy-config.json");
-    const FIXTURE_MAX: &str =
-        include_str!("../../../tests-fixtures/bridge/legacy-config-maximal.json");
+    const FIXTURE_MAX: &str = include_str!("../../../tests-fixtures/bridge/legacy-config-maximal.json");
 
     fn opts(dir: &Path) -> MigrateOptions {
         MigrateOptions {
@@ -1056,11 +1040,7 @@ mod tests {
                 continue;
             }
             let text = String::from_utf8_lossy(&f.contents);
-            assert!(
-                !text.contains(&legacy.token),
-                "{} leaked the bot token",
-                f.label
-            );
+            assert!(!text.contains(&legacy.token), "{} leaked the bot token", f.label);
             assert!(
                 !text.contains("sk_TEST-ELEVENLABS-KEY"),
                 "{} leaked the ElevenLabs key",
@@ -1174,7 +1154,10 @@ mod tests {
         assert_eq!(doc["maxMediaBytes"], json!(LEGACY_MAX_MEDIA_BYTES));
         assert_eq!(doc["targets"]["gcp"]["label"], json!("☁️ GCP"));
         assert_eq!(doc["targets"]["mac"]["type"], json!("worker"));
-        assert_eq!(doc["targets"]["blort"]["cwd"], json!("/home/testuser/projects/example"));
+        assert_eq!(
+            doc["targets"]["blort"]["cwd"],
+            json!("/home/testuser/projects/example")
+        );
         assert!(doc.get("token").is_none());
         assert!(doc.get("chatId").is_none());
     }
@@ -1397,11 +1380,7 @@ mod tests {
         std::fs::write(cfg.join("secrets.json"), "{}\n").unwrap();
 
         let plan = plan_of(FIXTURE, dir.path());
-        let conflicts: Vec<String> = plan
-            .conflicts()
-            .iter()
-            .map(|f| f.label.clone())
-            .collect();
+        let conflicts: Vec<String> = plan.conflicts().iter().map(|f| f.label.clone()).collect();
         assert!(conflicts.contains(&"prompts/help.md".to_string()));
         assert!(conflicts.contains(&"secrets.json".to_string()));
 
@@ -1504,8 +1483,12 @@ mod tests {
         std::fs::remove_file(dir.path().join("config/commands/ship.toml")).unwrap();
 
         let issues = verify(&plan);
-        assert!(issues.iter().any(|i| i.contains("help.md") && i.contains("differ")));
-        assert!(issues.iter().any(|i| i.contains("ship.toml") && i.contains("missing")));
+        assert!(issues
+            .iter()
+            .any(|i| i.contains("help.md") && i.contains("differ")));
+        assert!(issues
+            .iter()
+            .any(|i| i.contains("ship.toml") && i.contains("missing")));
     }
 
     /// The check none of the `bridge show` diffs can do: a legacy key that
@@ -1530,9 +1513,6 @@ mod tests {
     fn a_fully_mapped_config_has_no_unmapped_keys() {
         let dir = tempfile::tempdir().unwrap();
         assert_eq!(plan_of(FIXTURE, dir.path()).unmapped, Vec::<String>::new());
-        assert_eq!(
-            plan_of(FIXTURE_MAX, dir.path()).unmapped,
-            Vec::<String>::new()
-        );
+        assert_eq!(plan_of(FIXTURE_MAX, dir.path()).unmapped, Vec::<String>::new());
     }
 }

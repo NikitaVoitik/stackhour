@@ -77,12 +77,7 @@ impl BridgePaths {
         let runtime_dir = env("STACKHOUR_BRIDGE_HOME")
             .filter(|v| !v.trim().is_empty())
             .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                home.join(".local")
-                    .join("share")
-                    .join("stackhour")
-                    .join("bridge")
-            });
+            .unwrap_or_else(|| home.join(".local").join("share").join("stackhour").join("bridge"));
         Self::from_runtime_dir(&runtime_dir)
     }
 
@@ -98,10 +93,7 @@ impl BridgePaths {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(
-                &self.media_dir,
-                std::fs::Permissions::from_mode(0o700),
-            )?;
+            std::fs::set_permissions(&self.media_dir, std::fs::Permissions::from_mode(0o700))?;
         }
         Ok(())
     }
@@ -175,10 +167,7 @@ mod tests {
     #[test]
     fn an_empty_env_override_falls_back_to_the_default() {
         for blank in ["", "   "] {
-            let p = BridgePaths::resolve(
-                &env_of(&[("STACKHOUR_BRIDGE_HOME", blank)]),
-                Path::new("/h"),
-            );
+            let p = BridgePaths::resolve(&env_of(&[("STACKHOUR_BRIDGE_HOME", blank)]), Path::new("/h"));
             assert_eq!(p.runtime_dir, Path::new("/h/.local/share/stackhour/bridge"));
         }
     }

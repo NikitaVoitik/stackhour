@@ -143,8 +143,7 @@ pub fn beat(heartbeat_path: &Path) {
     // tmp+rename so a coordinator read landing mid-write cannot observe a
     // truncated string (which `Number('')` turns into 0, i.e. "offline").
     let tmp = heartbeat_path.with_extension("tmp");
-    if std::fs::write(&tmp, body.as_bytes()).is_ok() && std::fs::rename(&tmp, heartbeat_path).is_ok()
-    {
+    if std::fs::write(&tmp, body.as_bytes()).is_ok() && std::fs::rename(&tmp, heartbeat_path).is_ok() {
         return;
     }
     let _ = std::fs::remove_file(&tmp);
@@ -319,7 +318,10 @@ mod tests {
     #[test]
     fn the_uuid_gate_accepts_v4_and_rejects_everything_else() {
         assert!(uuid_ok("3f2504e0-4f89-41d3-9a0c-0305e82c3301"));
-        assert!(uuid_ok("3F2504E0-4F89-41D3-9A0C-0305E82C3301"), "case-insensitive");
+        assert!(
+            uuid_ok("3F2504E0-4F89-41D3-9A0C-0305E82C3301"),
+            "case-insensitive"
+        );
         assert!(uuid_ok(&uuid::Uuid::new_v4().to_string()), "what we generate");
 
         for bad in [
@@ -468,8 +470,14 @@ mod tests {
         assert!(!p.jobs_dir.join("aaa.json").exists());
         assert!(p.inprogress_dir.join("aaa.json").exists());
 
-        assert_eq!(try_claim(&p.jobs_dir, &p.inprogress_dir).unwrap(), r#"{"id":"bbb"}"#);
-        assert_eq!(try_claim(&p.jobs_dir, &p.inprogress_dir).unwrap(), r#"{"id":"ccc"}"#);
+        assert_eq!(
+            try_claim(&p.jobs_dir, &p.inprogress_dir).unwrap(),
+            r#"{"id":"bbb"}"#
+        );
+        assert_eq!(
+            try_claim(&p.jobs_dir, &p.inprogress_dir).unwrap(),
+            r#"{"id":"ccc"}"#
+        );
         assert_eq!(try_claim(&p.jobs_dir, &p.inprogress_dir), None);
         // The tmp file is still sitting there, unclaimed and unnoticed.
         assert!(p.jobs_dir.join("zzz.json.tmp").exists());
@@ -541,8 +549,7 @@ mod tests {
         let id = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
         std::fs::write(p.inprogress_dir.join(format!("{id}.json")), "{}").unwrap();
 
-        let payload =
-            r#"{"id":"x","engine":"codex","text":"done","sessionId":"s1","code":0,"error":null}"#;
+        let payload = r#"{"id":"x","engine":"codex","text":"done","sessionId":"s1","code":0,"error":null}"#;
         assert_eq!(run_return_with(tmp.path(), id, payload), 0);
 
         assert_eq!(
@@ -592,14 +599,21 @@ mod tests {
         let p = crate::BridgePaths::from_runtime_dir(tmp.path());
         assert_eq!(run_return_with(tmp.path(), "", "{}"), 2);
         for evil in ["../../pwned", "..", "not-a-uuid", "/etc/passwd"] {
-            assert_eq!(run_return_with(tmp.path(), evil, r#"{"text":"pwn"}"#), 2, "{evil}");
+            assert_eq!(
+                run_return_with(tmp.path(), evil, r#"{"text":"pwn"}"#),
+                2,
+                "{evil}"
+            );
         }
         assert_eq!(
             std::fs::read_dir(&p.results_dir).unwrap().count(),
             0,
             "a rejected id must write nothing at all"
         );
-        assert!(!tmp.path().join("pwned.json").exists(), "traversal escaped results/");
+        assert!(
+            !tmp.path().join("pwned.json").exists(),
+            "traversal escaped results/"
+        );
     }
 
     // ---- the round trip ----
@@ -628,10 +642,9 @@ mod tests {
                               "sessionId": "next", "code": 0, "error": null });
         assert_eq!(run_return_with(tmp.path(), &id, &payload.to_string()), 0);
 
-        let result: Value = serde_json::from_str(
-            &std::fs::read_to_string(p.results_dir.join(format!("{id}.json"))).unwrap(),
-        )
-        .unwrap();
+        let result: Value =
+            serde_json::from_str(&std::fs::read_to_string(p.results_dir.join(format!("{id}.json"))).unwrap())
+                .unwrap();
         assert_eq!(result["sessionId"], "next");
         assert_eq!(std::fs::read_dir(&p.inprogress_dir).unwrap().count(), 0);
         assert_eq!(std::fs::read_dir(&p.jobs_dir).unwrap().count(), 0);

@@ -109,9 +109,8 @@ impl SkillHooks {
             }
             Ok(list)
         };
-        let timeout_seconds =
-            toml_util::opt_u64(hooks, "timeout_seconds", DEFAULT_HOOK_TIMEOUT_SECONDS)
-                .map_err(|e| e.under("hooks"))?;
+        let timeout_seconds = toml_util::opt_u64(hooks, "timeout_seconds", DEFAULT_HOOK_TIMEOUT_SECONDS)
+            .map_err(|e| e.under("hooks"))?;
         if timeout_seconds == 0 {
             return Err(FieldError::nested(
                 "hooks",
@@ -207,17 +206,13 @@ impl SkillDef {
     /// `from_toml` is the loader-facing wrapper that flattens this to a
     /// `String`, matching the other registry parsers and `read_toml`'s
     /// signature; prefer this one when you want the key back.
-    pub fn try_from_toml(
-        name: &str,
-        skill_dir: &Path,
-        v: &toml::Value,
-    ) -> Result<Self, FieldError> {
+    pub fn try_from_toml(name: &str, skill_dir: &Path, v: &toml::Value) -> Result<Self, FieldError> {
         let table = toml_util::root_table(v, "skill.toml")?;
 
         let description = toml_util::req_string(table, "description")?;
 
-        let body_file = toml_util::opt_nonempty_string(table, "body")?
-            .unwrap_or_else(|| DEFAULT_BODY_FILE.to_string());
+        let body_file =
+            toml_util::opt_nonempty_string(table, "body")?.unwrap_or_else(|| DEFAULT_BODY_FILE.to_string());
         // `Path::join` keeps an absolute `body` path as-is, so both
         // `body = "skill.md"` and an absolute override work. A missing file
         // is an empty body (see `body()`), so `skill.md` may be written
@@ -241,10 +236,7 @@ impl SkillDef {
             ));
         }
         if let Some(dupe) = first_duplicate(&uses) {
-            return Err(FieldError::key(
-                "uses",
-                format!("duplicate entry '{dupe}'"),
-            ));
+            return Err(FieldError::key("uses", format!("duplicate entry '{dupe}'")));
         }
 
         let tools = tool_policy_from(table)?;
@@ -370,8 +362,7 @@ fn visit(
 /// (cheap: a stat per file) and an edit to any one body takes effect on the
 /// next prompt with no reload.
 pub fn composed_body(reg: &Registry, skill: &str) -> io::Result<String> {
-    let order = composition_order(reg, skill)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+    let order = composition_order(reg, skill).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
     let mut parts: Vec<String> = Vec::with_capacity(order.len());
     for name in &order {
         let Some(def) = reg.skills.get(name) else {
@@ -663,7 +654,11 @@ timeout_seconds = 120
             "key `args[0].rest`: only the LAST argument may set rest = true ('a' is followed by 'b')"
         );
         assert_eq!(
-            err("s", dir.path(), "description = \"d\"\n[[args]]\nrequired = true\n"),
+            err(
+                "s",
+                dir.path(),
+                "description = \"d\"\n[[args]]\nrequired = true\n"
+            ),
             "key `args[0].name`: is required and must be a non-empty string"
         );
     }
@@ -776,11 +771,7 @@ timeout_seconds = 120
     fn composition_order_is_dependency_first_and_deduped() {
         let (_d, reg) = registry_with(&[
             ("base", "description = \"base\"\n", "BASE"),
-            (
-                "mid",
-                "description = \"mid\"\nuses = [\"base\"]\n",
-                "MID",
-            ),
+            ("mid", "description = \"mid\"\nuses = [\"base\"]\n", "MID"),
             (
                 "top",
                 "description = \"top\"\nuses = [\"mid\", \"base\"]\n",

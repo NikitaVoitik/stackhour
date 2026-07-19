@@ -207,11 +207,7 @@ pub fn run(args: &TgSendArgs, env: &mut TgSendEnv) -> i32 {
 }
 
 /// One JSON POST. `Err` carries a transport-level message.
-fn post(
-    client: &reqwest::blocking::Client,
-    url: &str,
-    body: &Value,
-) -> Result<(u16, Value), String> {
+fn post(client: &reqwest::blocking::Client, url: &str, body: &Value) -> Result<(u16, Value), String> {
     let res = client
         .post(url)
         .header("content-type", "application/json")

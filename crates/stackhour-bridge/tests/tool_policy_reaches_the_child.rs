@@ -199,7 +199,9 @@ fn an_agent_without_a_tools_table_adds_no_flags() {
     ]);
     let argv = argv_for(&reg, "enforcer", "plain");
     assert!(
-        !argv.iter().any(|a| a == "--allowedTools" || a == "--disallowedTools"),
+        !argv
+            .iter()
+            .any(|a| a == "--allowedTools" || a == "--disallowedTools"),
         "tool flags leaked into an agent that declares no policy: {argv:?}"
     );
 }

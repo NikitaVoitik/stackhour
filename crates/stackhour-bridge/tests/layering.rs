@@ -171,8 +171,7 @@ fn a_command_invokes_a_skill_that_runs_under_an_agent_with_a_soul_from_the_confi
         "alias did not resolve to the command"
     );
 
-    let Dispatch::Command { command, raw } = commands::resolve(&table, "/review 4821 the error paths")
-    else {
+    let Dispatch::Command { command, raw } = commands::resolve(&table, "/review 4821 the error paths") else {
         panic!("expected a command dispatch");
     };
     let def = table.get(&command).expect("command in table");
@@ -188,18 +187,19 @@ fn a_command_invokes_a_skill_that_runs_under_an_agent_with_a_soul_from_the_confi
         "the prompt template did not render with the bound args"
     );
     // dependency-first: house-style before review.
-    let fragments: Vec<&str> = plan
-        .system_fragments
-        .iter()
-        .map(|f| f.name.as_str())
-        .collect();
+    let fragments: Vec<&str> = plan.system_fragments.iter().map(|f| f.name.as_str()).collect();
     assert_eq!(fragments, vec!["house-style", "review"]);
     assert_eq!(plan.env["REVIEW_MODE"], "strict");
     assert_eq!(plan.agent_override.as_deref(), Some("strict"));
 
     // -- seam 4: agent resolution honours the skill's override ---------------
-    let agent = souls::resolve_agent(&state(), &reg, def.agent.as_deref(), plan.agent_override.as_deref())
-        .expect("the skill's agent must be selected");
+    let agent = souls::resolve_agent(
+        &state(),
+        &reg,
+        def.agent.as_deref(),
+        plan.agent_override.as_deref(),
+    )
+    .expect("the skill's agent must be selected");
     assert_eq!(agent.name, "strict");
     // `extends` pulled the engine down from `base`, and the child's own
     // fields won where it set them.

@@ -282,9 +282,10 @@ impl MacLane {
                 "pollResults: unparseable result quarantined as {}",
                 bad.display()
             )),
-            Err(e) => self
-                .ctx
-                .log(&format!("pollResults: unparseable result {} ({e})", path.display())),
+            Err(e) => self.ctx.log(&format!(
+                "pollResults: unparseable result {} ({e})",
+                path.display()
+            )),
         }
     }
 
@@ -301,8 +302,12 @@ impl MacLane {
         // Explicitly the mac target, never the active one: switching to /gcp
         // mid-flight must not file this session under gcp.
         if let Some(session) = str_field(res, "sessionId") {
-            self.ctx
-                .set_session(&target, &engine, info.and_then(|i| i.agent.as_deref()), Some(session));
+            self.ctx.set_session(
+                &target,
+                &engine,
+                info.and_then(|i| i.agent.as_deref()),
+                Some(session),
+            );
         }
 
         let body = self.result_text(res, &engine_label);
@@ -359,13 +364,7 @@ impl MacLane {
     pub fn cancel_queued(&self) -> CancelOutcome {
         // Collect first: JS tolerates deleting from a Map mid-iteration, Rust
         // does not, and the insertion order is what the edits must follow.
-        let ids: Vec<String> = self
-            .pending
-            .lock()
-            .expect("pending")
-            .keys()
-            .cloned()
-            .collect();
+        let ids: Vec<String> = self.pending.lock().expect("pending").keys().cloned().collect();
 
         let mut out = CancelOutcome::default();
         for id in ids {
@@ -452,13 +451,7 @@ mod tests {
                 .get(&key(target, engine, agent))
                 .cloned()
         }
-        fn set_session(
-            &self,
-            target: &str,
-            engine: &str,
-            agent: Option<&str>,
-            id: Option<String>,
-        ) {
+        fn set_session(&self, target: &str, engine: &str, agent: Option<&str>, id: Option<String>) {
             self.sessions.lock().unwrap().push((
                 target.to_string(),
                 engine.to_string(),
@@ -499,8 +492,8 @@ mod tests {
         // A Tg pointed at an unroutable port: these tests exercise the lane's
         // decisions, not its transport. `tg()` degrades every failure to None,
         // which is precisely the "the message did not happen" path.
-        let mut cfg = crate::telegram::TgConfig::new("test-token", 1)
-            .with_api_root("http://127.0.0.1:1/".to_string());
+        let mut cfg =
+            crate::telegram::TgConfig::new("test-token", 1).with_api_root("http://127.0.0.1:1/".to_string());
         cfg.backoff_base_ms = 0;
         cfg.attempts = 1;
         MacLane::new(Arc::new(Tg::with_config(cfg)), ctx, paths)
@@ -539,7 +532,10 @@ mod tests {
         assert_eq!(lane.result_text(&json!({ "code": 0 }), "Claude"), "(no output)");
         // The spawn-failed shape: no `code` key at all.
         assert_eq!(lane.result_text(&json!({}), "Claude"), "(no output)");
-        assert_eq!(lane.result_text(&json!({ "code": null }), "Claude"), "(no output)");
+        assert_eq!(
+            lane.result_text(&json!({ "code": null }), "Claude"),
+            "(no output)"
+        );
     }
 
     // ---- dispatch ----
@@ -552,11 +548,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let lane = lane_with(Arc::clone(&ctx), tmp.path());
 
-        let id = lane.dispatch("do the thing", "codex", None, None).expect("dispatched");
+        let id = lane
+            .dispatch("do the thing", "codex", None, None)
+            .expect("dispatched");
         assert_eq!(lane.pending_len(), 1);
 
-        let body =
-            std::fs::read_to_string(tmp.path().join("jobs").join(format!("{id}.json"))).unwrap();
+        let body = std::fs::read_to_string(tmp.path().join("jobs").join(format!("{id}.json"))).unwrap();
         let job: Value = serde_json::from_str(&body).unwrap();
         assert_eq!(job["id"], id);
         assert_eq!(job["prompt"], "do the thing");
@@ -597,8 +594,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let lane = lane_with(ctx, tmp.path());
         let id = lane.dispatch("x", "claude", None, None).unwrap();
-        let body =
-            std::fs::read_to_string(tmp.path().join("jobs").join(format!("{id}.json"))).unwrap();
+        let body = std::fs::read_to_string(tmp.path().join("jobs").join(format!("{id}.json"))).unwrap();
         assert!(body.contains(r#""sessionId":null"#), "{body}");
     }
 
@@ -628,7 +624,12 @@ mod tests {
 
         assert_eq!(
             *ctx.sessions.lock().unwrap(),
-            vec![("mac".to_string(), "codex".to_string(), None, Some("s-next".to_string()))],
+            vec![(
+                "mac".to_string(),
+                "codex".to_string(),
+                None,
+                Some("s-next".to_string())
+            )],
             "the session must be filed under 'mac', never the active target"
         );
         assert_eq!(lane.pending_len(), 0, "the pending entry is consumed");
@@ -752,10 +753,19 @@ mod tests {
         .unwrap();
 
         let out = lane.cancel_queued();
-        assert_eq!(out, CancelOutcome { cancelled: 1, running: 1 });
+        assert_eq!(
+            out,
+            CancelOutcome {
+                cancelled: 1,
+                running: 1
+            }
+        );
         assert!(!tmp.path().join("jobs").join(format!("{queued}.json")).exists());
         assert!(
-            tmp.path().join("inprogress").join(format!("{claimed}.json")).exists(),
+            tmp.path()
+                .join("inprogress")
+                .join(format!("{claimed}.json"))
+                .exists(),
             "cancellation must never touch inprogress/"
         );
         assert_eq!(

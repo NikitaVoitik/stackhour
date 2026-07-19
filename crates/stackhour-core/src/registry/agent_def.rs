@@ -300,8 +300,8 @@ impl AgentDef {
         }
 
         let permission_mode_explicit = table.contains_key("permission_mode");
-        let permission_mode = opt_enum(table, "permission_mode", PERMISSION_MODES)?
-            .unwrap_or_else(|| "default".to_string());
+        let permission_mode =
+            opt_enum(table, "permission_mode", PERMISSION_MODES)?.unwrap_or_else(|| "default".to_string());
 
         let cwd = opt_nonempty_string(table, "cwd")?;
         let prompt_template = opt_nonempty_string(table, "prompt_template")?;
@@ -368,7 +368,10 @@ fn relative_doc(file: &str, key: &str) -> Result<PathBuf, FieldError> {
     if path.is_absolute() {
         return Ok(path);
     }
-    if path.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+    if path
+        .components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
         return Err(FieldError::key(
             key,
             format!("must not escape the agent directory (got '{file}')"),
@@ -448,11 +451,7 @@ pub fn resolve_inheritance(agents: &mut IndexMap<String, AgentDef>, errors: &mut
         let ready: Vec<String> = agents
             .iter()
             .filter(|(name, def)| {
-                !resolved.contains(*name)
-                    && def
-                        .extends
-                        .as_ref()
-                        .is_some_and(|p| resolved.contains(p))
+                !resolved.contains(*name) && def.extends.as_ref().is_some_and(|p| resolved.contains(p))
             })
             .map(|(name, _)| name.clone())
             .collect();
@@ -500,7 +499,10 @@ pub fn resolve_inheritance(agents: &mut IndexMap<String, AgentDef>, errors: &mut
         if let Some(def) = agents.shift_remove(&name) {
             errors.push(agent_error(
                 &def,
-                FieldError::key("engine", "is required: no agent in the `extends` chain declares one"),
+                FieldError::key(
+                    "engine",
+                    "is required: no agent in the `extends` chain declares one",
+                ),
             ));
         }
     }
@@ -540,10 +542,7 @@ pub fn composed_soul(agent: &AgentDef, reg: &Registry) -> io::Result<String> {
             break;
         }
         chain.push(def);
-        current = def
-            .extends
-            .as_deref()
-            .and_then(|parent| reg.agents.get(parent));
+        current = def.extends.as_deref().and_then(|parent| reg.agents.get(parent));
     }
     chain.reverse();
 
@@ -772,7 +771,12 @@ deny = ["WebSearch"]
     fn from_toml_rejects_traversal_out_of_the_agent_dir() {
         let dir = tmpdir();
         assert_eq!(
-            parse("a", dir.path(), "engine = \"claude\"\nsoul = \"../../etc/passwd\"\n").unwrap_err(),
+            parse(
+                "a",
+                dir.path(),
+                "engine = \"claude\"\nsoul = \"../../etc/passwd\"\n"
+            )
+            .unwrap_err(),
             "key `soul`: must not escape the agent directory (got '../../etc/passwd')"
         );
         assert_eq!(
@@ -1020,7 +1024,11 @@ deny = ["WebSearch"]
     fn inheritance_unions_skills_parent_first_without_duplicates() {
         let dir = tmpdir();
         let mut agents = map(vec![
-            agent("base", dir.path(), "engine = \"claude\"\nskills = [\"review\", \"style\"]\n"),
+            agent(
+                "base",
+                dir.path(),
+                "engine = \"claude\"\nskills = [\"review\", \"style\"]\n",
+            ),
             agent(
                 "child",
                 dir.path(),
@@ -1124,9 +1132,9 @@ deny = ["WebSearch"]
         let mut errors = Vec::new();
         resolve_inheritance(&mut agents, &mut errors);
         assert!(agents.is_empty(), "{:?}", agents.keys().collect::<Vec<_>>());
-        assert!(errors.iter().all(|e| e
-            .message
-            .contains("no agent in the `extends` chain declares one")));
+        assert!(errors
+            .iter()
+            .all(|e| e.message.contains("no agent in the `extends` chain declares one")));
     }
 
     #[test]

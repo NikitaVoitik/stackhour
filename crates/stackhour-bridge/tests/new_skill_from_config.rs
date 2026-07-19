@@ -289,20 +289,14 @@ fn config_only_skill_is_invocable_from_another_skill() {
     let plan = skills::plan_invocation(&reg, "release", "1.4.0").expect("plan");
 
     // Dependency-first: the used skill's prose comes BEFORE the composer's.
-    let order: Vec<&str> = plan
-        .system_fragments
-        .iter()
-        .map(|f| f.name.as_str())
-        .collect();
+    let order: Vec<&str> = plan.system_fragments.iter().map(|f| f.name.as_str()).collect();
     assert_eq!(
         order,
         ["changelog", "release"],
         "composition order is wrong: {order:?}"
     );
     assert!(
-        plan.system_fragments[0]
-            .body
-            .contains("Added / Changed / Fixed"),
+        plan.system_fragments[0].body.contains("Added / Changed / Fixed"),
         "the used skill's body was not composed in"
     );
 
@@ -343,8 +337,7 @@ fn an_agent_listing_the_skill_gets_its_prose_without_binding_arguments() {
 #[test]
 fn the_post_hook_runs_with_placeholders_substituted() {
     let (_dir, reg, receipt) = loaded();
-    let plan = skills::plan_invocation(&reg, "changelog", "1.4.0 v1.3.0 the export pipeline")
-        .expect("plan");
+    let plan = skills::plan_invocation(&reg, "changelog", "1.4.0 v1.3.0 the export pipeline").expect("plan");
 
     // Substituted at PLAN time, per argv element — never re-split.
     let joined = plan.hooks.post.join(" ");

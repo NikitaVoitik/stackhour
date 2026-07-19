@@ -79,10 +79,7 @@ permission_mode = "default"
             "agents/oracle/soul.md",
             format!("You are the Oracle.\n\n{SOUL_SENTINEL}\n"),
         ),
-        (
-            "agents/oracle/laconic.md",
-            format!("{OVERLAY_SENTINEL}\n"),
-        ),
+        ("agents/oracle/laconic.md", format!("{OVERLAY_SENTINEL}\n")),
         (
             "agents/scribe/agent.toml",
             "label = \"The Scribe\"\nengine = \"fake-echo\"\n".to_string(),

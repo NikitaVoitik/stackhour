@@ -69,9 +69,7 @@ fn info_line_re() -> &'static regex::Regex {
 
 fn sep_re() -> &'static regex::Regex {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        regex::Regex::new(r"^\s*\|?[\s:|-]*-{1,}[\s:|-]*\|?\s*$").expect("static regex")
-    })
+    RE.get_or_init(|| regex::Regex::new(r"^\s*\|?[\s:|-]*-{1,}[\s:|-]*\|?\s*$").expect("static regex"))
 }
 
 /// Markdown -> Telegram HTML, byte-for-byte with `renderHtml()`.
@@ -88,9 +86,8 @@ pub fn render_html(text: &str) -> String {
             out.push_str("</pre>");
         } else {
             let escaped = esc(part);
-            let replaced = inline_code_re().replace_all(&escaped, |c: &regex::Captures| {
-                format!("<code>{}</code>", &c[1])
-            });
+            let replaced = inline_code_re()
+                .replace_all(&escaped, |c: &regex::Captures| format!("<code>{}</code>", &c[1]));
             out.push_str(&replaced);
         }
     }
@@ -352,7 +349,10 @@ mod tests {
 
     #[test]
     fn esc_escapes_exactly_three_entities_and_leaves_quotes_alone() {
-        assert_eq!(esc(r#"a & b < c > d " e ' f"#), "a &amp; b &lt; c &gt; d \" e ' f");
+        assert_eq!(
+            esc(r#"a & b < c > d " e ' f"#),
+            "a &amp; b &lt; c &gt; d \" e ' f"
+        );
     }
 
     #[test]
@@ -537,14 +537,17 @@ mod tests {
 
     #[test]
     fn claude_activity_truncates_the_detail_at_80_units() {
-        let line = claude_activity(&json!({"name": "Bash", "input": {"command": "x".repeat(200)}}))
-            .expect("line");
+        let line =
+            claude_activity(&json!({"name": "Bash", "input": {"command": "x".repeat(200)}})).expect("line");
         assert_eq!(line, format!("⚙️ Bash: {}", "x".repeat(80)));
     }
 
     #[test]
     fn codex_activity_maps_known_types_and_skips_agent_messages() {
-        assert_eq!(codex_activity(&json!({"type": "agent_message", "text": "hi"})), None);
+        assert_eq!(
+            codex_activity(&json!({"type": "agent_message", "text": "hi"})),
+            None
+        );
         assert_eq!(
             codex_activity(&json!({"type": "command_execution", "command": "cargo test"})),
             Some("⚙️ Command: cargo test".to_string())

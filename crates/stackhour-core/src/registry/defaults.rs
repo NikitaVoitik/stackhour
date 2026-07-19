@@ -39,10 +39,7 @@ pub const STARTER_FILES: &[StarterFile] = &[
         "commands/review.toml",
         include_str!("defaults/commands/review.toml"),
     ),
-    (
-        "commands/ship.toml",
-        include_str!("defaults/commands/ship.toml"),
-    ),
+    ("commands/ship.toml", include_str!("defaults/commands/ship.toml")),
     (
         "skills/review/skill.toml",
         include_str!("defaults/skills/review/skill.toml"),

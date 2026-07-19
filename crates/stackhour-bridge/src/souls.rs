@@ -77,7 +77,10 @@ pub fn compose_system_prompt(agent: &AgentDef, reg: &Registry) -> Result<String>
     }
     Ok(reg
         .prompts
-        .render(SYSTEM_TEMPLATE, &[("soul", soul.trim()), ("skills", skills.trim())])
+        .render(
+            SYSTEM_TEMPLATE,
+            &[("soul", soul.trim()), ("skills", skills.trim())],
+        )
         .trim()
         .to_string())
 }
@@ -180,9 +183,10 @@ pub fn apply_agent(def: &EngineDef, agent: Option<&AgentDef>, reg: &Registry, re
     if def.system_prompt_args.is_some() {
         req.system_prompt = Some(system);
     } else {
-        req.prompt = reg
-            .prompts
-            .render(AGENT_TURN_TEMPLATE, &[("system", &system), ("prompt", &req.prompt)]);
+        req.prompt = reg.prompts.render(
+            AGENT_TURN_TEMPLATE,
+            &[("system", &system), ("prompt", &req.prompt)],
+        );
     }
 }
 
@@ -286,7 +290,11 @@ pub fn resolve_agent<'r>(
 ///
 /// Returns the reply text on success, or the error text to send on failure —
 /// both already HTML-safe. Mutates `state` only on success.
-pub fn select_agent(state: &mut BridgeState, reg: &Registry, arg: &str) -> std::result::Result<String, String> {
+pub fn select_agent(
+    state: &mut BridgeState,
+    reg: &Registry,
+    arg: &str,
+) -> std::result::Result<String, String> {
     let name = arg.trim();
     if name.is_empty() || name.eq_ignore_ascii_case("none") || name.eq_ignore_ascii_case("off") {
         state.agent = None;
@@ -440,7 +448,10 @@ mod tests {
         // The agent exists but its soul.md was never written: the turn must
         // stay identical to a no-agent turn rather than shipping a stub.
         let dir = tmpdir();
-        write(&dir.path().join("agents/blank/agent.toml"), "engine = \"claude\"\n");
+        write(
+            &dir.path().join("agents/blank/agent.toml"),
+            "engine = \"claude\"\n",
+        );
         let reg = load(dir.path());
         let agent = reg.agents.get("blank").expect("loaded");
         assert_eq!(compose_system_prompt(agent, &reg).unwrap(), "");
@@ -481,7 +492,10 @@ mod tests {
             &dir.path().join("skills/review/skill.toml"),
             "description = \"Review code\"\n",
         );
-        write(&dir.path().join("skills/review/skill.md"), "Quote code, don't describe it.\n");
+        write(
+            &dir.path().join("skills/review/skill.md"),
+            "Quote code, don't describe it.\n",
+        );
 
         let reg = load(dir.path());
         assert!(reg.errors.is_empty(), "{:?}", reg.errors);
@@ -527,7 +541,10 @@ mod tests {
         config_with_reviewer(dir.path());
         let reg = load(dir.path());
         let agent = reg.agents.get("reviewer").expect("loaded");
-        assert_eq!(compose_system_prompt(agent, &reg).unwrap(), "Lead with the verdict.");
+        assert_eq!(
+            compose_system_prompt(agent, &reg).unwrap(),
+            "Lead with the verdict."
+        );
 
         let soul = dir.path().join("agents/reviewer/soul.md");
         fs::write(&soul, "Totally new instructions.\n").unwrap();
@@ -661,7 +678,10 @@ mod tests {
     #[test]
     fn an_unknown_engine_drops_the_agent_and_names_the_file_key_and_alternatives() {
         let dir = tmpdir();
-        write(&dir.path().join("agents/broken/agent.toml"), "engine = \"gpt5\"\n");
+        write(
+            &dir.path().join("agents/broken/agent.toml"),
+            "engine = \"gpt5\"\n",
+        );
         let reg = load(dir.path());
 
         assert!(!reg.agents.contains_key("broken"));
@@ -670,7 +690,8 @@ mod tests {
         assert_eq!(err.name, "broken");
         assert_eq!(err.file, Some(dir.path().join("agents/broken/agent.toml")));
         assert!(
-            err.message.starts_with("key `engine`: references unknown engine 'gpt5' (known: "),
+            err.message
+                .starts_with("key `engine`: references unknown engine 'gpt5' (known: "),
             "got: {}",
             err.message
         );
@@ -706,7 +727,9 @@ mod tests {
         let reg = load(dir.path());
         assert!(!reg.agents.contains_key("reviewer"));
         assert!(
-            reg.errors[0].message.contains("key `skills`: references unknown skill 'ghost'"),
+            reg.errors[0]
+                .message
+                .contains("key `skills`: references unknown skill 'ghost'"),
             "got: {}",
             reg.errors[0].message
         );
@@ -741,7 +764,10 @@ mod tests {
     fn the_conversation_selection_wins_over_the_configured_default() {
         let dir = tmpdir();
         config_with_reviewer(dir.path());
-        write(&dir.path().join("agents/other/agent.toml"), "engine = \"claude\"\n");
+        write(
+            &dir.path().join("agents/other/agent.toml"),
+            "engine = \"claude\"\n",
+        );
         write(
             &dir.path().join("config.json"),
             "{\"bridge\": {\"defaultAgent\": \"other\"}}",
@@ -749,7 +775,10 @@ mod tests {
         let reg = load(dir.path());
         assert_eq!(reg.defaults.agent.as_deref(), Some("other"));
 
-        assert_eq!(agent_for(&state(None), &reg).map(|a| a.name.as_str()), Some("other"));
+        assert_eq!(
+            agent_for(&state(None), &reg).map(|a| a.name.as_str()),
+            Some("other")
+        );
         assert_eq!(
             agent_for(&state(Some("reviewer")), &reg).map(|a| a.name.as_str()),
             Some("reviewer")
@@ -823,14 +852,20 @@ mod tests {
     fn agent_list_text_lists_agents_and_marks_the_default() {
         let dir = tmpdir();
         config_with_reviewer(dir.path());
-        write(&dir.path().join("agents/other/agent.toml"), "engine = \"codex\"\n");
+        write(
+            &dir.path().join("agents/other/agent.toml"),
+            "engine = \"codex\"\n",
+        );
         write(
             &dir.path().join("config.json"),
             "{\"bridge\": {\"defaultAgent\": \"other\"}}",
         );
         let reg = load(dir.path());
         let text = agent_list_text(&reg);
-        assert!(text.contains("• <b>reviewer</b> — Reviewer (claude)"), "got: {text}");
+        assert!(
+            text.contains("• <b>reviewer</b> — Reviewer (claude)"),
+            "got: {text}"
+        );
         assert!(text.contains("• <b>other</b> — other (codex)"), "got: {text}");
         assert!(text.contains("Default: <b>other</b>"), "got: {text}");
     }
@@ -845,7 +880,10 @@ mod tests {
     fn agent_names_are_html_escaped_in_replies() {
         // Names come from directory names, which a user controls.
         let dir = tmpdir();
-        write(&dir.path().join("agents/a/agent.toml"), "label = \"<b>x</b>\"\nengine = \"claude\"\n");
+        write(
+            &dir.path().join("agents/a/agent.toml"),
+            "label = \"<b>x</b>\"\nengine = \"claude\"\n",
+        );
         let reg = load(dir.path());
         assert!(agent_list_text(&reg).contains("&lt;b&gt;x&lt;/b&gt;"));
 

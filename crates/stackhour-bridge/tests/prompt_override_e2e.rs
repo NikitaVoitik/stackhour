@@ -78,7 +78,11 @@ fn fixture() -> (tempfile::TempDir, Registry, std::path::PathBuf) {
         "label = \"Reviewer\"\nengine = \"fake-echo\"\nskills = [\"review\"]\n",
     );
     write(root, "agents/reviewer/soul.md", "Lead with the verdict.\n");
-    write(root, "skills/review/skill.toml", "description = \"Review code\"\n");
+    write(
+        root,
+        "skills/review/skill.toml",
+        "description = \"Review code\"\n",
+    );
     write(root, "skills/review/skill.md", "Quote code, don't describe it.\n");
 
     // The whole extensibility claim, in one file.
@@ -263,17 +267,13 @@ fn a_sibling_template_on_the_same_turn_still_emits_shipped_bytes() {
     let (_d, reg, _bin) = fixture();
     let shipped = PromptStore::new(None);
 
-    let system = souls::compose_system_prompt(
-        reg.agents.get("reviewer").expect("agent"),
-        &reg,
-    )
-    .expect("compose");
+    let system =
+        souls::compose_system_prompt(reg.agents.get("reviewer").expect("agent"), &reg).expect("compose");
 
     let ours = reg
         .prompts
         .render("agent-turn", &[("system", &system), ("prompt", "go")]);
-    let theirs = shipped
-        .render("agent-turn", &[("system", &system), ("prompt", "go")]);
+    let theirs = shipped.render("agent-turn", &[("system", &system), ("prompt", "go")]);
     assert_eq!(ours, theirs);
     assert_eq!(ours, format!("{SYSTEM_EXPECTED}\n\n---\n\ngo"));
 }

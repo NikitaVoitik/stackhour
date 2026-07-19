@@ -1306,10 +1306,7 @@ rest = true
         ]));
         assert_eq!(
             table.keys().map(String::as_str).collect::<Vec<_>>(),
-            vec![
-                "claude", "codex", "mac", "gcp", "ship", "where", "new", "stop", "menu",
-                "help", "deploy",
-            ]
+            vec!["claude", "codex", "mac", "gcp", "ship", "where", "new", "stop", "menu", "help", "deploy",]
         );
         assert_eq!(table["gcp"].description, "My GCP");
         assert_eq!(table["gcp"].kind, CommandKind::Shell);

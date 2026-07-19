@@ -102,11 +102,7 @@ pub struct InvocationPlan {
 ///
 /// Errors are user-facing strings — they go straight into a Telegram reply —
 /// and always name the skill.
-pub fn plan_invocation(
-    reg: &Registry,
-    skill: &str,
-    raw_args: &str,
-) -> Result<InvocationPlan, String> {
+pub fn plan_invocation(reg: &Registry, skill: &str, raw_args: &str) -> Result<InvocationPlan, String> {
     let def = reg
         .skills
         .get(skill)
@@ -118,8 +114,7 @@ pub fn plan_invocation(
     // Arguments bind against the INVOKED skill's spec only. A composed skill
     // contributes prose and policy, not arity: otherwise adding `uses` to a
     // skill would silently change how the user has to type the command.
-    let args = bind_args(&def.args, raw_args)
-        .map_err(|e| format!("/{skill}: {}", e.message()))?;
+    let args = bind_args(&def.args, raw_args).map_err(|e| format!("/{skill}: {}", e.message()))?;
 
     let mut fragments: Vec<SkillFragment> = Vec::with_capacity(order.len());
     let mut tools = ToolPolicy::default();
@@ -395,13 +390,11 @@ fn substitute_argv(
     vars.insert("agent".to_string(), agent.unwrap_or_default().to_string());
     vars.insert(
         "cwd".to_string(),
-        cwd.as_ref()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| {
-                std::env::current_dir()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_default()
-            }),
+        cwd.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| {
+            std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default()
+        }),
     );
     for (k, v) in args {
         vars.insert(format!("arg:{k}"), v.clone());
@@ -467,10 +460,7 @@ mod tests {
 
     fn skill_files() -> Vec<(&'static str, &'static str)> {
         vec![
-            (
-                "skills/review/skill.toml",
-                "description = \"Review a PR\"\n",
-            ),
+            ("skills/review/skill.toml", "description = \"Review a PR\"\n"),
             ("skills/review/skill.md", "Read before you write.\n"),
         ]
     }
@@ -550,10 +540,7 @@ REVIEW_MODE = "strict"
         let plan = plan_invocation(&reg, "review", "4821 the error paths").expect("plan");
         assert_eq!(plan.args["pr"], "4821");
         assert_eq!(plan.args["focus"], "the error paths");
-        assert_eq!(
-            plan.user_prompt,
-            "Review PR 4821 focusing on the error paths."
-        );
+        assert_eq!(plan.user_prompt, "Review PR 4821 focusing on the error paths.");
         assert_eq!(plan.agent_override.as_deref(), Some("reviewer"));
         assert_eq!(plan.tools.allow, vec!["Bash"]);
         assert_eq!(plan.env["REVIEW_MODE"], "strict");
@@ -580,11 +567,7 @@ REVIEW_MODE = "strict"
         assert!(reg.errors.is_empty(), "unexpected: {:?}", reg.errors);
 
         let plan = plan_invocation(&reg, "top", "").expect("plan");
-        let names: Vec<&str> = plan
-            .system_fragments
-            .iter()
-            .map(|f| f.name.as_str())
-            .collect();
+        let names: Vec<&str> = plan.system_fragments.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(names, vec!["base", "top"]);
         // deny wins over an inherited allow: composing can only tighten.
         assert_eq!(plan.tools.allow, vec!["Bash"]);
@@ -648,14 +631,8 @@ REVIEW_MODE = "strict"
     #[test]
     fn a_uses_cycle_is_dropped_by_the_loader_and_reported() {
         let (_d, reg) = registry(&[
-            (
-                "skills/a/skill.toml",
-                "description = \"a\"\nuses = [\"b\"]\n",
-            ),
-            (
-                "skills/b/skill.toml",
-                "description = \"b\"\nuses = [\"a\"]\n",
-            ),
+            ("skills/a/skill.toml", "description = \"a\"\nuses = [\"b\"]\n"),
+            ("skills/b/skill.toml", "description = \"b\"\nuses = [\"a\"]\n"),
         ]);
         // Both nodes on the cycle are dropped, so neither is invocable and the
         // registry carries an error naming the cycle.

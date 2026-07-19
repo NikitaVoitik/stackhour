@@ -450,10 +450,7 @@ impl Remote for SshRemote {
         let stderr = String::from_utf8_lossy(&out.stderr);
         let tail = stderr.trim();
         let tail = truncate_tail_utf16(tail, 240);
-        Err(format!(
-            "scp exited {}: {tail}",
-            out.status.code().unwrap_or(-1)
-        ))
+        Err(format!("scp exited {}: {tail}", out.status.code().unwrap_or(-1)))
     }
 }
 
@@ -853,7 +850,10 @@ mod tests {
         let h = harness(
             FakeRemote::claiming(&job(json!({ "sessionId": "stale" }))),
             FakeRunner::with(vec![
-                RunResult { code: Some(1), ..RunResult::default() },
+                RunResult {
+                    code: Some(1),
+                    ..RunResult::default()
+                },
                 RunResult {
                     text: "second time lucky".into(),
                     session_id: Some("fresh".into()),
@@ -875,13 +875,38 @@ mod tests {
     fn the_resume_retry_is_suppressed_by_text_by_success_and_by_a_signal_kill() {
         let cases = [
             // captured text: the run said something, so it did not fail
-            (json!("stale"), RunResult { code: Some(1), text: "partial".into(), ..RunResult::default() }),
+            (
+                json!("stale"),
+                RunResult {
+                    code: Some(1),
+                    text: "partial".into(),
+                    ..RunResult::default()
+                },
+            ),
             // clean exit
-            (json!("stale"), RunResult { code: Some(0), ..RunResult::default() }),
+            (
+                json!("stale"),
+                RunResult {
+                    code: Some(0),
+                    ..RunResult::default()
+                },
+            ),
             // SIGTERM: code is None, not a failure to resume
-            (json!("stale"), RunResult { code: None, ..RunResult::default() }),
+            (
+                json!("stale"),
+                RunResult {
+                    code: None,
+                    ..RunResult::default()
+                },
+            ),
             // no stored session to have failed on
-            (Value::Null, RunResult { code: Some(1), ..RunResult::default() }),
+            (
+                Value::Null,
+                RunResult {
+                    code: Some(1),
+                    ..RunResult::default()
+                },
+            ),
         ];
         for (session, result) in cases {
             let h = harness(
@@ -986,7 +1011,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let log = dir.path().join("worker.log");
         let remote = Arc::new(FakeRemote::claiming(&job(json!({ "sessionId": "stale" }))));
-        let runner = FakeRunner::with(vec![RunResult { code: Some(7), ..RunResult::default() }]);
+        let runner = FakeRunner::with(vec![RunResult {
+            code: Some(7),
+            ..RunResult::default()
+        }]);
         let worker = Worker::new(
             Arc::clone(&remote) as Arc<dyn Remote>,
             Arc::clone(&runner) as Arc<dyn EngineRunner>,
@@ -1004,7 +1032,10 @@ mod tests {
             "{body}"
         );
         assert!(body.contains("claude resume failed (7); retry fresh"), "{body}");
-        assert!(body.contains("returned 3f2504e0-4f89-41d3-9a0c-0305e82c3301"), "{body}");
+        assert!(
+            body.contains("returned 3f2504e0-4f89-41d3-9a0c-0305e82c3301"),
+            "{body}"
+        );
     }
 
     #[test]
@@ -1018,10 +1049,7 @@ mod tests {
 
     #[test]
     fn the_claim_and_return_commands_are_built_from_the_remote_config() {
-        let h = harness(
-            FakeRemote::claiming(&job(json!({}))),
-            FakeRunner::with(vec![]),
-        );
+        let h = harness(FakeRemote::claiming(&job(json!({}))), FakeRunner::with(vec![]));
         h.worker.poll_once();
         let calls = h.remote.calls.lock().unwrap().clone();
         assert_eq!(calls[0].0, "node /remote/bridge/claim.mjs");
@@ -1067,9 +1095,7 @@ mod tests {
         assert_eq!(returns, 1, "no retry — the result is simply lost");
         let body = std::fs::read_to_string(&log).unwrap();
         assert!(
-            body.contains(
-                "return failed for 3f2504e0-4f89-41d3-9a0c-0305e82c3301: Connection reset by peer"
-            ),
+            body.contains("return failed for 3f2504e0-4f89-41d3-9a0c-0305e82c3301: Connection reset by peer"),
             "{body}"
         );
     }
@@ -1095,7 +1121,10 @@ mod tests {
         );
         // No key configured: fall back to agent auth rather than passing an
         // empty `-i`.
-        let no_key = SshRemote { key: None, host: "n@gcp".into() };
+        let no_key = SshRemote {
+            key: None,
+            host: "n@gcp".into(),
+        };
         assert_eq!(no_key.base_args()[0], "-o");
     }
 }

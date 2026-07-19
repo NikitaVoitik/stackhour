@@ -56,6 +56,16 @@ pub fn my_commands_payload(reg: &Registry) -> Value {
     my_commands_payload_for(&table(reg))
 }
 
+/// Just the command ARRAY, without the `{ "commands": … }` wrapper.
+///
+/// `Tg::set_my_commands` adds the wrapper itself, so it must be handed this
+/// and not [`my_commands_payload`] — passing the wrapped body there produces
+/// `{"commands": {"commands": [...]}}`, which Telegram rejects with a 400 that
+/// `tg()` swallows, leaving the bot with NO registered commands and no error.
+pub fn my_commands_list(reg: &Registry) -> Value {
+    my_commands_payload(reg)["commands"].clone()
+}
+
 /// [`my_commands_payload`] over an already-built table.
 pub fn my_commands_payload_for(table: &IndexMap<String, CommandDef>) -> Value {
     let commands: Vec<Value> = table
@@ -85,9 +95,7 @@ fn truncate_chars(s: &str, max: usize) -> String {
 
 /// Minimal HTML escaping, matching the JS coordinator's `esc()`.
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
 /// One `/help` line per visible command: `/usage — description`.
@@ -232,10 +240,7 @@ pub fn resolve_callback(table: &IndexMap<String, CommandDef>, data: &str) -> Opt
     })
 }
 
-fn find_by(
-    table: &IndexMap<String, CommandDef>,
-    pred: impl Fn(&CommandDef) -> bool,
-) -> Option<String> {
+fn find_by(table: &IndexMap<String, CommandDef>, pred: impl Fn(&CommandDef) -> bool) -> Option<String> {
     table.values().find(|d| pred(d)).map(|d| d.command.clone())
 }
 
@@ -321,10 +326,7 @@ impl CommandEnv<'_> {
 
     /// The `{{engine}}` / `{{target}}` pair every `where`-shaped template takes.
     fn where_vars(&self, state: &BridgeState) -> (String, String) {
-        (
-            self.engine_label(&state.engine),
-            self.target_label(&state.active),
-        )
+        (self.engine_label(&state.engine), self.target_label(&state.active))
     }
 }
 
@@ -496,9 +498,7 @@ pub fn should_refresh_keyboard(table: &IndexMap<String, CommandDef>, text: &str)
             // and target emoji for the same reason: '🆕 New session' is never
             // marked, so a message merely containing 🆕 is not a control
             // surface and must be left alone.
-            d.keyboard
-                && !d.hidden
-                && matches!(d.kind, CommandKind::Engine | CommandKind::Target)
+            d.keyboard && !d.hidden && matches!(d.kind, CommandKind::Engine | CommandKind::Target)
         })
         .flat_map(|d| d.button_text().chars())
         .filter(|c| !c.is_ascii() && !is_marker(*c))
@@ -530,10 +530,7 @@ pub enum Action {
     /// where `setSession`/`switchTarget`/`switchEngine` all save inline.
     SaveState,
     /// Route text to the active lane (mac dispatch or the local queue).
-    RoutePrompt {
-        text: String,
-        message_id: Option<i64>,
-    },
+    RoutePrompt { text: String, message_id: Option<i64> },
     /// Kill the local child and cancel queued mac jobs, then reply with
     /// [`stop_text`] of the outcome.
     Stop,
@@ -565,9 +562,7 @@ pub fn plan_text(
             keyboard: Some(control_keyboard_for(state, &table)),
         }],
         Dispatch::Confirm { command, raw } => vec![Action::Confirm { command, raw }],
-        Dispatch::Command { command, raw } => {
-            run_command(env, state, &table, &command, &raw, message_id)
-        }
+        Dispatch::Command { command, raw } => run_command(env, state, &table, &command, &raw, message_id),
     }
 }
 
@@ -753,8 +748,7 @@ mod tests {
     }
 
     fn table_with(defs: Vec<CommandDef>) -> IndexMap<String, CommandDef> {
-        let user: IndexMap<String, CommandDef> =
-            defs.into_iter().map(|d| (d.command.clone(), d)).collect();
+        let user: IndexMap<String, CommandDef> = defs.into_iter().map(|d| (d.command.clone(), d)).collect();
         command::effective_table(&user)
     }
 
@@ -923,10 +917,7 @@ required = true
             "key `target`: unknown target 'moon' (known: gcp, mac)"
         );
         // ...and the bridge still shows exactly the shipped table.
-        assert_eq!(
-            my_commands_payload(&reg),
-            my_commands_payload(&empty_registry())
-        );
+        assert_eq!(my_commands_payload(&reg), my_commands_payload(&empty_registry()));
     }
 
     #[test]
@@ -976,8 +967,8 @@ required = true
         assert_eq!(
             registered,
             vec![
-                "claude", "codex", "mac", "gcp", "ship", "where", "new", "stop", "menu", "help",
-                "deploy", "review", "status",
+                "claude", "codex", "mac", "gcp", "ship", "where", "new", "stop", "menu", "help", "deploy",
+                "review", "status",
             ]
         );
 
@@ -1002,10 +993,7 @@ required = true
         assert_eq!(resolve(&t, "/reset"), cmd("new"));
         assert_eq!(resolve(&t, "/start"), cmd("help"));
         assert_eq!(resolve(&t, "/nope"), Dispatch::Unknown);
-        assert_eq!(
-            resolve(&t, "hello there"),
-            Dispatch::Prompt("hello there".into())
-        );
+        assert_eq!(resolve(&t, "hello there"), Dispatch::Prompt("hello there".into()));
         // A slash mid-text is still just a prompt.
         assert_eq!(
             resolve(&t, "what about /gcp?"),
@@ -1342,12 +1330,29 @@ required = true
         let mut state = fresh_state();
 
         let help = plan_text(&e, &mut state, "/start", None);
-        assert!(matches!(help[0], Action::Send { html: true, keyboard: Some(_), .. }));
+        assert!(matches!(
+            help[0],
+            Action::Send {
+                html: true,
+                keyboard: Some(_),
+                ..
+            }
+        ));
         assert_eq!(sends(&help), vec![help_text(&reg)]);
 
         let unknown = plan_text(&e, &mut state, "/nope", None);
-        assert!(matches!(unknown[0], Action::Send { html: true, keyboard: Some(_), .. }));
-        assert_eq!(sends(&unknown)[0], format!("Unknown command.\n\n{}", help_text(&reg)));
+        assert!(matches!(
+            unknown[0],
+            Action::Send {
+                html: true,
+                keyboard: Some(_),
+                ..
+            }
+        ));
+        assert_eq!(
+            sends(&unknown)[0],
+            format!("Unknown command.\n\n{}", help_text(&reg))
+        );
         // Neither touched state.
         assert!(!unknown.contains(&Action::SaveState));
     }
@@ -1357,7 +1362,10 @@ required = true
         let reg = empty_registry();
         let l = labels();
         let mut state = fresh_state();
-        assert_eq!(plan_text(&env(&reg, &l), &mut state, "/stop", None), vec![Action::Stop]);
+        assert_eq!(
+            plan_text(&env(&reg, &l), &mut state, "/stop", None),
+            vec![Action::Stop]
+        );
     }
 
     // ---- /ship ----
@@ -1377,7 +1385,10 @@ required = true
             vec!["🚀 Ship mode: Claude on the Blort repo. Send the task (text, ECM-xxxx, or a Slack link)."]
         );
         // Parked on blort, NEITHER Mac nor GCP is checked.
-        let Action::Send { keyboard: Some(kb), .. } = &actions[1] else {
+        let Action::Send {
+            keyboard: Some(kb), ..
+        } = &actions[1]
+        else {
             panic!("expected a keyboard");
         };
         assert_eq!(kb["inline_keyboard"][1][0]["text"], "🖥️ Mac");
@@ -1391,7 +1402,12 @@ required = true
         let reg = empty_registry();
         let l = labels();
         let mut state = fresh_state();
-        let actions = plan_text(&env(&reg, &l), &mut state, "/SHIP ECM-1234 fix the CSV export", Some(42));
+        let actions = plan_text(
+            &env(&reg, &l),
+            &mut state,
+            "/SHIP ECM-1234 fix the CSV export",
+            Some(42),
+        );
 
         assert_eq!(state.active, "blort");
         assert_eq!(actions[0], Action::SaveState);
@@ -1493,7 +1509,11 @@ required = true
         let l = labels();
         let mut state = fresh_state();
         assert_eq!(
-            plan_callback(&env(&reg, &l), &mut state, &callback("stale:payload", Some("🧠 x"))),
+            plan_callback(
+                &env(&reg, &l),
+                &mut state,
+                &callback("stale:payload", Some("🧠 x"))
+            ),
             vec![Action::AnswerCallback {
                 id: "cb-1".into(),
                 text: None
@@ -1513,7 +1533,10 @@ required = true
         assert!(should_refresh_keyboard(&table, "🎛 Controls — Claude on ☁️ GCP"));
         assert!(should_refresh_keyboard(&table, "Switched to 🖥️ Mac with Claude."));
         assert!(should_refresh_keyboard(&table, "🧠 Claude"));
-        assert!(!should_refresh_keyboard(&table, "🆕 Fresh Claude session on gcp."));
+        assert!(!should_refresh_keyboard(
+            &table,
+            "🆕 Fresh Claude session on gcp."
+        ));
         assert!(!should_refresh_keyboard(&table, "Nothing running."));
 
         let mut state = fresh_state();
@@ -1546,7 +1569,10 @@ required = true
 
         assert_eq!(state.active, "mac");
         assert!(actions.contains(&Action::SaveState));
-        assert_eq!(sends(&actions), vec!["Switched to 🖥️ Mac with Claude. (new session)"]);
+        assert_eq!(
+            sends(&actions),
+            vec!["Switched to 🖥️ Mac with Claude. (new session)"]
+        );
     }
 
     /// The stop button carries no message id, so nothing reacts to it.
