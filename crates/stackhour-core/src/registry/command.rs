@@ -247,13 +247,11 @@ impl CommandDef {
 
         let kind_str = toml_util::req_string(table, "kind")?;
         let kind = CommandKind::from_toml_str(&kind_str).ok_or_else(|| {
-            FieldError::key("kind", format!("unknown kind '{kind_str}'"))
-                .with_known(USER_KINDS)
+            FieldError::key("kind", format!("unknown kind '{kind_str}'")).with_known(USER_KINDS)
         })?;
 
-        let nonempty = |key: &str| -> Result<Option<String>, FieldError> {
-            toml_util::opt_nonempty_string(table, key)
-        };
+        let nonempty =
+            |key: &str| -> Result<Option<String>, FieldError> { toml_util::opt_nonempty_string(table, key) };
         let template = nonempty("template")?;
         let agent = nonempty("agent")?;
         let engine = nonempty("engine")?;
@@ -288,9 +286,7 @@ impl CommandDef {
         // name one of the two runnable targets.
         if let Some(t) = &target {
             if !TARGETS.contains(&t.as_str()) {
-                return Err(
-                    FieldError::key("target", format!("unknown target '{t}'")).with_known(TARGETS)
-                );
+                return Err(FieldError::key("target", format!("unknown target '{t}'")).with_known(TARGETS));
             }
         }
 
@@ -320,9 +316,7 @@ impl CommandDef {
                         "is required for kind = \"shell\" and must be a non-empty array of strings",
                     ))
                 }
-                Some(a) if a.is_empty() => {
-                    return Err(FieldError::key("argv", "must not be empty"))
-                }
+                Some(a) if a.is_empty() => return Err(FieldError::key("argv", "must not be empty")),
                 Some(a) if a.iter().any(|e| e.is_empty()) => {
                     return Err(FieldError::key("argv", "entries must not be empty"))
                 }
@@ -350,17 +344,10 @@ impl CommandDef {
                 }
             }
             CommandKind::Builtin => match &builtin {
-                None => {
-                    return Err(FieldError::key(
-                        "builtin",
-                        "is required for kind = \"builtin\"",
-                    ))
-                }
+                None => return Err(FieldError::key("builtin", "is required for kind = \"builtin\"")),
                 Some(b) if !BUILTIN_VERBS.contains(&b.as_str()) => {
-                    return Err(
-                        FieldError::key("builtin", format!("unknown bridge verb '{b}'"))
-                            .with_known(BUILTIN_VERBS),
-                    )
+                    return Err(FieldError::key("builtin", format!("unknown bridge verb '{b}'"))
+                        .with_known(BUILTIN_VERBS))
                 }
                 Some(_) => {}
             },
@@ -493,10 +480,7 @@ fn validate_aliases(name: &str, aliases: &[String], user: bool) -> Result<(), Fi
             ));
         }
         if aliases[..i].contains(alias) {
-            return Err(FieldError::key(
-                "aliases",
-                format!("'{alias}' is listed twice"),
-            ));
+            return Err(FieldError::key("aliases", format!("'{alias}' is listed twice")));
         }
     }
     Ok(())
@@ -637,40 +621,36 @@ pub fn effective_table(user: &IndexMap<String, CommandDef>) -> IndexMap<String, 
 // Table-level validation (called by the loader)
 // ---------------------------------------------------------------------------
 
-/// Detect alias collisions across the WHOLE table: an alias must not equal
-/// another command's name, another command's alias, or a reserved verb.
+/// Detect alias collisions across the WHOLE table.
 ///
-/// Returns `(command name, error)` pairs, one per collision, in table order.
-/// The loader attaches the file and drops the offending command.
+/// Two rules, chosen so that shadowing stays predictable:
+///
+/// * A command NAME always wins over any alias. A user file called
+///   `commands/status.toml` therefore takes `/status` from the shipped
+///   `/where` alias silently — that is the same "the user's file wins" rule
+///   that applies everywhere else, not a mistake to report.
+/// * Two ALIASES claiming the same verb IS an error: neither can win, so the
+///   later one is reported and its command is dropped by the loader.
+///
+/// Returns `(command name, error)` pairs in table order.
 pub fn alias_conflicts(table: &IndexMap<String, CommandDef>) -> Vec<(String, FieldError)> {
-    // Seed the namespace with the SHIPPED aliases, so `/start -> /help` is
-    // already accounted for and a user claiming it collides with /help rather
-    // than tripping a special reserved-word rule.
-    let mut owner: IndexMap<String, String> = IndexMap::new();
-    for def in builtin_commands().values() {
-        for alias in &def.aliases {
-            owner.insert(alias.clone(), def.command.clone());
-        }
-    }
-    // Command names always win over an inherited alias binding.
-    for def in table.values() {
-        owner.insert(def.command.clone(), def.command.clone());
-    }
-
+    let mut alias_owner: IndexMap<String, String> = IndexMap::new();
     let mut out: Vec<(String, FieldError)> = Vec::new();
+
     for def in table.values() {
         for alias in &def.aliases {
-            match owner.get(alias) {
+            // Shadowed by a real command name: the alias is simply dead.
+            if table.contains_key(alias) {
+                continue;
+            }
+            match alias_owner.get(alias) {
                 Some(other) if *other != def.command => out.push((
                     def.command.clone(),
-                    FieldError::key(
-                        "aliases",
-                        format!("'{alias}' is already taken by /{other}"),
-                    ),
+                    FieldError::key("aliases", format!("'{alias}' is already an alias of /{other}")),
                 )),
                 Some(_) => {}
                 None => {
-                    owner.insert(alias.clone(), def.command.clone());
+                    alias_owner.insert(alias.clone(), def.command.clone());
                 }
             }
         }
@@ -971,15 +951,21 @@ button_order = 5
     #[test]
     fn sequence_self_reference_and_depth_cap() {
         assert_eq!(
-            parse("loop", "description=\"d\"\nkind=\"sequence\"\nsteps=[\"a\",\"loop\"]\n")
-                .unwrap_err(),
+            parse(
+                "loop",
+                "description=\"d\"\nkind=\"sequence\"\nsteps=[\"a\",\"loop\"]\n"
+            )
+            .unwrap_err(),
             "key `steps`: 'loop' must not list itself as a step"
         );
         let many: Vec<String> = (0..17).map(|i| format!("\"s{i}\"")).collect();
         assert_eq!(
             parse(
                 "big",
-                &format!("description=\"d\"\nkind=\"sequence\"\nsteps=[{}]\n", many.join(","))
+                &format!(
+                    "description=\"d\"\nkind=\"sequence\"\nsteps=[{}]\n",
+                    many.join(",")
+                )
             )
             .unwrap_err(),
             "key `steps`: must not list more than 16 steps"
@@ -1029,28 +1015,34 @@ button_order = 5
     }
 
     #[test]
-    fn alias_conflicts_across_the_table() {
+    fn alias_conflicts_reports_alias_vs_alias() {
         let sh = |n: &str, a: &str| {
             ok(
                 n,
                 &format!("description=\"d\"\nkind=\"shell\"\nargv=[\"true\"]\naliases=[\"{a}\"]\n"),
             )
         };
-        let conflicts = alias_conflicts(&table_from(vec![
-            sh("deploy", "ship"),
-            sh("release", "ship"),
-            sh("other", "deploy"),
-        ]));
+        let conflicts = alias_conflicts(&table_from(vec![sh("deploy", "ship"), sh("release", "ship")]));
         assert_eq!(
             conflicts
                 .iter()
                 .map(|(n, e)| (n.as_str(), e.msg.as_str()))
                 .collect::<Vec<_>>(),
-            vec![
-                ("release", "'ship' is already taken by /deploy"),
-                ("other", "'deploy' is already taken by /deploy"),
-            ]
+            vec![("release", "'ship' is already an alias of /deploy")]
         );
+    }
+
+    #[test]
+    fn a_command_name_silently_wins_over_a_shipped_alias() {
+        // A user file named status.toml takes /status from /where's alias.
+        let table = effective_table(&table_from(vec![ok(
+            "status",
+            "description=\"Host status\"\nkind=\"shell\"\nargv=[\"uptime\"]\n",
+        )]));
+        assert!(alias_conflicts(&table).is_empty());
+        assert_eq!(lookup(&table, "status").unwrap().command, "status");
+        // /where still works under its own name.
+        assert_eq!(lookup(&table, "where").unwrap().command, "where");
     }
 
     #[test]
@@ -1101,7 +1093,10 @@ rest = true
         assert!(def.args[0].required);
         assert!(def.args[1].rest);
         assert_eq!(def.usage(), "/deploy <env> [note...]");
-        assert_eq!(ok("x", "description=\"d\"\nkind=\"shell\"\nargv=[\"a\"]\n").usage(), "/x");
+        assert_eq!(
+            ok("x", "description=\"d\"\nkind=\"shell\"\nargv=[\"a\"]\n").usage(),
+            "/x"
+        );
     }
 
     #[test]
@@ -1119,9 +1114,12 @@ rest = true
         )
         .unwrap_err()
         .starts_with("key `args[0].rest`:"));
-        assert!(parse("x", &format!("{base}[[args]]\nname=\"a\"\n[[args]]\nname=\"a\"\n"))
-            .unwrap_err()
-            .starts_with("key `args[1].name`:"));
+        assert!(parse(
+            "x",
+            &format!("{base}[[args]]\nname=\"a\"\n[[args]]\nname=\"a\"\n")
+        )
+        .unwrap_err()
+        .starts_with("key `args[1].name`:"));
     }
 
     #[test]
@@ -1208,7 +1206,11 @@ rest = true
             def.shell_argv("prod ; rm -rf /").unwrap(),
             vec!["./deploy.sh", "--env", "prod", "; rm -rf /"]
         );
-        assert!(def.shell_argv("").unwrap_err().msg.contains("missing required argument"));
+        assert!(def
+            .shell_argv("")
+            .unwrap_err()
+            .msg
+            .contains("missing required argument"));
     }
 
     // ---- embedded defaults ----
@@ -1268,7 +1270,10 @@ rest = true
     fn effective_table_substitutes_user_commands_in_place() {
         let table = effective_table(&table_from(vec![
             ok("gcp", "description=\"My GCP\"\nkind=\"shell\"\nargv=[\"true\"]\n"),
-            ok("deploy", "description=\"Deploy\"\nkind=\"shell\"\nargv=[\"true\"]\n"),
+            ok(
+                "deploy",
+                "description=\"Deploy\"\nkind=\"shell\"\nargv=[\"true\"]\n",
+            ),
         ]));
         assert_eq!(
             table.keys().map(String::as_str).collect::<Vec<_>>(),

@@ -274,6 +274,109 @@ if the underlying files are edited or deleted meanwhile.
 Newly appeared validation errors are logged once by the coordinator rather than
 on every update; `stackhour bridge doctor` always prints the full current set.
 
+### Commands
+
+`commands/<name>.toml` defines one Telegram verb; the file stem is the verb, so
+`commands/deploy.toml` is `/deploy`. Names follow Telegram's own rule: 1–32
+characters of lowercase letters, digits and underscores.
+
+There is exactly **one** command table — the commands shipped with the binary,
+with any user file of the same name substituted in place, followed by the
+remaining user commands. The `setMyCommands` registration, the `/help` body and
+the inline keyboard are all generated from that table. There is no second copy
+of the command list anywhere.
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `description` | string | — (required) | Shown by `setMyCommands` and in `/help`. |
+| `kind` | enum | — (required) | The action; see below. |
+| `aliases` | \[string] | `[]` | Extra verbs that dispatch here. Not registered with Telegram separately, so they stay out of autocomplete — exactly like `/local` and `/remote` today. |
+| `hidden` | bool | `false` | Registered, but omitted from `/help` and the keyboard. |
+| `keyboard` | bool | `false` | Also render as an inline button in `/menu`. |
+| `button` | string | `description` | Button caption when `keyboard = true`. |
+| `button_order` | integer | table position | Keyboard sort key. Buttons are laid out two per row in this order. |
+| `confirm` | bool | `false` | Show an inline Yes/Cancel keyboard before running. |
+| `[[args]]` | array of tables | `[]` | Positional arguments; see below. |
+
+#### Kinds
+
+| `kind` | Required key | Action |
+| --- | --- | --- |
+| `prompt` | `template` | Render that prompt template with the bound arguments and route the result exactly like typed text. |
+| `agent` | `agent` | Switch the active named agent. |
+| `engine` | `engine` | Switch the active engine. |
+| `target` | `target` | Switch the active target (`gcp` or `mac`). |
+| `shell` | `argv` | Run a fixed argv and reply with its output. |
+| `skill` | `skill` | Invoke a named skill with the bound arguments. |
+| `sequence` | `steps` | Run other commands in order, aborting on the first failure. |
+
+Any kind may also set `agent` and/or `target` as a **pre-switch** applied before
+the action runs. All of these names are cross-referenced at load time and a
+command with a broken reference is dropped with a message naming the key.
+
+`steps` names other commands and is cycle-checked with the same detector used
+for agent `extends` and skill `uses`; a command may not list itself, may not
+list more than 16 steps, and any cycle drops every command on it.
+
+#### `kind = "shell"` never touches a shell
+
+`argv` is exec'd literally. There is no `sh -c`, no word splitting of user
+input, and no quoting for you to get wrong:
+
+```toml
+description = "Show host load and disk"
+kind        = "shell"
+argv        = ["df", "-h", "/"]
+```
+
+How the user's words reach the process depends on whether the command declares
+arguments:
+
+- **No `[[args]]`** — the trimmed argument string is appended as **one** final
+  argv element, verbatim. `/disk ; rm -rf /` passes the literal string
+  `; rm -rf /` as a single argument; nothing interprets it.
+- **With `[[args]]`** — each fixed argv element gets `{{name}}` substituted per
+  element, then any argument the template did not reference is appended as its
+  **own separate element** in declaration order, skipping empty values. This is
+  a deliberate change from the single trailing blob, which is why an argument
+  spec is opt-in.
+
+```toml
+argv = ["./deploy.sh", "--env", "{{env}}"]
+# /deploy prod hurry up  ->  ["./deploy.sh", "--env", "prod", "hurry up"]
+```
+
+#### Overriding a shipped command
+
+Only `/start`, `/help`, `/menu` and `/stop` are reserved — the bridge cannot
+recover if those break. **Every other shipped verb can now be redefined by a
+user file of the same name**, including `/claude`, `/codex`, `/mac`, `/gcp`,
+`/where` and `/new`. This is a behavioural change from the Node bridge, where
+all fourteen verbs were unshadowable.
+
+An override keeps the slot it replaced, so `/help`, the keyboard and the
+Telegram command list stay in the same order. A command **name** always wins
+over an **alias**: a user file called `commands/status.toml` quietly takes
+`/status` from the shipped `/where` alias. Two aliases claiming the same verb
+is an error, since neither can win.
+
+#### Generated help
+
+`/help` renders the `help` prompt template. Drop a `prompts/help.md` containing
+a `{{commands}}` placeholder and the whole body is generated from the table:
+
+```markdown
+<b>My bridge</b>
+
+{{commands}}
+
+<i>Anything else goes to the active engine.</i>
+```
+
+The shipped `help` template has no placeholder — it is still the Node bridge's
+exact HTML — so an unconfigured bridge prints byte-identical help, and any user
+commands are simply appended to it.
+
 ### A worked example
 
 `~/.config/stackhour/commands/deploy.toml` — a prompt command with named

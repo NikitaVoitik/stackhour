@@ -1,0 +1,19 @@
+# /ship — a SEQUENCE: run other commands in order, stopping at the first
+# failure. Steps are command names, not shell words; each one runs exactly as
+# if you had typed it.
+#
+# Sequences are cycle-checked at load with the same detector used for agent
+# `extends` and skill `uses`: a command cannot list itself, cannot exceed 16
+# steps, and any cycle drops every command on it with one error naming the
+# full path.
+
+description = "Review, then deploy"
+kind = "sequence"
+steps = ["review", "deploy"]
+
+# Sequences are the most consequential thing a verb can do, so gate it.
+confirm = true
+
+# Registered with Telegram (it is not `hidden`) but deliberately kept off the
+# /menu keyboard, which is for one-tap state switches rather than long runs.
+keyboard = false

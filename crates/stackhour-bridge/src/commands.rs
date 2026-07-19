@@ -461,6 +461,63 @@ required = true
         );
     }
 
+    #[test]
+    fn the_shipped_starter_tree_generates_a_working_table() {
+        // `stackhour bridge init --config-dir` must produce a config a user
+        // can actually run: every example command survives cross-referencing
+        // and shows up in registration, help and dispatch.
+        let dir = tempfile::tempdir().unwrap();
+        registry::defaults::materialize(dir.path()).expect("materialize starter tree");
+        let reg = registry::load(dir.path());
+
+        let t = table(&reg);
+        for name in ["deploy", "status", "review", "ship"] {
+            assert!(t.contains_key(name), "/{name} missing: {:?}", reg.errors);
+        }
+        // Aliases from the examples dispatch to their owners.
+        assert_eq!(
+            resolve(&t, "/ship"),
+            Dispatch::Confirm {
+                command: "ship".into(),
+                raw: String::new()
+            }
+        );
+        assert_eq!(
+            resolve(&t, "/rv src/api"),
+            Dispatch::Command {
+                command: "review".into(),
+                raw: "src/api".into()
+            }
+        );
+        // /status is a user command name, so it wins over /where's alias.
+        assert_eq!(
+            resolve(&t, "/status"),
+            Dispatch::Command {
+                command: "status".into(),
+                raw: String::new()
+            }
+        );
+
+        let payload = my_commands_payload(&reg);
+        let registered: Vec<&str> = payload["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["command"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            registered,
+            vec![
+                "claude", "codex", "mac", "gcp", "where", "new", "stop", "menu", "help", "deploy",
+                "review", "ship", "status",
+            ]
+        );
+
+        let help = help_text(&reg);
+        assert!(help.contains("/deploy &lt;env&gt; [note...] — Run the deploy checklist"));
+        assert!(help.contains("/ship — Review, then deploy"));
+    }
+
     // ---- dispatch order ----
 
     #[test]
