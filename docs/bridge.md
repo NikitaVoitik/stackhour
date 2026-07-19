@@ -589,6 +589,191 @@ and an invocation error is answered in the chat, naming the argument:
 /review: key `path`: missing required argument 'path' (file or directory to review)
 ```
 
+### Agents
+
+An **agent** is a named persona: an engine, an optional model and reasoning
+effort, a tool policy, a permission mode, a working directory — and a **soul
+document**, which is plain markdown you edit by hand.
+
+The soul is the point. It is not a string buried in a JSON blob; it is a file
+you open in an editor, and it is re-read whenever its mtime changes, so an edit
+is live on the very next message with no reload and no restart.
+
+```
+agents/
+  reviewer/
+    agent.toml        # the manifest; the agent's NAME is the directory name
+    soul.md           # the soul document
+    terse.md          # an optional overlay
+```
+
+#### `agents/<name>/agent.toml`
+
+| key | type | default | meaning |
+| --- | --- | --- | --- |
+| `label` | string | the directory name | display name in `/agents` |
+| `engine` | string | — | **required**, unless inherited via `extends` |
+| `model` | string | the engine's default | model override |
+| `effort` | `"low"`\|`"medium"`\|`"high"` | unset | reasoning effort |
+| `soul` | string | `"soul.md"` | soul document, relative to this directory |
+| `overlays` | [string] | `[]` | extra markdown appended after the soul, in order |
+| `extends` | string | unset | inherit from another agent |
+| `skills` | [string] | `[]` | skills composed into the system prompt |
+| `permission_mode` | `"default"`\|`"bypassPermissions"` | `"default"` | approval behaviour |
+| `cwd` | string | unset | working directory; may start with `~` |
+| `prompt_template` | string | unset | a prompt template **name** wrapping each user prompt |
+| `[tools] allow` / `deny` | [string] | `[]` | tool policy |
+
+`engine`, `skills`, `prompt_template` and `extends` are cross-referenced at
+load. A broken reference drops the agent and reports it; it never takes the
+bridge down.
+
+#### Soul composition
+
+The system prompt is assembled in a fixed, boring order:
+
+1. the `extends` chain, **root first** — each ancestor's `soul.md`, then that
+   ancestor's overlays in declaration order;
+2. this agent's own `soul.md`;
+3. this agent's overlays, in declaration order;
+4. the bodies of its `skills`, `uses`-expanded, under a `## Skills` heading.
+
+Segments are joined by a blank line. Empty and missing documents contribute
+nothing, so there are no stray blank paragraphs and no dangling `## Skills`
+heading when an agent has no skills. Every document keeps its own mtime cache,
+so composing per turn costs a handful of `stat` calls.
+
+#### Inheritance
+
+`extends` is the one place in the registry with field-level merging rather than
+wholesale replacement — because you asked for it explicitly, in the file.
+
+* Scalars (`engine`, `model`, `effort`, `permission_mode`, `cwd`,
+  `prompt_template`): the child wins when it sets one, otherwise it inherits.
+  An explicit `permission_mode = "default"` in the child is a real
+  de-escalation and is **not** overwritten by a parent's `bypassPermissions`.
+* `skills`: unioned, parent first, de-duplicated.
+* `[tools]`: `allow` and `deny` are both unioned, and **deny wins** — a child
+  cannot re-enable something its base denied.
+* `label` is **not** inherited; it defaults to the child's own directory name.
+
+Chains are cycle-detected and capped at 16 levels. A cycle reports one error
+naming the whole path (`agents: cycle a -> b -> a`) and drops every agent on
+it. An agent whose parent does not exist is dropped too, along with everything
+beneath it, so a dangling sub-tree is reported in full rather than by its root.
+
+#### Selecting an agent
+
+Four places can choose one. Highest wins:
+
+    skill  >  command  >  conversation  >  configured default
+
+* **skill** — `agent` in `skills/<name>/skill.toml`
+* **command** — `agent` in `commands/<name>.toml`
+* **conversation** — `/agent <name>`; `/agent none` clears it. `/agents` lists
+  what is available and marks the default.
+* **configured default** — `bridge.defaultAgent` in `config.json`, overridden
+  by the `STACKHOUR_AGENT` environment variable.
+
+With none of these set there is **no agent**, and that path is byte-for-byte
+today's bridge: no system prompt, no model override, no permission-mode
+override, plain `<target>:<engine>` session keys.
+
+#### How settings reach the engine
+
+Through the engine's *declared* flag templates, never through hardcoded
+per-engine knowledge:
+
+* engines with `system_prompt_args` (claude) receive the composed text as a
+  flag;
+* engines without (codex) get it prepended to the user prompt via the
+  `agent-turn` template;
+* `effort` is spliced only into engines that declare `effort_args`. An engine
+  with no such flag ignores it rather than erroring, so an agent stays portable
+  when you move it between engines.
+
+#### A worked example
+
+A house style everything inherits, and a reviewer that sharpens it.
+`agents/base/agent.toml`:
+
+```toml
+engine = "claude"
+
+[tools]
+deny = ["WebSearch"]
+```
+
+`agents/base/soul.md`:
+
+```markdown
+You are answering over Telegram, on a phone. Assume the reader is walking.
+
+- Lead with the answer. One line, first line.
+- No preamble, no "Great question", no restating what was asked.
+- Code in fenced blocks, everything else in prose.
+- If you are guessing, say you are guessing.
+```
+
+`agents/reviewer/agent.toml`:
+
+```toml
+label   = "Reviewer"
+extends = "base"
+model   = "claude-opus-4"
+effort  = "high"
+
+overlays = ["terse.md"]
+skills   = ["review"]
+cwd      = "~/work/repo"
+```
+
+`agents/reviewer/soul.md`:
+
+```markdown
+You are reviewing someone else's work.
+
+- At most three findings. If there are more, the top three are the ones that
+  matter and you say how many you dropped.
+- Quote the code, do not describe it.
+- If you did not run it, say you did not run it.
+
+You are allowed to say a change is fine. You are not allowed to say it is fine
+without naming what you looked at.
+```
+
+`agents/reviewer/terse.md`:
+
+```markdown
+Hard cap: 200 words. Going over is itself a review failure.
+```
+
+Then `/agent reviewer` and any message runs Claude Opus at high effort, in
+`~/work/repo`, with `WebSearch` denied (inherited from `base`), under a system
+prompt that reads: the house style, then the review instructions, then the
+word cap, then the `review` skill's body under `## Skills`.
+
+Editing any one of those four markdown files changes the next message. Nothing
+restarts.
+
+Errors name the file and the key like everywhere else in the registry:
+
+```
+agents/reviewer/agent.toml: key `engine`: references unknown engine 'gpt5' (known: claude, codex)
+agents/reviewer/agent.toml: key `effort`: must be one of "low", "medium", "high" (got 'max')
+agents/reviewer/agent.toml: key `extends`: references unknown agent 'bass' (known: base, reviewer)
+agents/reviewer/agent.toml: key `soul`: must not escape the agent directory (got '../../etc/passwd')
+agents/a/agent.toml: key `extends`: agents: cycle a -> b -> a
+```
+
+#### Not yet wired
+
+`effort` and `[tools]` parse, validate and inherit correctly, but do not yet
+reach the child process: `RunRequest` has no `effort` field and `EngineDef`
+declares no tool allow/deny flag templates. The values are computed and
+exposed (`souls::agent_effort`, `souls::tool_policy`) so that connecting them
+is a change in the engine runner alone.
+
 ## Security
 
 This is intentionally a remote-execution bridge. Protect the Telegram account, bot token, SSH key, and agent credentials as privileged access.

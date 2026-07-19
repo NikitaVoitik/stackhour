@@ -60,6 +60,18 @@ pub const STARTER_FILES: &[StarterFile] = &[
         include_str!("defaults/agents/reviewer/soul.md"),
     ),
     (
+        "agents/reviewer/terse.md",
+        include_str!("defaults/agents/reviewer/terse.md"),
+    ),
+    (
+        "agents/base/agent.toml",
+        include_str!("defaults/agents/base/agent.toml"),
+    ),
+    (
+        "agents/base/soul.md",
+        include_str!("defaults/agents/base/soul.md"),
+    ),
+    (
         "engines/ollama.toml",
         include_str!("defaults/engines/ollama.toml"),
     ),

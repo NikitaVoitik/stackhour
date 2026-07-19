@@ -1,106 +1,71 @@
-//! PromptStore (NEW): named markdown templates with dumb, dependency-free
+//! `PromptStore`: named markdown templates with dumb, dependency-free
 //! `{{placeholder}}` substitution. Unknown placeholders are left VERBATIM; no
 //! logic, no escaping — boring on purpose.
 //!
-//! Built-in defaults are the exact strings currently hardcoded in
-//! coordinator.mjs / worker.mjs (system composition, media-image, media-video
-//! guidance, help text, online banner, transcribing notice, status text
-//! skeleton). A `prompts/<name>.md` file overrides the built-in of the same
-//! name, re-read via an mtime cache.
+//! This file is the MECHANISM: lookup, on-disk override, mtime cache,
+//! substitution, and the placeholder lint. Every literal user-facing byte
+//! lives in the sibling table [`prompt_defaults::DEFAULTS`], so prompt.rs can
+//! be reviewed as code and prompt_defaults.rs as copy.
 //!
-//! Substitution is a sequential literal `{{key}}` -> value replace in the
-//! caller-given var order (the same rule as `EngineDef`'s argv templating):
+//! # What a template is
+//!
+//! Every string the bridge can send to Telegram, and every prompt it composes
+//! for an engine, is a named template. A `prompts/<name>.md` file in the
+//! config dir replaces the shipped body of that name; a file whose stem
+//! matches NO built-in defines a brand new template, which commands
+//! (`kind = "prompt"`) and skills (`template = `) may reference by name.
+//! Both cases are hot: the file is re-stat'd on every render and re-read when
+//! its mtime moves, so editing a prompt takes effect on the next message with
+//! no reload and no restart.
+//!
+//! # Substitution semantics
+//!
+//! A sequential literal `{{key}}` -> value replace in the caller-given var
+//! order (the same rule as [`super::engine::EngineDef`]'s argv templating):
 //! no recursion guard, no escaping, values pasted as-is. A value that itself
 //! contains a later var's `{{key}}` WILL be substituted by that later var —
 //! deliberate "dumb template" semantics, documented rather than defended.
+//! Callers that interpolate untrusted text into an HTML-parsed message must
+//! escape it themselves before handing it over.
+//!
+//! # Backward compatibility
+//!
+//! With no config directory the store is built-ins only and every render is
+//! byte-identical to the Node bridge. That is asserted template by template
+//! in the tests at the bottom of this file.
 
 use indexmap::IndexMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
-// ---------------------------------------------------------------------------
-// Built-in template bodies.
-//
-// Every dynamic value the JS interpolated becomes a {{placeholder}}; every
-// literal byte around them is kept byte-identical to coordinator.mjs /
-// worker.mjs so a built-in render with the right vars reproduces today's
-// Telegram strings exactly.
-// ---------------------------------------------------------------------------
+#[path = "prompt_defaults.rs"]
+pub mod prompt_defaults;
 
-/// 'system': the composed agent system prompt (souls.rs
-/// `compose_system_prompt`): soul text + skill bodies under a Skills heading.
-const TPL_SYSTEM: &str = "{{soul}}\n\n## Skills\n{{skills}}";
+pub use prompt_defaults::{Placeholder, PromptDefault, DEFAULTS};
 
-/// 'agent-turn': how the composed system text reaches engines WITHOUT
-/// `system_prompt_args` (e.g. codex) — prepended to the user prompt with a
-/// separator. New in the rewrite (JS had no souls), so no legacy bytes to
-/// match; the separator is a plain markdown rule.
-const TPL_AGENT_TURN: &str = "{{system}}\n\n---\n\n{{prompt}}";
-
-/// 'media-image': the full engine prompt for an image attachment
-/// (coordinator.mjs / worker.mjs `mediaPrompt`, kind != 'video' guidance
-/// line). `{{request}}` is the trimmed caption or the hardcoded
-/// "Please inspect this image and respond." fallback — the fallback stays in
-/// the caller because it depends on the caption, not the template.
-const TPL_MEDIA_IMAGE: &str = "{{request}}\n\nTelegram attachment ({{kind}}, {{mime}}, {{name}}) is saved locally at: {{path}}\nUse the available image inspection tool to view it.";
-
-/// 'media-video': ditto for video attachments (`mediaPrompt`, kind ==
-/// 'video' guidance line).
-const TPL_MEDIA_VIDEO: &str = "{{request}}\n\nTelegram attachment ({{kind}}, {{mime}}, {{name}}) is saved locally at: {{path}}\nUse available tools such as ffmpeg/ffprobe to inspect representative frames and audio when useful.";
-
-/// 'help': the HELP constant from coordinator.mjs (HTML, lines joined by
-/// '\n'). No placeholders.
-const TPL_HELP: &str = "<b>Claude + Codex bridge</b> (distributed)\n\n\u{1f9e0} /claude — use Claude Code\n\u{1f6e0} /codex — use Codex\n\u{1f5a5}\u{fe0f} /mac — run on the Mac\n\u{2601}\u{fe0f} /gcp — run on the GCP box\n\u{2139}\u{fe0f} /where — active engine, target &amp; session\n\u{1f195} /new — fresh session for this engine + target\n\u{23f9} /stop — kill/cancel the running job\n\u{1f39b} /menu — tap-button controls\n\n<i>Anything else → selected engine on the active target.</i>";
-
-/// 'online': the startup banner (coordinator.mjs `poll()`). Vars: engine =
-/// engine label ("Claude"/"Codex"), target = target label, worker =
-/// "online"/"offline".
-const TPL_ONLINE: &str =
-    "\u{1f916} Claude + Codex bridge online. Active: {{engine}} on {{target}}. Mac worker: {{worker}}.";
-
-/// 'status': the /where reply skeleton (coordinator.mjs `statusText()`).
-/// Vars: engine label, target label, session ("<first8>…" or
-/// "none (fresh)"), worker ("online"/"offline"), busy ("yes"/"no").
-const TPL_STATUS: &str = "Engine: {{engine}}\nTarget: {{target}}\nSession: {{session}}\nMac worker: {{worker}}\nGCP busy: {{busy}}";
-
-/// 'transcribing': the voice-flow status message (coordinator.mjs
-/// `handleVoiceMessage`). No placeholders.
-const TPL_TRANSCRIBING: &str = "\u{1f399}\u{fe0f} Transcribing voice message…";
-
-/// (name, body) for every built-in, in [`builtin_names`] order.
-fn builtins() -> [(&'static str, &'static str); 8] {
-    [
-        ("system", TPL_SYSTEM),
-        ("agent-turn", TPL_AGENT_TURN),
-        ("media-image", TPL_MEDIA_IMAGE),
-        ("media-video", TPL_MEDIA_VIDEO),
-        ("help", TPL_HELP),
-        ("online", TPL_ONLINE),
-        ("status", TPL_STATUS),
-        ("transcribing", TPL_TRANSCRIBING),
-    ]
+/// The names of every built-in template, in catalogue order.
+pub fn builtin_names() -> &'static [&'static str] {
+    static NAMES: OnceLock<Vec<&'static str>> = OnceLock::new();
+    NAMES.get_or_init(|| DEFAULTS.iter().map(|d| d.name).collect())
 }
 
-/// The names of every built-in template.
-pub fn builtin_names() -> &'static [&'static str] {
-    &[
-        "system",
-        "agent-turn",
-        "media-image",
-        "media-video",
-        "help",
-        "online",
-        "status",
-        "transcribing",
-    ]
+/// The documented placeholders of a built-in template; `&[]` for an unknown
+/// name or for a purely user-defined template (whose slots only its author
+/// knows).
+pub fn placeholders(name: &str) -> &'static [Placeholder] {
+    DEFAULTS
+        .iter()
+        .find(|d| d.name == name)
+        .map(|d| d.placeholders)
+        .unwrap_or(&[])
 }
 
 /// Named prompt templates: built-ins + optional on-disk overrides.
 #[derive(Debug)]
 pub struct PromptStore {
-    /// Built-in template bodies by name.
-    builtins: IndexMap<String, String>,
+    /// Built-in template bodies by name, in catalogue order.
+    builtins: IndexMap<String, &'static str>,
     /// `prompts/` directory, when the registry root exists.
     dir: Option<PathBuf>,
     /// mtime cache of on-disk overrides.
@@ -116,9 +81,9 @@ fn safe_name(name: &str) -> bool {
 impl PromptStore {
     /// Build a store over the given prompts dir (None = built-ins only).
     pub fn new(dir: Option<PathBuf>) -> Self {
-        let mut map: IndexMap<String, String> = IndexMap::new();
-        for (name, body) in builtins() {
-            map.insert(name.to_string(), body.to_string());
+        let mut map: IndexMap<String, &'static str> = IndexMap::new();
+        for d in DEFAULTS {
+            map.insert(d.name.to_string(), d.body);
         }
         PromptStore {
             builtins: map,
@@ -127,22 +92,31 @@ impl PromptStore {
         }
     }
 
-    /// Render template `name` with `{{var}}` substitution; unknown template
-    /// -> "" (the miss is the caller's to notice — `has` is the existence
-    /// check); unknown placeholders left verbatim.
+    /// Render template `name` with `{{var}}` substitution.
+    ///
+    /// An unknown template renders as `""` — the miss is the caller's to
+    /// notice, and [`has`](Self::has) is the existence check that cross
+    /// reference validation uses, so an unknown name never reaches here in
+    /// validated config. Unknown placeholders are left verbatim.
     pub fn render(&self, name: &str, vars: &[(&str, &str)]) -> String {
-        let Some(body) = self.body(name) else {
-            return String::new();
-        };
-        let mut out = body;
+        self.try_render(name, vars).unwrap_or_default()
+    }
+
+    /// [`render`](Self::render), distinguishing "template missing" (`None`)
+    /// from "template rendered to nothing" (`Some("")`).
+    pub fn try_render(&self, name: &str, vars: &[(&str, &str)]) -> Option<String> {
+        let mut out = self.body(name)?;
         for (key, value) in vars {
             let needle = format!("{{{{{key}}}}}");
             out = out.replace(&needle, value);
         }
-        out
+        Some(out)
     }
 
-    /// Whether a template of this name exists (built-in or override).
+    /// Whether a template of this name exists — built-in, override of a
+    /// built-in, or a purely user-defined `prompts/<name>.md`. This is the
+    /// predicate the loader cross-references command `template` and skill
+    /// `template` against.
     pub fn has(&self, name: &str) -> bool {
         if self.builtins.contains_key(name) {
             return true;
@@ -153,13 +127,51 @@ impl PromptStore {
         }
     }
 
-    /// The current template body: on-disk override (mtime-cached) when
-    /// present and readable, else the built-in, else None.
-    fn body(&self, name: &str) -> Option<String> {
+    /// The template body currently in force: the on-disk override
+    /// (mtime-cached) when present and readable, else the shipped body, else
+    /// `None`.
+    pub fn body(&self, name: &str) -> Option<String> {
         if let Some(text) = self.override_body(name) {
             return Some(text);
         }
-        self.builtins.get(name).cloned()
+        self.builtins.get(name).map(|s| s.to_string())
+    }
+
+    /// Whether this name is currently served by a file rather than the
+    /// shipped body. Used by `bridge doctor` to report what a user overrode.
+    pub fn is_overridden(&self, name: &str) -> bool {
+        self.override_body(name).is_some()
+    }
+
+    /// Required placeholders that the body currently in force does NOT
+    /// contain — i.e. information the user's override silently drops.
+    ///
+    /// Empty for a built-in with no override (the shipped bodies are checked
+    /// against their own documentation by a test), empty for a purely
+    /// user-defined template (nothing is documented, so nothing is required),
+    /// and empty for an unknown name.
+    pub fn missing_required(&self, name: &str) -> Vec<&'static str> {
+        let Some(body) = self.body(name) else {
+            return Vec::new();
+        };
+        placeholders(name)
+            .iter()
+            .filter(|p| p.required && !body.contains(&format!("{{{{{}}}}}", p.key)))
+            .map(|p| p.key)
+            .collect()
+    }
+
+    /// Every override that drops a required placeholder, as
+    /// `(name, missing keys)`, in catalogue order. One call gives
+    /// `bridge doctor` its whole prompt report.
+    pub fn lint(&self) -> Vec<(&'static str, Vec<&'static str>)> {
+        DEFAULTS
+            .iter()
+            .filter_map(|d| {
+                let missing = self.missing_required(d.name);
+                (!missing.is_empty()).then_some((d.name, missing))
+            })
+            .collect()
     }
 
     /// Read `prompts/<name>.md` through the mtime cache. Any failure (missing
@@ -219,7 +231,7 @@ mod tests {
         PromptStore::new(Some(dir.to_path_buf()))
     }
 
-    // ---- built-ins ----
+    // ---- catalogue invariants ----
 
     #[test]
     fn builtin_names_all_exist_and_render_nonempty() {
@@ -228,8 +240,34 @@ mod tests {
             assert!(store.has(name), "missing built-in {name}");
             assert!(!store.render(name, &[]).is_empty(), "empty built-in {name}");
         }
-        assert_eq!(builtin_names().len(), builtins().len());
+        assert_eq!(builtin_names().len(), DEFAULTS.len());
     }
+
+    #[test]
+    fn builtin_names_are_in_catalogue_order() {
+        let names: Vec<&str> = DEFAULTS.iter().map(|d| d.name).collect();
+        assert_eq!(builtin_names(), names.as_slice());
+        // And the store iterates in the same order, so anything listing
+        // templates is stable across runs.
+        let store = PromptStore::new(None);
+        let keys: Vec<&str> = store.builtins.keys().map(|k| k.as_str()).collect();
+        assert_eq!(keys, names);
+    }
+
+    #[test]
+    fn shipped_bodies_never_drop_their_own_required_placeholders() {
+        let store = PromptStore::new(None);
+        assert_eq!(store.lint(), Vec::new());
+    }
+
+    #[test]
+    fn placeholders_are_exposed_for_builtins_only() {
+        assert!(placeholders("status").iter().any(|p| p.key == "session"));
+        assert!(placeholders("stop-idle").is_empty());
+        assert!(placeholders("no-such-template").is_empty());
+    }
+
+    // ---- byte parity with the JS bridge, template by template ----
 
     #[test]
     fn system_template_is_the_documented_composition() {
@@ -288,6 +326,19 @@ mod tests {
     }
 
     #[test]
+    fn media_caption_fallbacks_match_js() {
+        let store = PromptStore::new(None);
+        assert_eq!(
+            store.render("media-request-image", &[]),
+            "Please inspect this image and respond."
+        );
+        assert_eq!(
+            store.render("media-request-video", &[]),
+            "Please inspect this video and respond."
+        );
+    }
+
+    #[test]
     fn help_matches_coordinator_help_constant() {
         // The exact string from coordinator.mjs: HTML lines joined by '\n'.
         let expected = [
@@ -306,6 +357,31 @@ mod tests {
         ]
         .join("\n");
         assert_eq!(PromptStore::new(None).render("help", &[]), expected);
+    }
+
+    /// `{{commands}}` is documented but deliberately absent from the shipped
+    /// body: passing it must not perturb the legacy bytes.
+    #[test]
+    fn help_ignores_the_commands_var_unless_an_override_uses_it() {
+        let store = PromptStore::new(None);
+        assert_eq!(
+            store.render("help", &[("commands", "/x — y")]),
+            store.render("help", &[])
+        );
+        assert!(placeholders("help").iter().any(|p| p.key == "commands"));
+        assert!(placeholders("help")
+            .iter()
+            .all(|p| !p.required || p.key != "commands"));
+    }
+
+    #[test]
+    fn unknown_command_wraps_the_help_body() {
+        let store = PromptStore::new(None);
+        let help = store.render("help", &[]);
+        assert_eq!(
+            store.render("unknown-command", &[("help", &help)]),
+            format!("Unknown command.\n\n{help}")
+        );
     }
 
     #[test]
@@ -336,13 +412,186 @@ mod tests {
             ),
             "Engine: Codex\nTarget: Mac\nSession: 0198ab12…\nMac worker: online\nGCP busy: no"
         );
+        assert_eq!(store.render("session-none", &[]), "none (fresh)");
     }
 
     #[test]
-    fn transcribing_notice_matches_coordinator() {
+    fn status_line_matches_show_status() {
+        let store = PromptStore::new(None);
+        let activity = store.render("status-working", &[]);
         assert_eq!(
-            PromptStore::new(None).render("transcribing", &[]),
+            store.render(
+                "status-line",
+                &[("engine", "Claude"), ("target", "GCP"), ("activity", &activity)]
+            ),
+            "▹ Claude · GCP · working…"
+        );
+        assert_eq!(
+            store.render(
+                "status-line",
+                &[
+                    ("engine", "Claude"),
+                    ("target", "Mac"),
+                    ("activity", &store.render("status-queued", &[])),
+                ]
+            ),
+            "▹ Claude · Mac · queued (Mac offline — runs when it wakes)"
+        );
+    }
+
+    #[test]
+    fn activity_tool_matches_activity_line() {
+        let store = PromptStore::new(None);
+        assert_eq!(
+            store.render("activity-tool", &[("name", "Bash"), ("detail", ": ls -la")]),
+            "⚙️ Bash: ls -la"
+        );
+        assert_eq!(
+            store.render("activity-tool", &[("name", "Plan"), ("detail", "")]),
+            "⚙️ Plan"
+        );
+    }
+
+    #[test]
+    fn final_footer_matches_deliver_final() {
+        let store = PromptStore::new(None);
+        assert_eq!(
+            store.render(
+                "final",
+                &[
+                    ("text", "all done"),
+                    ("engine", "Codex"),
+                    ("target", "Mac"),
+                    ("duration", "3m07s"),
+                ]
+            ),
+            "all done\n\n— Codex · Mac · 3m07s"
+        );
+        assert_eq!(store.render("no-output", &[]), "(no output)");
+        assert_eq!(store.render("empty-chunk", &[]), "…");
+    }
+
+    #[test]
+    fn switch_replies_match_coordinator() {
+        let store = PromptStore::new(None);
+        let resuming = store.render("session-resuming", &[]);
+        let fresh = store.render("session-new", &[]);
+        assert_eq!(resuming, "(resuming session)");
+        assert_eq!(fresh, "(new session)");
+        assert_eq!(
+            store.render(
+                "switch-engine",
+                &[("engine", "Codex"), ("target", "Mac"), ("session", &resuming)]
+            ),
+            "Switched to Codex on Mac. (resuming session)"
+        );
+        // switchTarget names the TARGET first and says "with", not "on".
+        assert_eq!(
+            store.render(
+                "switch-target",
+                &[("target", "Mac"), ("engine", "Claude"), ("session", &fresh)]
+            ),
+            "Switched to Mac with Claude. (new session)"
+        );
+        assert_eq!(
+            store.render("session-reset", &[("engine", "Claude"), ("target", "GCP")]),
+            "🆕 Fresh Claude session on GCP."
+        );
+        assert_eq!(
+            store.render("menu", &[("engine", "Claude"), ("target", "GCP")]),
+            "🎛 Controls — Claude on GCP"
+        );
+    }
+
+    #[test]
+    fn stop_replies_match_coordinator() {
+        let store = PromptStore::new(None);
+        assert_eq!(store.render("stop-local", &[]), "🛑 Stopped GCP job.");
+        assert_eq!(
+            store.render("stop-cancelled", &[("count", "2")]),
+            "🛑 Cancelled 2 queued Mac job(s)."
+        );
+        assert_eq!(
+            store.render("stop-claimed", &[("count", "1")]),
+            "⚠️ 1 Mac job(s) already running — can't interrupt remotely yet."
+        );
+        assert_eq!(store.render("stop-idle", &[]), "Nothing running.");
+        assert_eq!(store.render("cancelled", &[]), "🛑 Cancelled.");
+    }
+
+    #[test]
+    fn callback_toasts_match_coordinator() {
+        let store = PromptStore::new(None);
+        assert_eq!(
+            store.render("toast-engine", &[("engine", "Claude Code")]),
+            "Using Claude Code"
+        );
+        assert_eq!(
+            store.render("toast-target", &[("target", "Mac 🖥️")]),
+            "On the Mac 🖥️"
+        );
+        assert_eq!(
+            store.render("toast-target", &[("target", "GCP box ☁️")]),
+            "On the GCP box ☁️"
+        );
+        assert_eq!(store.render("toast-new", &[]), "Fresh session");
+        assert_eq!(store.render("toast-stop", &[]), "Stopping…");
+    }
+
+    #[test]
+    fn voice_flow_strings_match_coordinator() {
+        let store = PromptStore::new(None);
+        assert_eq!(
+            store.render("transcribing", &[]),
             "🎙️ Transcribing voice message…"
+        );
+        assert_eq!(
+            store.render("transcript", &[("transcript", "hello there")]),
+            "🎙️ Transcript:\nhello there"
+        );
+        assert_eq!(
+            store.render("error-transcribe", &[("error", "HTTP 500")]),
+            "⚠️ Could not transcribe voice message: HTTP 500"
+        );
+    }
+
+    #[test]
+    fn error_reports_match_coordinator_and_worker() {
+        let store = PromptStore::new(None);
+        assert_eq!(
+            store.render("error-run", &[("error", "spawn ENOENT")]),
+            "⚠️ Error: spawn ENOENT"
+        );
+        assert_eq!(
+            store.render(
+                "error-exit",
+                &[("engine", "Claude"), ("code", "1"), ("stderr", "boom")]
+            ),
+            "⚠️ Claude exited (code 1).\nboom"
+        );
+        assert_eq!(
+            store.render("error-mac", &[("error", "scp exited 1")]),
+            "⚠️ Mac error: scp exited 1"
+        );
+        assert_eq!(
+            store.render("error-exit-mac", &[("engine", "Codex"), ("code", "2")]),
+            "⚠️ Codex exited on Mac (code 2)."
+        );
+        assert_eq!(
+            store.render("error-generic", &[("error", "disk full")]),
+            "⚠️ disk full"
+        );
+        assert_eq!(
+            store.render("error-media", &[("error", "too big")]),
+            "⚠️ Could not process attachment: too big"
+        );
+        assert_eq!(
+            store.render("error-media-size", &[("size", "700"), ("limit", "512")]),
+            "Attachment is too large (700 MB; limit 512 MB)."
+        );
+        assert_eq!(
+            store.render("error-media-limit", &[("limit", "512")]),
+            "Attachment exceeds the 512 MB limit."
         );
     }
 
@@ -381,6 +630,16 @@ mod tests {
         assert!(!store.has("nope"));
     }
 
+    #[test]
+    fn try_render_separates_missing_from_empty() {
+        let dir = tmpdir();
+        fs::write(dir.path().join("blank.md"), "").unwrap();
+        let store = store_over(dir.path());
+        assert_eq!(store.try_render("nope", &[]), None);
+        assert_eq!(store.try_render("blank", &[]), Some(String::new()));
+        assert_eq!(store.body("nope"), None);
+    }
+
     // ---- overrides + mtime cache ----
 
     #[test]
@@ -390,6 +649,8 @@ mod tests {
         let store = store_over(dir.path());
         assert_eq!(store.render("help", &[("who", "nikita")]), "custom help nikita");
         assert!(store.has("help"));
+        assert!(store.is_overridden("help"));
+        assert!(!store.is_overridden("status"));
     }
 
     #[test]
@@ -399,6 +660,10 @@ mod tests {
         let store = store_over(dir.path());
         assert!(store.has("deploy"));
         assert_eq!(store.render("deploy", &[("args", "v2")]), "ship v2 now");
+        // Nothing is documented for a user-defined template, so nothing can
+        // be reported as missing.
+        assert!(placeholders("deploy").is_empty());
+        assert!(store.missing_required("deploy").is_empty());
     }
 
     #[test]
@@ -463,6 +728,59 @@ mod tests {
             store.cache.lock().unwrap().get("status"),
             Some(&(real, "FRESH".to_string()))
         );
+    }
+
+    // ---- the placeholder lint ----
+
+    #[test]
+    fn an_override_that_drops_a_required_placeholder_is_reported() {
+        let dir = tmpdir();
+        // A user rewrites /where and forgets {{session}} — the single
+        // highest-value guard rail, because the loss is otherwise silent.
+        fs::write(
+            dir.path().join("status.md"),
+            "Engine: {{engine}}\nTarget: {{target}}\nMac worker: {{worker}}\nGCP busy: {{busy}}",
+        )
+        .unwrap();
+        let store = store_over(dir.path());
+        assert_eq!(store.missing_required("status"), vec!["session"]);
+        assert_eq!(store.lint(), vec![("status", vec!["session"])]);
+    }
+
+    #[test]
+    fn an_override_keeping_every_required_placeholder_is_clean() {
+        let dir = tmpdir();
+        fs::write(
+            dir.path().join("status.md"),
+            "{{engine}}/{{target}} s={{session}} w={{worker}} b={{busy}}",
+        )
+        .unwrap();
+        let store = store_over(dir.path());
+        assert!(store.missing_required("status").is_empty());
+        assert!(store.lint().is_empty());
+    }
+
+    #[test]
+    fn optional_placeholders_are_never_reported() {
+        let dir = tmpdir();
+        // `duration` is optional; dropping it is a legitimate taste change.
+        fs::write(
+            dir.path().join("final.md"),
+            "{{text}}\n\n({{engine}} on {{target}})",
+        )
+        .unwrap();
+        let store = store_over(dir.path());
+        assert!(store.lint().is_empty());
+    }
+
+    #[test]
+    fn lint_reports_every_broken_override_in_catalogue_order() {
+        let dir = tmpdir();
+        fs::write(dir.path().join("status.md"), "no vars here").unwrap();
+        fs::write(dir.path().join("final.md"), "no vars here either").unwrap();
+        let store = store_over(dir.path());
+        let names: Vec<&str> = store.lint().iter().map(|(n, _)| *n).collect();
+        assert_eq!(names, vec!["status", "final"]);
     }
 
     // ---- name hygiene ----

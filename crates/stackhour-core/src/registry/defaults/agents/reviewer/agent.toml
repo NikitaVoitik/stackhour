@@ -3,8 +3,15 @@
 
 label = "Reviewer"
 
+# Inherit the house style in agents/base: its soul is composed in FIRST, its
+# denied tools are unioned with this agent's, and any scalar this file does
+# not set falls back to it. Chains are cycle-detected and capped at 16 levels.
+extends = "base"
+
 # Required, and cross-checked against the built-in engines plus anything in
 # engines/. Getting this wrong drops the agent and tells you the known names.
+# It could be inherited from `base`, but stating it keeps this file readable
+# on its own.
 engine = "claude"
 
 # Optional. Omitted = the engine's own default model.
@@ -16,6 +23,10 @@ engine = "claude"
 
 # The soul document, relative to this directory. Defaults to "soul.md".
 soul = "soul.md"
+
+# Extra markdown appended AFTER the soul, in this order. Overlays are the way
+# to bolt one rule onto a persona without forking the whole document.
+overlays = ["terse.md"]
 
 # Skills to compose into the system prompt, by name.
 skills = ["review"]

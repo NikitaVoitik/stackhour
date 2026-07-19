@@ -1,0 +1,10 @@
+# A house style every other agent inherits with `extends = "base"`.
+#
+# An agent that is only ever extended still needs a valid engine: it is a
+# real, selectable agent, not an abstract class.
+engine = "claude"
+
+# Inherited allow/deny lists are UNIONED with the child's, and deny wins — a
+# child cannot re-enable something denied here.
+[tools]
+deny = ["WebSearch"]
