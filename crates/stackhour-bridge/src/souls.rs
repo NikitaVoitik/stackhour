@@ -340,16 +340,15 @@ pub fn agent_list_text(reg: &Registry) -> String {
     out
 }
 
-/// 5-entity HTML escape. `render::esc` is the shared implementation, but it is
-/// still a `todo!()`; this local copy keeps agent selection working today and
-/// should be deleted in favour of it once that lands.
-fn esc(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
-}
+/// HTML escape for Telegram text nodes — the ONE shared implementation.
+///
+/// This was a local 5-entity copy, written while `render::esc` was assumed to
+/// be unimplemented. It was not, and the extra two entities were a
+/// divergence: coordinator.mjs escapes `&`, `<` and `>` only, and Telegram's
+/// HTML parse mode does not require quote escaping outside attributes. The
+/// local copy therefore rendered a literal `&quot;` to the user wherever a
+/// soul label contained a quote.
+use crate::render::esc;
 
 #[cfg(test)]
 mod tests {
