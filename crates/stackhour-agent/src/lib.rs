@@ -373,3 +373,19 @@ mod tests {
         assert_eq!(tick_interval(1.5), Duration::from_secs_f64(1.5));
     }
 }
+
+/// Build a `Config` from a raw JSON body, for watcher unit tests.
+///
+/// Goes through the real `load_config` (temp file) rather than constructing
+/// the struct directly, so tests exercise the same defaulting and coercion
+/// the agent sees in production.
+#[cfg(test)]
+pub(crate) fn test_config(raw: serde_json::Value) -> Config {
+    let dir = tempfile::TempDir::new().expect("tempdir");
+    let path = dir.path().join("config.json");
+    std::fs::write(&path, serde_json::to_string(&raw).unwrap()).unwrap();
+    let cfg = stackhour_core::config::load_config(&path).expect("config loads");
+    // The TempDir must outlive load_config, not the returned Config.
+    drop(dir);
+    cfg
+}

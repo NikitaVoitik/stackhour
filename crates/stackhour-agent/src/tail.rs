@@ -156,6 +156,39 @@ pub fn prune_offsets(map: &mut Map<String, Value>, live: &HashSet<String>, max: 
 /// `pruneOffsets(offsets, files)` — the default 2000-entry threshold.
 pub const DEFAULT_PRUNE_MAX: usize = 2000;
 
+/// `Date.parse(line.timestamp) / 1000`, as epoch seconds.
+///
+/// Returns `None` where JS produces NaN. Claude and Codex both write RFC 3339
+/// with an explicit `Z`; anything else is treated as unparseable rather than
+/// guessed at in local time, so a weird line is skipped instead of being
+/// attributed to the wrong hour.
+pub fn parse_ts_seconds(value: Option<&Value>) -> Option<f64> {
+    let text = value?.as_str()?;
+    let dt = chrono::DateTime::parse_from_rfc3339(text).ok()?;
+    Some(dt.timestamp_millis() as f64 / 1000.0)
+}
+
+/// Depth-limited recursive walk collecting files whose basename satisfies
+/// `keep`. Mirrors the `function* jsonlFiles(dir, depth)` generators: `depth
+/// > 4` stops, an unreadable directory is skipped silently.
+pub fn walk_files(dir: &Path, depth: u32, keep: &dyn Fn(&str) -> bool, out: &mut Vec<std::path::PathBuf>) {
+    if depth > 4 {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let full = entry.path();
+        match entry.file_type() {
+            Ok(ft) if ft.is_dir() => walk_files(&full, depth + 1, keep, out),
+            Ok(_) if keep(&name) => out.push(full),
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
