@@ -314,7 +314,9 @@ fn no_advertised_verb_panics() {
         &["backup", "verify", "/nonexistent"],
         &["install"],
         &["status"],
-        &["agent"],
+        // `--once` is mandatory here: a bare `agent` is a daemon and would
+        // never return.
+        &["agent", "--once"],
         &["import-wakatime"],
         &["bridge"],
         &[],

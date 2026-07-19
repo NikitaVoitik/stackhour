@@ -145,9 +145,21 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         }
+        "agent" => {
+            let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+            let result = stackhour_core::config::load_config(&paths.config_path)
+                .and_then(|cfg| stackhour_agent::run_agent(&cfg, args::has_flag(&tail, "--once")));
+            match result {
+                Ok(_report) => ExitCode::SUCCESS,
+                Err(err) => {
+                    eprintln!("stackhour agent: {}", err.message());
+                    ExitCode::FAILURE
+                }
+            }
+        }
         // Verbs that exist in the Node CLI but are not ported yet. Kept
         // distinct from the help path so we never silently claim parity.
-        "agent" | "import-wakatime" | "bridge" => {
+        "import-wakatime" | "bridge" => {
             eprintln!("stackhour: `{cmd}` is not implemented in the Rust port yet");
             ExitCode::FAILURE
         }
