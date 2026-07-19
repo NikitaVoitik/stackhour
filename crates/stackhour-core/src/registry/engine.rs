@@ -54,6 +54,11 @@ const PLACEHOLDER_SYSTEM_PROMPT: &str = "{{system_prompt}}";
 /// Substituted into `effort_args`. Engines that declare no `effort_args`
 /// silently ignore an agent's `effort` field.
 const PLACEHOLDER_EFFORT: &str = "{{effort}}";
+/// Substituted into `allowed_tools_args` / `disallowed_tools_args`. Rendered
+/// as the comma-joined tool list, which is the shape both Claude Code and
+/// Codex accept.
+const PLACEHOLDER_ALLOWED_TOOLS: &str = "{{allowed_tools}}";
+const PLACEHOLDER_DISALLOWED_TOOLS: &str = "{{disallowed_tools}}";
 
 /// Which shipped stream parser to use for the child's stdout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -137,6 +142,15 @@ pub struct EngineDef {
     /// and an agent's `effort` is ignored rather than an error (engines are
     /// swappable, so a soft ignore is the right failure mode).
     pub effort_args: Option<Vec<String>>,
+    /// e.g. `["--allowedTools", "{{allowed_tools}}"]`. Spliced only when the
+    /// effective [`ToolPolicy`] has a non-empty `allow` list.
+    pub allowed_tools_args: Option<Vec<String>>,
+    /// e.g. `["--disallowedTools", "{{disallowed_tools}}"]`.
+    ///
+    /// Unlike `effort_args`, a `deny` list that an engine cannot express is
+    /// NOT safe to ignore silently — see [`EngineDef::unenforceable_policy`],
+    /// which callers use to refuse the run instead.
+    pub disallowed_tools_args: Option<Vec<String>>,
 }
 
 /// Spawn-time template variables for [`EngineDef::assemble_argv`].
@@ -150,6 +164,10 @@ pub struct ArgvVars<'a> {
     /// Agent reasoning effort ("low" | "medium" | "high"); `None` = the
     /// engine's own default and `effort_args` is not spliced at all.
     pub effort: Option<&'a str>,
+    /// Tools to allow; empty = do not splice `allowed_tools_args` at all.
+    pub allow_tools: &'a [String],
+    /// Tools to deny; empty = do not splice `disallowed_tools_args` at all.
+    pub deny_tools: &'a [String],
     /// true on the coordinator's local lane (enables partial_messages_flag).
     pub live_status: bool,
 }
@@ -164,6 +182,8 @@ fn subst(template: &str, vars: &ArgvVars<'_>) -> String {
         )
         .replace(PLACEHOLDER_SYSTEM_PROMPT, vars.system_prompt.unwrap_or(""))
         .replace(PLACEHOLDER_EFFORT, vars.effort.unwrap_or(""))
+        .replace(PLACEHOLDER_ALLOWED_TOOLS, &vars.allow_tools.join(","))
+        .replace(PLACEHOLDER_DISALLOWED_TOOLS, &vars.deny_tools.join(","))
 }
 
 /// The built-in `claude` engine (argv byte-identical to coordinator.mjs/worker.mjs).
@@ -202,6 +222,18 @@ pub fn builtin_claude() -> EngineDef {
         partial_messages_flag: Some("--include-partial-messages".to_string()),
         // Claude Code exposes no reasoning-effort flag today.
         effort_args: None,
+        // Claude Code's own tool gating. Splicing these is a no-op unless an
+        // agent or skill actually declares a `[tools]` policy, so argv stays
+        // byte-identical to coordinator.mjs/worker.mjs for every existing
+        // config.
+        allowed_tools_args: Some(vec![
+            "--allowedTools".to_string(),
+            PLACEHOLDER_ALLOWED_TOOLS.to_string(),
+        ]),
+        disallowed_tools_args: Some(vec![
+            "--disallowedTools".to_string(),
+            PLACEHOLDER_DISALLOWED_TOOLS.to_string(),
+        ]),
     }
 }
 
@@ -239,6 +271,12 @@ pub fn builtin_codex() -> EngineDef {
         // Left unset to preserve byte-parity with coordinator.mjs/worker.mjs,
         // which never pass a reasoning-effort flag to codex.
         effort_args: None,
+        // `codex exec` has no per-tool allow/deny flags. Leaving these None
+        // means a `[tools]` policy on a codex agent is UNENFORCEABLE, which
+        // `unenforceable_policy` turns into a refusal rather than a silent
+        // grant.
+        allowed_tools_args: None,
+        disallowed_tools_args: None,
     }
 }
 
@@ -266,6 +304,35 @@ impl EngineDef {
 
     /// Assemble the full argv (after the binary) for one spawn — the argv
     /// byte-parity surface. See the module docs for the exact semantics.
+    /// Why this engine cannot enforce `policy`, if it cannot.
+    ///
+    /// `effort` is safe to ignore when an engine has no flag for it — the run
+    /// is merely less tuned. A `deny` list is NOT: silently dropping it hands
+    /// the agent back a tool the user explicitly took away, which is a
+    /// security-shaped failure that no error message ever surfaces. Callers
+    /// must refuse the run instead.
+    ///
+    /// An `allow` list is treated the same way: it is a whitelist, so losing
+    /// it also widens access.
+    #[must_use]
+    pub fn unenforceable_policy(&self, policy: &super::agent_def::ToolPolicy) -> Option<String> {
+        if !policy.deny.is_empty() && self.disallowed_tools_args.is_none() {
+            return Some(format!(
+                "engine '{}' has no way to deny tools, but this agent denies: {}",
+                self.name,
+                policy.deny.join(", ")
+            ));
+        }
+        if !policy.allow.is_empty() && self.allowed_tools_args.is_none() {
+            return Some(format!(
+                "engine '{}' has no way to restrict tools, but this agent allows only: {}",
+                self.name,
+                policy.allow.join(", ")
+            ));
+        }
+        None
+    }
+
     pub fn assemble_argv(&self, vars: &ArgvVars<'_>) -> Vec<String> {
         let mut out: Vec<String> = self.args.iter().map(|a| subst(a, vars)).collect();
 
@@ -294,6 +361,16 @@ impl EngineDef {
         }
         if vars.effort.is_some() {
             if let Some(template) = &self.effort_args {
+                splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
+            }
+        }
+        if !vars.allow_tools.is_empty() {
+            if let Some(template) = &self.allowed_tools_args {
+                splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
+            }
+        }
+        if !vars.deny_tools.is_empty() {
+            if let Some(template) = &self.disallowed_tools_args {
                 splice_in(&mut out, template.iter().map(|a| subst(a, vars)).collect());
             }
         }
@@ -418,6 +495,8 @@ impl EngineDef {
         let permission_args = opt_string_array(table, "permission_args")?;
         let system_prompt_args = opt_string_array(table, "system_prompt_args")?;
         let effort_args = opt_string_array(table, "effort_args")?;
+        let allowed_tools_args = opt_string_array(table, "allowed_tools_args")?;
+        let disallowed_tools_args = opt_string_array(table, "disallowed_tools_args")?;
 
         let prompt_delivery = match opt_string(table, "prompt")? {
             None => PromptDelivery::Stdin,
@@ -464,6 +543,8 @@ impl EngineDef {
             env,
             partial_messages_flag,
             effort_args,
+            allowed_tools_args,
+            disallowed_tools_args,
         })
     }
 }

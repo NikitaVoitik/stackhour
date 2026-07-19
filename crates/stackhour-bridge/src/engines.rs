@@ -56,6 +56,11 @@ pub struct RunRequest {
     pub live_status: bool,
     /// Target extraPath, prepended to the child's PATH.
     pub extra_path: Option<String>,
+    /// Effective tool allow-list (agent `[tools]` unioned with its skills').
+    /// Empty = unrestricted.
+    pub allow_tools: Vec<String>,
+    /// Effective tool deny-list. Empty = nothing denied.
+    pub deny_tools: Vec<String>,
 }
 
 /// What an engine run produced.
@@ -112,6 +117,8 @@ pub fn build_argv(def: &EngineDef, req: &RunRequest) -> Vec<String> {
         permission_mode: req.permission_mode.as_deref(),
         system_prompt: req.system_prompt.as_deref(),
         effort: req.effort.as_deref(),
+        allow_tools: &req.allow_tools,
+        deny_tools: &req.deny_tools,
         live_status: req.live_status,
     });
     // Engines that take the prompt as a positional argument get it appended

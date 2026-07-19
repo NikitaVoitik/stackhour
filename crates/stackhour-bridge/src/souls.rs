@@ -23,14 +23,19 @@
 //!
 //! See [`resolve_agent`].
 //!
-//! ## Known gap (deliberate, not an oversight)
+//! ## Soft ignore vs hard refusal
 //!
-//! [`AgentDef::effort`] and [`AgentDef::tools`] have no delivery path yet:
-//! `RunRequest` carries no `effort` field, and `EngineDef` declares no tool
-//! allow/deny flag templates. Both are computed and exposed here
-//! ([`agent_effort`], [`tool_policy`]) so that wiring them is a change in
-//! `engines.rs` alone. Until then an agent's `effort` and `[tools]` parse,
-//! validate and inherit correctly but do not reach the child process.
+//! Both [`AgentDef::effort`] and [`AgentDef::tools`] are delivered through
+//! flag templates the ENGINE declares, so an engine can simply not support
+//! them. The two cases are NOT symmetric:
+//!
+//! * `effort` on an engine with no `effort_args` is silently ignored. The run
+//!   is merely less tuned, and engines are swappable.
+//! * `[tools]` on an engine with no `allowed_tools_args` /
+//!   `disallowed_tools_args` is a REFUSAL
+//!   ([`EngineDef::unenforceable_policy`]). Dropping a `deny` list hands the
+//!   agent back a tool the user explicitly removed, and nothing downstream
+//!   would ever surface that.
 
 use crate::engines::RunRequest;
 use crate::state::BridgeState;
@@ -147,6 +152,14 @@ pub fn apply_agent(def: &EngineDef, agent: Option<&AgentDef>, reg: &Registry, re
     if let Some(effort) = agent_effort(def, Some(agent)) {
         req.effort = Some(effort.to_string());
     }
+
+    // The effective `[tools]` policy, spliced through the engine's declared
+    // flags. Without this the policy parsed, validated, inherited and merged
+    // cleanly — and then never reached the child, so `deny = ["Bash"]` was a
+    // config that reported no error while the agent kept full tool access.
+    let policy = tool_policy(Some(agent), reg);
+    req.allow_tools = policy.allow;
+    req.deny_tools = policy.deny;
 
     // Per-agent prompt wrapper, by template NAME. Rendering an unknown
     // template yields "", which would silently eat the user's message, so a
