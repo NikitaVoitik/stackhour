@@ -28,5 +28,33 @@ mod status;
 const HELP: &str = "REPLACED-BY-IMPLEMENTATION: pin to tests-fixtures/help.txt";
 
 fn main() -> ExitCode {
-    todo!()
+    let argv: Vec<String> = std::env::args().collect();
+    let cmd = argv.get(1).map(String::as_str).unwrap_or("");
+
+    match cmd {
+        // Node: `const cfg = loadConfig()` runs BEFORE the switch, so a
+        // corrupt config.json fails here rather than inside the verb.
+        "serve" => {
+            let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+            let cfg = match stackhour_core::config::load_config(&paths.config_path) {
+                Ok(cfg) => cfg,
+                Err(err) => {
+                    eprintln!("stackhour serve: {err}");
+                    return ExitCode::FAILURE;
+                }
+            };
+            match stackhour_server::start_server(cfg) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(err) => {
+                    eprintln!("stackhour serve: {err}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
+        // Remaining verbs are still scaffold; see the module stubs.
+        other => {
+            eprintln!("stackhour: `{other}` is not implemented in the Rust port yet");
+            ExitCode::FAILURE
+        }
+    }
 }
