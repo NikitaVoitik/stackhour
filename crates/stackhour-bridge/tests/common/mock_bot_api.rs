@@ -88,6 +88,10 @@ impl Reply {
 struct Shared {
     script: Mutex<VecDeque<Reply>>,
     default: Mutex<Reply>,
+    /// Per-method standing replies, consulted before `default` and after the
+    /// scripted queue. Lets a test say "sendRichMessage always 400s, like the
+    /// real API" without counting positions.
+    by_method: Mutex<Vec<(String, Reply)>>,
     seen: Mutex<Vec<Recorded>>,
 }
 
@@ -106,6 +110,7 @@ impl MockApi {
         let shared = Arc::new(Shared {
             script: Mutex::new(VecDeque::new()),
             default: Mutex::new(Reply::ok(json!({ "message_id": 1 }))),
+            by_method: Mutex::new(Vec::new()),
             seen: Mutex::new(Vec::new()),
         });
         let worker = Arc::clone(&shared);
@@ -142,6 +147,18 @@ impl MockApi {
     /// Replace the reply used once the script runs out.
     pub fn set_default(&self, reply: Reply) {
         *self.shared.default.lock().unwrap() = reply;
+    }
+
+    /// A standing reply for one method name, used whenever the scripted queue
+    /// is empty. Later registrations for the same method win.
+    pub fn set_method_reply(&self, method: &str, reply: Reply) -> &MockApi {
+        self.shared.by_method.lock().unwrap().retain(|(m, _)| m != method);
+        self.shared
+            .by_method
+            .lock()
+            .unwrap()
+            .push((method.to_string(), reply));
+        self
     }
 
     /// Every request the server has seen, in order.
@@ -209,17 +226,22 @@ fn handle(stream: TcpStream, shared: &Shared) -> std::io::Result<()> {
     // `/bot<token>/<method>` -> `<method>`; `/file/bot<token>/<file_path>`
     // keeps the whole path.
     let method = path.rsplit('/').next().unwrap_or_default().to_string();
+    let method_name = method.clone();
     shared.seen.lock().unwrap().push(Recorded {
         method,
         path: path.clone(),
         body,
     });
 
-    let reply = shared
-        .script
-        .lock()
-        .unwrap()
-        .pop_front()
+    let scripted = shared.script.lock().unwrap().pop_front();
+    let reply = scripted
+        .or_else(|| {
+            let by_method = shared.by_method.lock().unwrap();
+            by_method
+                .iter()
+                .find(|(m, _)| *m == method_name)
+                .map(|(_, r)| r.clone())
+        })
         .unwrap_or_else(|| shared.default.lock().unwrap().clone());
 
     let mut out = stream;
