@@ -1,0 +1,26 @@
+[package]
+name = "stackhour-store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "stackhour storage: everything touching stackhour.db — schema/migrations, ingest, summarize math, reattribution, backup/restore, data ops, wakatime import."
+
+[lib]
+name = "stackhour_store"
+path = "src/lib.rs"
+
+[dependencies]
+stackhour-core.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+indexmap.workspace = true
+chrono.workspace = true
+regex.workspace = true
+base64.workspace = true
+reqwest.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

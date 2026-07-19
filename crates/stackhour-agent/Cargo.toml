@@ -1,0 +1,26 @@
+[package]
+name = "stackhour-agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "stackhour local activity agent — fully synchronous watcher loop (files, claude, codex, macApps, ssh, zed)."
+
+[lib]
+name = "stackhour_agent"
+path = "src/lib.rs"
+
+[dependencies]
+stackhour-core.workspace = true
+# rusqlite is used directly, for the zed threads.db snapshot only.
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+indexmap.workspace = true
+reqwest.workspace = true
+regex.workspace = true
+chrono.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

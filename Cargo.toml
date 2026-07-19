@@ -1,0 +1,52 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.79"
+license = "MIT"
+
+[workspace.dependencies]
+# Async runtime — the HTTP server crate ONLY. Nothing else in the workspace is async.
+tokio = { version = "1.40", features = ["rt-multi-thread", "net", "macros", "signal"] }
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+
+# SQLite — store crate + the agent's zed watcher.
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+
+# JSON / config. preserve_order + float_roundtrip are load-bearing parity features.
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+indexmap = { version = "2", features = ["serde"] }
+toml = "0.8"
+
+# The single blocking HTTP client (agent posts, CLI probes, wakatime, Telegram, ElevenLabs).
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
+url = "2"
+
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+regex = "1"
+base64 = "0.22"
+getrandom = "0.2"
+uuid = { version = "1", features = ["v4"] }
+constant_time_eq = "0.3"
+hostname = "0.4"
+libc = "0.2"
+anyhow = "1"
+
+# Test-only.
+tempfile = "3"
+
+# Workspace-internal crates.
+stackhour-core = { path = "crates/stackhour-core" }
+stackhour-store = { path = "crates/stackhour-store" }
+stackhour-server = { path = "crates/stackhour-server" }
+stackhour-agent = { path = "crates/stackhour-agent" }
+stackhour-bridge = { path = "crates/stackhour-bridge" }
+
+[profile.release]
+lto = "thin"
+strip = true

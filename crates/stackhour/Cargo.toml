@@ -1,0 +1,31 @@
+[package]
+name = "stackhour"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "stackhour — self-hosted coding-time tracker. One binary, all verbs."
+
+[[bin]]
+name = "stackhour"
+path = "src/main.rs"
+
+[dependencies]
+stackhour-core.workspace = true
+stackhour-store.workspace = true
+stackhour-server.workspace = true
+stackhour-agent.workspace = true
+stackhour-bridge.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+indexmap.workspace = true
+reqwest.workspace = true
+rusqlite.workspace = true
+chrono.workspace = true
+regex.workspace = true
+hostname.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

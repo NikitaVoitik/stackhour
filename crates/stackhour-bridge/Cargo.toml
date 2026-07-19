@@ -1,0 +1,27 @@
+[package]
+name = "stackhour-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "stackhour Telegram bridge: coordinator + mac worker + claim/return + tg-send + installer + bridge doctor. Blocking, thread-per-child."
+
+[lib]
+name = "stackhour_bridge"
+path = "src/lib.rs"
+
+[dependencies]
+stackhour-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+indexmap.workspace = true
+reqwest.workspace = true
+uuid.workspace = true
+regex.workspace = true
+chrono.workspace = true
+url.workspace = true
+libc.workspace = true
+hostname.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

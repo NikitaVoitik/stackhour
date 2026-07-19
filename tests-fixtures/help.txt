@@ -1,0 +1,33 @@
+stackhour — self-hosted coding time tracker
+
+usage: stackhour <command>
+
+  serve             run the server (ingest API + dashboard) on this machine
+  agent [--once]    run the watcher agent (files, claude, codex, mac apps)
+  import-wakatime [--days=365]   backfill history from wakatime.com
+  status            print today's totals from the server
+  doctor [--json]   check config, inputs, database, server, and services
+  init server [--public-url=URL] [--project-root=PATH ...] [--install]
+                    configure the server and its local agent
+  init agent --enrollment=CODE [--project-root=PATH ...] [--install]
+                    enroll and optionally install an agent service
+  token create MACHINE [--force] [--raw] [--server-url=URL]
+                    enroll a machine and print its copy-paste command
+  token list                       list enrolled machines (never secrets)
+  token revoke MACHINE             revoke a machine token
+  data stats [--json]              inspect local database size and coverage
+  data export --output=FILE [--from=TIME] [--to=TIME] [--force]
+                                   atomically export JSONL
+  data prune --before=TIME [--confirm]
+                                   preview or confirm retention pruning
+  backup create [--output=FILE] [--force]
+                                   create and verify a consistent snapshot
+  backup verify FILE               integrity-check a backup
+  backup restore FILE [--confirm]  preview or restore, preserving old DB
+  install <server|agent>           install and start user service(s)
+  bridge install <coordinator|worker> [--reconfigure] [--no-start]
+                                   set up the Telegram Claude/Codex bridge
+  bridge doctor|status|restart <coordinator|worker>
+                                   operate the bridge service
+
+config: /home/nikita/.config/stackhour/config.json
