@@ -409,11 +409,9 @@ fn agent_extends(_def: &AgentDef) -> Vec<String> {
     Vec::new()
 }
 
-/// Skills compose via `uses`. Owned by the SKILLS pillar; returns nothing
-/// until `SkillDef::uses` lands, at which point this becomes
-/// `def.uses.clone()`.
-fn skill_uses(_def: &SkillDef) -> Vec<String> {
-    Vec::new()
+/// Skills compose via `uses` (SKILLS pillar).
+fn skill_uses(def: &SkillDef) -> Vec<String> {
+    def.uses.clone()
 }
 
 /// Commands compose via `steps` (kind = "sequence").

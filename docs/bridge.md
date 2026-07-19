@@ -428,6 +428,167 @@ takes the remainder of the line including internal whitespace. Optional
 arguments that were not supplied get their `default`, so a template never leaks
 an unsubstituted `{{placeholder}}`.
 
+### Skills
+
+A skill is a **capability pack** in `skills/<name>/`: prose that goes into the
+system prompt, an argument schema, a prompt template, a tool/permission policy,
+a default agent, and pre/post hooks. The point is that a repeatable task should
+be a file you edit, not a paragraph you retype.
+
+A skill can be invoked three ways, and all three resolve identically:
+
+- from a command with `kind = "skill"`,
+- from another skill's `uses` list,
+- from an agent's `skills` list — which contributes the prose and policy only,
+  binding no arguments and running no hooks, because listing a skill is not
+  invoking it.
+
+`skills/<name>/skill.toml`. Only `description` is required, and every default
+reproduces the pre-skills behaviour exactly:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `description` | — | required, non-empty; shown wherever the skill is listed |
+| `body` | `"skill.md"` | markdown appended to the system prompt; hot-reloaded by mtime |
+| `agent` | none | default agent for this skill; cross-ref checked |
+| `template` | none | prompt template rendered with the bound args to form the user prompt; absent = the raw argument string, verbatim |
+| `uses` | `[]` | skills composed into this one; cycle-detected |
+| `[[args]]` | `[]` | the same `ArgSpec` as commands |
+| `[tools]` | empty | `allow` / `deny` merged into the engine spawn |
+| `[env]` | empty | env vars merged into the spawn |
+| `[hooks]` | none | `pre` / `post` fixed argv, `timeout_seconds` (default 60) |
+
+#### Composition
+
+`uses` pulls other skills in. Bodies are concatenated **dependency-first** —
+the general advice before the specialisation that refines it — deduped by name,
+so a skill reached by two paths appears once at its earliest position. Tool
+policies and env are merged in the same order, so the invoked skill's own
+settings win. Tool merging is a union in which **deny always wins**: composing
+a skill can only ever tighten the policy, never loosen it.
+
+Arguments bind against the **invoked** skill's spec only. A composed skill
+contributes prose and policy, not arity — otherwise adding a `uses` entry would
+silently change how the user has to type the command.
+
+Cycles are detected at load, reported once naming the full path, and every
+skill on the cycle is dropped. Composition deeper than 16 levels is refused.
+
+#### Hooks never touch a shell
+
+`pre` and `post` are **fixed argv**, exactly like `kind = "shell"` commands.
+They go straight to `execve`; there is no shell, no word splitting and no
+quoting to get wrong. Placeholders are substituted **per argv element** —
+`{{arg:<name>}}`, `{{skill}}`, `{{agent}}`, `{{cwd}}` — and one element always
+produces exactly one argument, so a value of `; rm -rf /` is inert data. An
+unknown placeholder is left verbatim rather than becoming an empty argument, so
+a typo is visible instead of silent.
+
+A `pre` hook exiting non-zero **aborts the turn** and its stderr is sent to the
+chat. A `post` hook exiting non-zero is logged only — the turn already
+happened. Either hook exceeding `timeout_seconds` is killed and reported. Hooks
+run in the selected agent's `cwd` when it declares one, and see the skill's
+`[env]`.
+
+#### A worked example
+
+`~/.config/stackhour/skills/git-hygiene/skill.toml` — a small shared skill that
+other skills compose in:
+
+```toml
+description = "House rules for touching a git repository"
+
+[tools]
+deny = ["WebSearch"]
+```
+
+`~/.config/stackhour/skills/git-hygiene/skill.md`:
+
+```markdown
+Never commit on `master`; branch first. Never use `git checkout .`,
+`git reset --hard` or `git clean` on files you did not create in this task.
+Commit messages describe what changed and why, in the imperative.
+```
+
+`~/.config/stackhour/skills/review/skill.toml` — the realistic one:
+
+```toml
+description = "Careful code review with a fixed rubric"
+agent       = "reviewer"       # switch to agents/reviewer/ for this turn
+template    = "review"         # -> prompts/review.md
+uses        = ["git-hygiene"]  # its body is prepended, its deny inherited
+
+[[args]]
+name        = "path"
+required    = true
+description = "file or directory to review"
+
+[[args]]
+name        = "focus"
+rest        = true
+default     = "correctness and error handling"
+description = "what to pay attention to"
+
+[tools]
+allow = ["Read", "Grep", "Glob", "Bash"]
+deny  = ["Write", "Edit"]
+
+[env]
+REVIEW_STRICT = "1"
+
+[hooks]
+pre  = ["git", "diff", "--quiet", "--exit-code", "--", "{{arg:path}}"]
+post = ["git", "status", "--short"]
+timeout_seconds = 30
+```
+
+`~/.config/stackhour/prompts/review.md`:
+
+```markdown
+Review `{{path}}`, paying particular attention to {{focus}}.
+
+Quote the exact line for each finding. Do not say "looks good" without naming
+what you checked.
+```
+
+`~/.config/stackhour/commands/review.toml`:
+
+```toml
+description = "Review a path with the review skill"
+aliases     = ["rv"]
+kind        = "skill"
+skill       = "review"
+```
+
+Then `/review src/api the error paths`:
+
+1. binds `path = "src/api"` and `focus = "the error paths"`;
+2. runs the `pre` hook — `git diff --quiet -- src/api`. If the path has
+   uncommitted changes the hook exits non-zero, the turn is **aborted**, and
+   the chat gets the hook's stderr;
+3. composes the system prompt from `git-hygiene`'s body then `review`'s;
+4. spawns the `reviewer` agent with `WebSearch`, `Write` and `Edit` denied and
+   `REVIEW_STRICT=1` set;
+5. sends the rendered `prompts/review.md` as the user prompt;
+6. runs the `post` hook, logging but not surfacing a failure.
+
+A skill with no `template` sends the raw argument string exactly as typed,
+which is what a skill with only a `description` has always done.
+
+Errors name the file and the key like everything else in the registry:
+
+```
+skills/review/skill.toml: key `hooks.pre`: argv entries must be non-empty strings
+skills/review/skill.toml: key `args[0].rest`: only the LAST argument may set rest = true ('path' is followed by 'focus')
+skills/review/skill.toml: key `uses`: skill 'review' cannot use itself
+```
+
+and an invocation error is answered in the chat, naming the argument:
+
+```
+/review: key `path`: missing required argument 'path' (file or directory to review)
+```
+
 ## Security
 
 This is intentionally a remote-execution bridge. Protect the Telegram account, bot token, SSH key, and agent credentials as privileged access.

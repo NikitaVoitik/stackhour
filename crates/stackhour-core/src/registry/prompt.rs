@@ -56,7 +56,8 @@ const TPL_HELP: &str = "<b>Claude + Codex bridge</b> (distributed)\n\n\u{1f9e0} 
 /// 'online': the startup banner (coordinator.mjs `poll()`). Vars: engine =
 /// engine label ("Claude"/"Codex"), target = target label, worker =
 /// "online"/"offline".
-const TPL_ONLINE: &str = "\u{1f916} Claude + Codex bridge online. Active: {{engine}} on {{target}}. Mac worker: {{worker}}.";
+const TPL_ONLINE: &str =
+    "\u{1f916} Claude + Codex bridge online. Active: {{engine}} on {{target}}. Mac worker: {{worker}}.";
 
 /// 'status': the /where reply skeleton (coordinator.mjs `statusText()`).
 /// Vars: engine label, target label, session ("<first8>…" or
@@ -109,10 +110,7 @@ pub struct PromptStore {
 /// A template name that is safe to map to `prompts/<name>.md`: non-empty, no
 /// path separators, not dot-prefixed (editor artifacts / traversal).
 fn safe_name(name: &str) -> bool {
-    !name.is_empty()
-        && !name.starts_with('.')
-        && !name.contains('/')
-        && !name.contains('\\')
+    !name.is_empty() && !name.starts_with('.') && !name.contains('/') && !name.contains('\\')
 }
 
 impl PromptStore {
@@ -407,7 +405,10 @@ mod tests {
     fn missing_dir_or_file_falls_back_to_builtin() {
         let dir = tmpdir();
         let store = store_over(&dir.path().join("prompts")); // dir absent
-        assert_eq!(store.render("transcribing", &[]), "🎙️ Transcribing voice message…");
+        assert_eq!(
+            store.render("transcribing", &[]),
+            "🎙️ Transcribing voice message…"
+        );
         assert!(store.has("transcribing"));
         assert!(!store.has("deploy"));
     }
@@ -420,13 +421,11 @@ mod tests {
         let store = store_over(dir.path());
         assert_eq!(store.render("transcribing", &[]), "OVERRIDDEN");
         fs::remove_file(&path).unwrap();
-        assert_eq!(store.render("transcribing", &[]), "🎙️ Transcribing voice message…");
-        assert!(store
-            .cache
-            .lock()
-            .unwrap()
-            .get("transcribing")
-            .is_none());
+        assert_eq!(
+            store.render("transcribing", &[]),
+            "🎙️ Transcribing voice message…"
+        );
+        assert!(store.cache.lock().unwrap().get("transcribing").is_none());
     }
 
     #[test]

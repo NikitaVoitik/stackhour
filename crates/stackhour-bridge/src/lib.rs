@@ -15,6 +15,7 @@ pub mod keyboard;
 pub mod media;
 pub mod registry_ctx;
 pub mod render;
+pub mod skills;
 pub mod souls;
 pub mod state;
 pub mod telegram;
