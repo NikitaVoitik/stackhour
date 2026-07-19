@@ -202,11 +202,7 @@ pub fn build_argv(def: &EngineDef, req: &RunRequest) -> Vec<String> {
 }
 
 /// Run the engine to completion, streaming activity lines to `activity`.
-pub fn run_engine(
-    def: &EngineDef,
-    req: RunRequest,
-    activity: Option<mpsc::Sender<String>>,
-) -> RunResult {
+pub fn run_engine(def: &EngineDef, req: RunRequest, activity: Option<mpsc::Sender<String>>) -> RunResult {
     let (_job, handle) = spawn_engine(def, req, activity);
     handle.join().unwrap_or_else(|_| RunResult {
         error: Some("engine reader thread panicked".to_string()),
@@ -408,8 +404,7 @@ impl StreamState {
         }
         match ev.get("type").and_then(|v| v.as_str()) {
             Some("assistant") => {
-                let Some(content) = ev.pointer("/message/content").and_then(|c| c.as_array())
-                else {
+                let Some(content) = ev.pointer("/message/content").and_then(|c| c.as_array()) else {
                     return;
                 };
                 let t: String = content
@@ -454,8 +449,7 @@ impl StreamState {
             return;
         }
         let item = ev.get("item");
-        let is_message = item.and_then(|i| i.get("type")).and_then(|v| v.as_str())
-            == Some("agent_message");
+        let is_message = item.and_then(|i| i.get("type")).and_then(|v| v.as_str()) == Some("agent_message");
         if ty == "item.completed" && is_message {
             let msg = item
                 .and_then(|i| i.get("text"))
@@ -550,10 +544,8 @@ mod tests {
             StreamKind::CodexJsonl,
             &[
                 &json!({"type":"thread.started","thread_id":"t-1"}).to_string(),
-                &json!({"type":"item.completed","item":{"type":"agent_message","text":"one"}})
-                    .to_string(),
-                &json!({"type":"item.completed","item":{"type":"agent_message","text":"two"}})
-                    .to_string(),
+                &json!({"type":"item.completed","item":{"type":"agent_message","text":"one"}}).to_string(),
+                &json!({"type":"item.completed","item":{"type":"agent_message","text":"two"}}).to_string(),
             ],
         );
         assert_eq!(r.session_id.as_deref(), Some("t-1"));
@@ -578,5 +570,4 @@ mod tests {
         );
         assert_eq!(r.text, "ok");
     }
-
 }

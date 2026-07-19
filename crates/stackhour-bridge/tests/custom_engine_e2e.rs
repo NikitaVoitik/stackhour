@@ -419,7 +419,11 @@ fn a_config_only_engine_can_be_stopped_through_the_running_job_handle() {
     job.terminate();
 
     let result = handle.join().expect("runner thread");
-    assert_ne!(result.code, Some(0), "the child should not have run to completion");
+    assert_ne!(
+        result.code,
+        Some(0),
+        "the child should not have run to completion"
+    );
     // Terminating an already-reaped job is a no-op, not a panic.
     job.terminate();
 }

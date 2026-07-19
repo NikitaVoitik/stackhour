@@ -479,7 +479,11 @@ const MEDIA_PLACEHOLDERS: &[Placeholder] = &[
     ph("kind", "`image` or `video`", false),
     ph("mime", "the attachment MIME type", false),
     ph("name", "the attachment file name", false),
-    ph("path", "absolute path of the downloaded file on the engine's box", true),
+    ph(
+        "path",
+        "absolute path of the downloaded file on the engine's box",
+        true,
+    ),
 ];
 
 #[cfg(test)]

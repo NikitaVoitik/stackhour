@@ -252,10 +252,12 @@ impl LocalLane {
         let _ = self.tg.typing();
 
         let Some(def) = self.ctx.engine(&job.engine) else {
-            let msg = self
-                .ctx
-                .prompt(tpl::ERROR_GENERIC, &[("error", &format!("unknown engine {}", job.engine))]);
-            self.ctx.log(&format!("drainLocal err unknown engine {}", job.engine));
+            let msg = self.ctx.prompt(
+                tpl::ERROR_GENERIC,
+                &[("error", &format!("unknown engine {}", job.engine))],
+            );
+            self.ctx
+                .log(&format!("drainLocal err unknown engine {}", job.engine));
             status.fail(&msg);
             return;
         };
@@ -493,7 +495,11 @@ impl StatusMessage {
                 // update sends a fresh message — the JS does the same, and a
                 // long job against a failing API will spam status messages.
                 let sent = self.tg.send_message(&txt, None, Some(&extra));
-                if let Some(id) = sent.as_ref().and_then(|m| m.get("message_id")).and_then(Value::as_i64) {
+                if let Some(id) = sent
+                    .as_ref()
+                    .and_then(|m| m.get("message_id"))
+                    .and_then(Value::as_i64)
+                {
                     if let Ok(mut shared) = self.shared.lock() {
                         shared.message_id = Some(id);
                     }
@@ -628,10 +634,7 @@ mod tests {
             None
         }
         fn set_session(&self, t: &str, e: &str, _a: Option<&str>, id: Option<String>) {
-            self.sessions
-                .lock()
-                .unwrap()
-                .push((t.into(), e.into(), id));
+            self.sessions.lock().unwrap().push((t.into(), e.into(), id));
         }
         fn log(&self, line: &str) {
             self.logs.lock().unwrap().push(line.to_string());
