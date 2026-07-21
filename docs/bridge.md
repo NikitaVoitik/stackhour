@@ -4,13 +4,16 @@
 > bridge (`src/bridge/*.mjs`), reached through the `bin/stackhour` launcher.
 > That is the working implementation — use it.
 >
-> The Rust port of the bridge (`crates/stackhour-bridge`) is **partially
-> runnable**. `bridge migrate`, `bridge claim`, `bridge return`,
-> `bridge coordinator` and `bridge worker` exist and run; `bridge install`,
-> `bridge doctor`, `bridge status` and `bridge restart` are still `todo!()` and
-> exit 1 with `` `bridge` is not implemented in the Rust port yet ``. So the
-> install instructions below still do not work with the Rust binary — the
-> systemd unit has to be written by hand.
+> The Rust port of the bridge (`crates/stackhour-bridge`) implements the full
+> verb surface: `bridge migrate`, `bridge claim`, `bridge return`,
+> `bridge coordinator`, `bridge worker`, `bridge tg-send`, and the operator
+> CLI — `bridge install`, `bridge doctor`, `bridge status`,
+> `bridge restart`. The install instructions below therefore work with the
+> Rust binary too, with one deliberate difference: instead of copying the
+> `.mjs` files, the Rust installer copies the running `stackhour` binary into
+> the runtime dir (the service units exec it directly — no Node needed for
+> the daemons) plus node-runnable `claim.mjs`/`return.mjs`/`tg-send.mjs`
+> shims so a Node counterpart on the other machine keeps working unchanged.
 >
 > The Rust coordinator has not yet been run against the real bot token. See
 > [docs/bridge-migration.md](bridge-migration.md) for the cutover runbook, the

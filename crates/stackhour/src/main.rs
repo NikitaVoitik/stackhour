@@ -177,8 +177,9 @@ fn main() -> ExitCode {
                 }
             }
         }
-        // Verbs that exist in the Node CLI but are not ported yet. Kept
-        // distinct from the help path so we never silently claim parity.
+        // The bridge family. Hidden wire/daemon verbs are routed here;
+        // everything else falls through to the operator CLI (cli.mjs
+        // runBridgeCli): install/doctor/status/restart plus the usage banner.
         "bridge" => match tail.first().map(String::as_str) {
             // The one bridge verb that is ported. It touches no network and
             // starts no poller, so it is safe to run beside the live Node
@@ -231,10 +232,16 @@ fn main() -> ExitCode {
                     stackhour_bridge::worker::run_worker(&paths)
                 }
             }
-            _ => {
-                eprintln!("stackhour: `{cmd}` is not implemented in the Rust port yet");
-                ExitCode::FAILURE
+            // The one-shot notifier (fully ported + tested in tgsend.rs).
+            // Node ran it as a standalone script, so its args are everything
+            // after the verb.
+            Some("tg-send") => {
+                ExitCode::from(stackhour_bridge::tgsend::run_tg_send(&tail[1..]) as u8)
             }
+            // install | doctor | status | restart, plus -h/--help and the
+            // usage-on-stderr exit(1) for anything unknown — exactly what
+            // cli.js hands to `runBridgeCli(process.argv.slice(3))`.
+            _ => ExitCode::from(stackhour_bridge::installer::run_bridge_cli(&tail) as u8),
         },
         // Node's `default:` case — an unknown verb (or none) prints usage and
         // exits 0. `loadConfig()` runs BEFORE the switch in cli.js, so a
