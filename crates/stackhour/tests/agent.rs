@@ -1,3 +1,7 @@
+#![cfg(all(feature = "tracker", feature = "agent"))]
+// Every test here drives a verb that only exists when the module(s) named
+// above are compiled in. Without the file-level gate a reduced-feature
+// `cargo test` would run them against a binary that answers exit 2.
 //! End-to-end agent tests against a real `stackhour serve`.
 //!
 //! This is the scenario the agent exists for and the one that was previously

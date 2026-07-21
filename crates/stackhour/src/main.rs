@@ -13,12 +13,15 @@
 use std::process::ExitCode;
 
 mod args;
+#[cfg(feature = "bridge")]
 mod bridge_migrate;
 mod doctor;
 mod doctor_checks;
 mod init;
 mod install;
+#[cfg(feature = "tracker")]
 mod status;
+#[cfg(feature = "tracker")]
 mod token;
 
 /// The help text body (everything before the trailing dynamic
@@ -72,11 +75,97 @@ fn deferred(cmd: &str, result: stackhour_core::Result<()>) -> ExitCode {
     }
 }
 
+/// The modules compiled into this binary — Layer 1.
+///
+/// The Cargo feature names and the `modules` config sub-keys are deliberately
+/// the same three strings (`Module::name`), so one identifier names both
+/// layers. A default build turns all three on and therefore resolves to
+/// `ModuleSet::ALL`, which is exactly what the gate treats as "no opinion".
+fn compiled_modules() -> stackhour_core::modules::ModuleSet {
+    stackhour_core::modules::ModuleSet::new(
+        cfg!(feature = "tracker"),
+        cfg!(feature = "agent"),
+        cfg!(feature = "bridge"),
+    )
+}
+
+/// Both gate layers plus the config file the runtime one came from, resolved
+/// from the process environment. The ONLY place the ambient environment is
+/// consulted for module state; everything downstream takes the context as an
+/// argument so it stays testable in a tempdir.
+fn gate_context() -> stackhour_core::modules::GateContext {
+    let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+    stackhour_core::modules::GateContext::from_config_file(compiled_modules(), paths.config_path)
+}
+
+/// Layer 1 (compile-time) + Layer 2 (runtime) gate, run BEFORE the dispatch
+/// match so a `#[cfg]`-removed arm can never fall through to the exit-0
+/// usage banner.
+///
+/// DELIBERATE DIVERGENCE (no Node original). Two properties are load-bearing:
+///   * verbs that map to no module (doctor, the help/default arm, unknown
+///     verbs) return early WITHOUT touching the filesystem, so stderr stays
+///     clean on the help path and doctor keeps surviving a corrupt config;
+///   * the runtime read is LENIENT, so a corrupt config.json still fails
+///     inside the verb with today's message and exit 1, not here.
+fn module_gate(cmd: &str, tail: &[String]) -> Option<ExitCode> {
+    use stackhour_core::modules;
+    let sub = tail.first().map(String::as_str);
+    modules::module_for(cmd, sub)?;
+    let msg = gate_context().refusal(cmd, sub)?;
+    eprintln!("{msg}");
+    Some(ExitCode::from(modules::GATED_EXIT_CODE))
+}
+
+/// One `note:` line per module that is OFF at either layer, printed after the
+/// `config: <path>` line of the usage banner.
+///
+/// DELIBERATE DIVERGENCE (no Node original). `HELP` stays a `const` and stays
+/// byte-identical — filtering the pinned banner would break
+/// `help_body_matches_the_node_fixture` and `tests-fixtures/help.txt`. Instead
+/// the verbs stay listed and a note explains why some of them will not run.
+///
+/// Returns immediately when nothing is off, which is the prime constraint:
+/// a default build reading a config with no `modules` key must print exactly
+/// what it printed before modules existed. Everything goes to STDOUT; the
+/// help path keeps stderr clean.
+///
+/// The config path is deliberately NOT repeated here — the `config: <path>`
+/// line directly above already names the file the notes are talking about.
+fn print_module_notes(runtime: stackhour_core::modules::ModuleSet) {
+    use stackhour_core::modules::{Module, ModuleSet};
+    let compiled = compiled_modules();
+    if runtime == ModuleSet::ALL && compiled == ModuleSet::ALL {
+        return;
+    }
+    println!();
+    // Layer 1 first, exactly as `modules::gate` resolves it: a module that is
+    // neither compiled nor enabled must send the reader to `cargo build`.
+    for m in Module::ALL {
+        if !compiled.contains(m) {
+            println!(
+                "note: the {} module was not compiled into this binary; its commands above exit 2.",
+                m.name()
+            );
+        } else if !runtime.contains(m) {
+            println!(
+                "note: the {} module is disabled by \"{}\": false; its commands above exit 2.",
+                m.name(),
+                m.config_key()
+            );
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args().collect();
     let cmd = argv.get(1).map(String::as_str).unwrap_or("");
     // `process.argv.slice(3)` — every verb parses its own tail.
     let tail: Vec<String> = argv.iter().skip(2).cloned().collect();
+
+    if let Some(code) = module_gate(cmd, &tail) {
+        return code;
+    }
 
     match cmd {
         // ---------------------------------------------------------------
@@ -93,8 +182,18 @@ fn main() -> ExitCode {
             }
         }
         "init" => deferred("init", init::run_init(&tail)),
+        // No `#[cfg(not(...))]` twin arms: `module_gate` runs before this
+        // match and has already returned exit 2 for any verb whose module is
+        // not compiled in, so a removed arm can never fall through to `_` and
+        // print the usage banner with exit 0.
+        //
+        // DELIBERATE DIVERGENCE: `status` and `token` link no tracker crate
+        // and would compile fine without the feature. They are gated anyway
+        // so that "tracker off" means the same thing at both layers.
+        #[cfg(feature = "tracker")]
         "token" => deferred("token", token::run_token(&tail)),
         "install" => deferred("install", install::run_install(&tail)),
+        #[cfg(feature = "tracker")]
         "data" | "backup" => {
             // These two DO need a config, but Node still dispatches them
             // before the shared `loadConfig()` so they own their own error
@@ -114,6 +213,7 @@ fn main() -> ExitCode {
         // Verbs below the `const cfg = loadConfig()` line: a corrupt
         // config.json fails HERE rather than inside the verb.
         // ---------------------------------------------------------------
+        #[cfg(feature = "tracker")]
         "serve" => {
             let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
             let cfg = match stackhour_core::config::load_config(&paths.config_path) {
@@ -131,6 +231,7 @@ fn main() -> ExitCode {
                 }
             }
         }
+        #[cfg(feature = "tracker")]
         "status" => {
             let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
             let cfg = match stackhour_core::config::load_config(&paths.config_path) {
@@ -146,6 +247,7 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         }
+        #[cfg(feature = "agent")]
         "agent" => {
             let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
             let result = stackhour_core::config::load_config(&paths.config_path)
@@ -158,6 +260,7 @@ fn main() -> ExitCode {
                 }
             }
         }
+        #[cfg(feature = "tracker")]
         "import-wakatime" => {
             let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
             // Node: `process.argv.find(a => a.startsWith('--days='))` — the
@@ -180,6 +283,7 @@ fn main() -> ExitCode {
         // The bridge family. Hidden wire/daemon verbs are routed here;
         // everything else falls through to the operator CLI (cli.mjs
         // runBridgeCli): install/doctor/status/restart plus the usage banner.
+        #[cfg(feature = "bridge")]
         "bridge" => match tail.first().map(String::as_str) {
             // The one bridge verb that is ported. It touches no network and
             // starts no poller, so it is safe to run beside the live Node
@@ -253,12 +357,24 @@ fn main() -> ExitCode {
         // corrupt config.json must fail here rather than print help.
         _ => {
             let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
-            if let Err(err) = stackhour_core::config::load_config(&paths.config_path) {
-                eprintln!("stackhour: {err}");
-                return ExitCode::FAILURE;
-            }
+            // The Ok value is BOUND rather than discarded only so the module
+            // notes can read `cfg.modules`. The error branch is byte-identical
+            // to the `if let Err` form it replaces, so a corrupt config.json
+            // still fails here with today's message and exit 1.
+            let cfg = match stackhour_core::config::load_config(&paths.config_path) {
+                Ok(cfg) => cfg,
+                Err(err) => {
+                    eprintln!("stackhour: {err}");
+                    return ExitCode::FAILURE;
+                }
+            };
             print!("{HELP}");
             println!("config: {}", paths.config_path.display());
+            // Module-aware help WITHOUT touching the pinned banner: the notes
+            // print only when something is off, so the default build against a
+            // config with no `modules` key emits byte-identical stdout and the
+            // `ends_with("config: <path>")` contract holds.
+            print_module_notes(cfg.modules);
             ExitCode::SUCCESS
         }
     }
@@ -268,6 +384,7 @@ fn main() -> ExitCode {
 ///
 /// `--runtime-dir <dir>` comes from argv so it is the caller's job, exactly as
 /// in cli.mjs; everything below it is [`BridgePaths::resolve`]'s.
+#[cfg(feature = "bridge")]
 fn runtime_dir_from(args: &[String]) -> Result<std::path::PathBuf, String> {
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -288,6 +405,7 @@ fn runtime_dir_from(args: &[String]) -> Result<std::path::PathBuf, String> {
 ///
 /// `return.mjs` reads a bare `argv[2]`; the Rust verb additionally accepts the
 /// runtime-dir flag either side of the id.
+#[cfg(feature = "bridge")]
 fn positional_after(args: &[String]) -> Option<String> {
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -305,12 +423,18 @@ fn positional_after(args: &[String]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{positional_after, runtime_dir_from, HELP};
+    use super::HELP;
+    // Split out from the `HELP` import so the pinned help-body test stays
+    // ungated: these two helpers only exist in a bridge build.
+    #[cfg(feature = "bridge")]
+    use super::{positional_after, runtime_dir_from};
 
+    #[cfg(feature = "bridge")]
     fn argv(parts: &[&str]) -> Vec<String> {
         parts.iter().map(|s| s.to_string()).collect()
     }
 
+    #[cfg(feature = "bridge")]
     #[test]
     fn the_return_id_is_found_around_the_runtime_dir_flag() {
         assert_eq!(positional_after(&argv(&["abc"])).as_deref(), Some("abc"));
@@ -326,6 +450,7 @@ mod tests {
         assert_eq!(positional_after(&argv(&[])), None);
     }
 
+    #[cfg(feature = "bridge")]
     #[test]
     fn an_explicit_runtime_dir_beats_the_environment() {
         let args: Vec<String> = ["--runtime-dir", "/tmp/rt"]
@@ -337,6 +462,7 @@ mod tests {
 
     /// A bare `--runtime-dir` must not silently resolve to the default and
     /// point a daemon at the wrong jobs directory.
+    #[cfg(feature = "bridge")]
     #[test]
     fn a_runtime_dir_flag_without_a_value_is_an_error() {
         let args = vec!["--runtime-dir".to_string()];
@@ -353,5 +479,29 @@ mod tests {
         let fixture = include_str!("../../../tests-fixtures/help.txt");
         let body = &fixture[..fixture.rfind("config: ").expect("fixture has a config: line")];
         assert_eq!(HELP, body);
+    }
+
+    /// Layer 1 has exactly one source of truth. If someone renames a feature
+    /// or forgets to wire a new one into `compiled_modules`, a reduced build
+    /// would silently report a module as present and then hit a `#[cfg]`-ed
+    /// away arm — the one failure mode the gate exists to prevent.
+    #[test]
+    fn the_compiled_set_reflects_the_cargo_features() {
+        let set = super::compiled_modules();
+        assert_eq!(set.tracker, cfg!(feature = "tracker"));
+        assert_eq!(set.agent, cfg!(feature = "agent"));
+        assert_eq!(set.bridge, cfg!(feature = "bridge"));
+    }
+
+    /// The prime constraint, stated as a test: a default build has every
+    /// module compiled in, so Layer 1 never refuses anything and the binary
+    /// behaves exactly as it did before features existed.
+    #[cfg(all(feature = "tracker", feature = "agent", feature = "bridge"))]
+    #[test]
+    fn a_default_build_compiles_in_every_module() {
+        assert_eq!(
+            super::compiled_modules(),
+            stackhour_core::modules::ModuleSet::ALL
+        );
     }
 }

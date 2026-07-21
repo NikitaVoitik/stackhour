@@ -1,3 +1,8 @@
+#![cfg(feature = "bridge")]
+// Every test here drives a verb that only exists when the bridge module is
+// compiled in, and the file names `stackhour_bridge` directly —
+// so without this gate a reduced build fails to COMPILE, which is the
+// likeliest way a feature break lands looking green.
 //! The bridge operator CLI (`bridge install|doctor|status|restart`) driven
 //! through the BUILT binary, like tests/cli.rs: these verbs previously fell
 //! into the "not implemented in the Rust port yet" catch-all even though the

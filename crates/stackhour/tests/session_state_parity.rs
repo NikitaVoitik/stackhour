@@ -1,3 +1,7 @@
+#![cfg(feature = "bridge")]
+// Every test here drives a verb that only exists when the module(s) named
+// above are compiled in. Without the file-level gate a reduced-feature
+// `cargo test` would run them against a binary that answers exit 2.
 //! Session-state parity with coordinator.mjs, proven by driving the REAL
 //! release/debug binary as a daemon.
 //!
@@ -194,9 +198,18 @@ fn drive(dir: &Path, first_id: i64, commands: &[&str]) -> Vec<String> {
     let api = MockApi::start(updates);
     write_config(dir, &api.base);
 
+    // The coordinator resolves everything from `--runtime-dir`, but the module
+    // gate in main.rs runs before dispatch and reads
+    // `$STACKHOUR_CONFIG` / `$HOME/.config/stackhour/config.json`. An inherited
+    // environment would make this test fail on any box whose config says
+    // `{"modules":{"bridge":false}}` — so HOME points at the throwaway runtime
+    // dir, where no such file exists and the gate fails open.
     let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_stackhour"))
         .args(["bridge", "coordinator", "--runtime-dir"])
         .arg(dir)
+        .env_clear()
+        .env("HOME", dir)
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()

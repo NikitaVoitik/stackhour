@@ -96,6 +96,9 @@ pub struct Config {
     /// `Some` only when the user config declares a `pricing` section
     /// (its presence replaces the whole built-in table — quirk kept).
     pub pricing: Option<PricingTable>,
+    /// Which modules the user's `modules` block leaves enabled. Absent block,
+    /// absent sub-key, or a malformed block = everything enabled.
+    pub modules: crate::modules::ModuleSet,
     pub wakatime: WakatimeCfg,
     /// Storage paths resolved alongside the config (config/data/db locations).
     pub paths: StoragePaths,
@@ -147,6 +150,11 @@ fn defaults_with(db_path: &str, machine: &str) -> Value {
         "summary": { "capSeconds": 120, "lastEventCreditSeconds": 60, "reattributeWindowSeconds": 120, "joinGapSeconds": 300 },
         // pricing deliberately ABSENT (JS `pricing: undefined`): a user table
         // replaces the whole built-in one because deepMerge sees no base object.
+        //
+        // `modules` is likewise deliberately ABSENT. Adding it here would insert
+        // a new root key into every Config.raw (changing key order and making an
+        // absent-key config distinguishable from today) and would make a user
+        // block merge per-key instead of landing verbatim. DO NOT ADD IT.
         "wakatime": { "apiKey": "" },
     })
 }
@@ -533,6 +541,10 @@ fn load_config_with(
     let agent = build_agent(&raw);
     let summary = build_summary(&raw);
     let pricing = build_pricing(&raw);
+    // Read post-merge like `pricing`; NEVER mutate `raw` and NEVER fail —
+    // `load_config` has exactly two failure modes (IO, parse) and a third
+    // would change `stackhour help`/`serve`/`status`/`doctor` for malformed input.
+    let modules = crate::modules::from_raw(&raw);
     let wakatime = WakatimeCfg {
         api_key: string_field(raw.get("wakatime"), "apiKey", ""),
     };
@@ -543,6 +555,7 @@ fn load_config_with(
         agent,
         summary,
         pricing,
+        modules,
         wakatime,
         paths: storage,
     })
@@ -982,5 +995,47 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.agent.project_aliases["github.com/a/b"], "myproj");
         assert_eq!(cfg.agent.project_aliases["n"], "7");
+    }
+
+    // ---- modules -------------------------------------------------------
+
+    #[test]
+    fn a_config_without_modules_enables_every_module() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = load_str(&dir, None).unwrap();
+        assert_eq!(cfg.modules, crate::modules::ModuleSet::ALL);
+        let cfg = load_str(&dir, Some(r#"{ "server": { "port": 1 } }"#)).unwrap();
+        assert_eq!(cfg.modules, crate::modules::ModuleSet::ALL);
+        assert!(cfg.raw.get("modules").is_none());
+    }
+
+    /// `modules` must stay out of DEFAULTS for the same reason `pricing` does:
+    /// a config with no `modules` key must be indistinguishable from today.
+    #[test]
+    fn modules_is_absent_from_the_defaults_table() {
+        assert!(defaults().get("modules").is_none());
+        assert!(defaults_with("/data/stackhour.db", "mach")
+            .get("modules")
+            .is_none());
+    }
+
+    #[test]
+    fn a_user_modules_block_lands_in_raw_verbatim_and_last() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = load_str(&dir, Some(r#"{ "modules": { "bridge": false } }"#)).unwrap();
+        let keys: Vec<&String> = cfg.raw.as_object().unwrap().keys().collect();
+        assert_eq!(keys.last().unwrap().as_str(), "modules");
+        assert_eq!(cfg.raw["modules"], json!({ "bridge": false }));
+    }
+
+    #[test]
+    fn a_disabled_module_reaches_the_typed_view() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = load_str(&dir, Some(r#"{ "modules": { "bridge": false } }"#)).unwrap();
+        assert_eq!(cfg.modules, crate::modules::ModuleSet::new(true, true, false));
+        assert!(!cfg.modules.contains(crate::modules::Module::Bridge));
+        // A malformed block still fails open.
+        let cfg = load_str(&dir, Some(r#"{ "modules": 3 }"#)).unwrap();
+        assert_eq!(cfg.modules, crate::modules::ModuleSet::ALL);
     }
 }

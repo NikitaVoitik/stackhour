@@ -15,6 +15,7 @@ use crate::doctor::{Check, CheckStatus, DoctorOpts};
 use serde_json::Value;
 use stackhour_core::config::Config;
 use stackhour_core::jsnum::js_round_f64;
+use stackhour_core::modules::{Module, ModuleSet};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -53,6 +54,12 @@ fn runtime_check() -> Check {
 
 /// The 'sqlite' check — the Rust build links SQLite statically, so this is
 /// an availability report rather than a dynamic-import probe.
+///
+/// Gated on the two modules that actually link rusqlite: the tracker (via
+/// stackhour-store) and the agent (its own Zed `threads.db` snapshot).
+/// Reporting "sqlite available" from a bridge-only binary that has no SQLite
+/// in it would be a lie, so the check is absent there instead.
+#[cfg(any(feature = "tracker", feature = "agent"))]
 fn sqlite_check() -> Check {
     match rusqlite::Connection::open_in_memory() {
         Result::Ok(_) => Check::new("sqlite", StatusOk, "sqlite available"),
@@ -238,6 +245,10 @@ fn input_checks(cfg: &Config, opts: &DoctorOpts, out: &mut Vec<Check>) {
     }
 }
 
+/// Probes `cfg.server.db`, which is a tracker artifact — a build without the
+/// tracker feature has no server database to check, and rusqlite may not even
+/// be linked.
+#[cfg(feature = "tracker")]
 fn database_check(cfg: &Config) -> Check {
     let db = &cfg.server.db;
     if !db.exists() {
@@ -456,20 +467,79 @@ fn services_check(out: &mut Vec<Check>) {
     }
 }
 
+/// Append one status line per module that is OFF at either layer.
+///
+/// DELIBERATE DIVERGENCE (no Node original): Node's doctor has no notion of
+/// modules. Emits NOTHING when everything is on, which is what keeps a
+/// default build against a config with no `modules` key byte-identical — and
+/// what keeps `check_order_matches_the_node_inventory` green untouched.
+///
+/// Status is always `Ok`: a deliberate operator choice is not a fault, and an
+/// `Error` here would make a healthy bridge-only box start exiting 1. The
+/// lines exist so nobody debugs a deliberately absent `database` check as a
+/// broken install.
+///
+/// Layer 1 is reported INSTEAD of Layer 2 when both are off, matching
+/// `modules::gate`: recompiling is the only remedy, so sending the operator
+/// to config.json would be the wrong instruction.
+///
+/// Split out as `pub` (like `agent_report_checks`) so tests can drive both
+/// layers hermetically without a `DoctorOpts` change.
+pub fn module_checks(
+    runtime: ModuleSet,
+    compiled: ModuleSet,
+    config_path: &Path,
+    out: &mut Vec<Check>,
+) {
+    for m in Module::ALL {
+        if !compiled.contains(m) {
+            out.push(Check::new(
+                &format!("module-{}", m.name()),
+                StatusOk,
+                format!(
+                    "not compiled into this binary (rebuild with --features {})",
+                    m.name()
+                ),
+            ));
+        } else if !runtime.contains(m) {
+            out.push(Check::new(
+                &format!("module-{}", m.name()),
+                StatusOk,
+                format!(
+                    "disabled by \"{}\": false in {}",
+                    m.config_key(),
+                    config_path.display()
+                ),
+            ));
+        }
+    }
+}
+
 /// Build the full ordered check list.
 pub fn all_checks(cfg: Result<&Config, &str>, opts: &DoctorOpts) -> Vec<Check> {
-    let mut out = vec![runtime_check(), sqlite_check()];
+    // Positions are load-bearing: a default build must still emit
+    // `node, sqlite, config, ...` in exactly today's order, so the two
+    // feature-gated entries are pushed where they have always sat rather than
+    // appended at the end.
+    let mut out = vec![runtime_check()];
+    #[cfg(any(feature = "tracker", feature = "agent"))]
+    out.push(sqlite_check());
     config_checks(cfg, opts, &mut out);
     data_dir_checks(opts, &mut out);
 
     // Everything below needs a config; a load failure stops the report here,
     // exactly like Node's `if (cfg) { ... }` guard.
     let Result::Ok(cfg) = cfg else {
+        // A config we could not load resolves the RUNTIME layer to all-enabled
+        // (the gate fails open), so a corrupt config still reports the
+        // compile-time layer rather than guessing at the user's block.
+        module_checks(ModuleSet::ALL, crate::compiled_modules(), &opts.config_path, &mut out);
         return out;
     };
     out.push(token_check(cfg));
     project_root_checks(cfg, &mut out);
     input_checks(cfg, opts, &mut out);
+    #[cfg(feature = "tracker")]
     out.push(database_check(cfg));
     if opts.check_server {
         server_checks(cfg, &mut out);
@@ -477,6 +547,10 @@ pub fn all_checks(cfg: Result<&Config, &str>, opts: &DoctorOpts) -> Vec<Check> {
     if opts.check_services {
         services_check(&mut out);
     }
+    // Appended LAST, after `services`, so every existing check keeps its
+    // pinned index. `crate::compiled_modules()` rather than a second copy of
+    // the `cfg!` triple: Layer 1 has exactly one source of truth.
+    module_checks(cfg.modules, crate::compiled_modules(), &opts.config_path, &mut out);
     out
 }
 
@@ -714,6 +788,7 @@ mod tests {
         assert_eq!(find(&out, "zed-input")[0].message, db.display().to_string());
     }
 
+    #[cfg(feature = "tracker")]
     #[test]
     fn database_check_warns_when_absent_and_passes_quick_check() {
         let tmp = TempDir::new().unwrap();
@@ -909,6 +984,14 @@ mod tests {
     }
 
     /// The overall ordering is a documented output contract.
+    ///
+    /// Pinned to the DEFAULT build, for two independent reasons: the list
+    /// below names `sqlite` and `database`, which a build without the tracker
+    /// feature deliberately omits, and it names no `module-*` line, which a
+    /// build missing ANY feature appends (Layer 1 is off, so doctor says so).
+    /// The attribute is the only change — the vector is byte-identical to the
+    /// pre-feature version.
+    #[cfg(all(feature = "tracker", feature = "agent", feature = "bridge"))]
     #[test]
     fn check_order_matches_the_node_inventory() {
         let tmp = TempDir::new().unwrap();
@@ -939,5 +1022,154 @@ mod tests {
                 "database",
             ]
         );
+    }
+
+    // ---- module status lines -------------------------------------------
+
+    fn module_line_names(checks: &[Check]) -> Vec<String> {
+        checks
+            .iter()
+            .filter(|c| c.name.starts_with("module-"))
+            .map(|c| c.name.clone())
+            .collect()
+    }
+
+    /// The prime constraint, stated for doctor: with nothing off there is
+    /// nothing to say, so a default build against a config with no `modules`
+    /// key emits exactly the check list it always has.
+    #[test]
+    fn an_all_enabled_build_appends_no_module_lines() {
+        let mut out = Vec::new();
+        module_checks(
+            ModuleSet::ALL,
+            ModuleSet::ALL,
+            Path::new("/home/u/.config/stackhour/config.json"),
+            &mut out,
+        );
+        assert_eq!(out, Vec::new());
+    }
+
+    #[test]
+    fn a_disabled_module_appends_one_ok_status_line_naming_the_config_key() {
+        let mut out = Vec::new();
+        module_checks(
+            ModuleSet::new(true, true, false),
+            ModuleSet::ALL,
+            Path::new("/home/u/.config/stackhour/config.json"),
+            &mut out,
+        );
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].name, "module-bridge");
+        assert_eq!(out[0].status, StatusOk);
+        assert_eq!(
+            out[0].message,
+            "disabled by \"modules.bridge\": false in /home/u/.config/stackhour/config.json"
+        );
+    }
+
+    /// Layer 1 wins, exactly as `modules::gate` resolves it: a module that is
+    /// neither compiled nor enabled must send the operator to `cargo build`,
+    /// not to config.json, and must say so only once.
+    #[test]
+    fn an_uncompiled_module_is_reported_instead_of_the_disabled_line() {
+        let mut out = Vec::new();
+        module_checks(
+            ModuleSet::new(true, true, false),
+            ModuleSet::new(true, true, false),
+            Path::new("/home/u/.config/stackhour/config.json"),
+            &mut out,
+        );
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].name, "module-bridge");
+        assert_eq!(
+            out[0].message,
+            "not compiled into this binary (rebuild with --features bridge)"
+        );
+        assert!(!out[0].message.contains("config.json"));
+    }
+
+    /// The lines are APPENDED: every pre-existing check keeps its index, so
+    /// no script that reads `checks[n]` breaks.
+    #[test]
+    fn module_lines_are_appended_after_every_existing_check() {
+        let tmp = TempDir::new().unwrap();
+        let opts = opts_for(&tmp);
+        let cfg = config_at(&opts.config_path, r#"{ "modules": { "bridge": false } }"#);
+        let with = all_checks(Result::Ok(&cfg), &opts);
+        let plain = config_at(&opts.config_path, "{}");
+        let without = all_checks(Result::Ok(&plain), &opts);
+        // Everything the plain config reports is a PREFIX of the disabled
+        // one: module lines are appended, never interleaved, so no existing
+        // check changes index.
+        assert_eq!(&with[..without.len()], &without[..]);
+        // Every module line sits at the very tail, below every real check.
+        let first = with.iter().position(|c| c.name.starts_with("module-")).unwrap();
+        assert!(with[first..].iter().all(|c| c.name.starts_with("module-")));
+        // Turning bridge off in the CONFIG is what put a bridge line there —
+        // unless this build has no bridge compiled in, in which case Layer 1
+        // had already claimed the line and wins.
+        let bridge = with.iter().find(|c| c.name == "module-bridge").expect("bridge is off");
+        if crate::compiled_modules().bridge {
+            assert!(bridge.message.starts_with("disabled by \"modules.bridge\""), "{bridge:?}");
+            assert!(!without.iter().any(|c| c.name == "module-bridge"));
+        } else {
+            assert!(bridge.message.starts_with("not compiled"), "{bridge:?}");
+        }
+    }
+
+    /// A deliberate operator choice is not a fault. If these were `Error`,
+    /// every healthy bridge-only leader would start exiting 1.
+    #[test]
+    fn module_lines_never_change_the_exit_code() {
+        let mut out = Vec::new();
+        module_checks(
+            ModuleSet::new(false, false, false),
+            ModuleSet::ALL,
+            Path::new("/home/u/.config/stackhour/config.json"),
+            &mut out,
+        );
+        assert_eq!(out.len(), 3);
+        assert!(out.iter().all(|c| c.status == StatusOk));
+        let report = crate::doctor::Report { checks: out };
+        assert!(report.ok());
+        assert_eq!(report.exit_code(), 0);
+    }
+
+    /// doctor is the diagnostic of last resort: the early return for a config
+    /// it could not load must still say which modules this binary even has.
+    #[test]
+    fn a_corrupt_config_still_reports_the_compile_time_layer() {
+        let tmp = TempDir::new().unwrap();
+        let opts = opts_for(&tmp);
+        std::fs::write(&opts.config_path, "{ not json").unwrap();
+        let out = all_checks(Result::Err("Unexpected token"), &opts);
+        // Whatever this build compiled in, the runtime layer is all-enabled
+        // here, so the ONLY module lines that may appear are Layer 1 ones.
+        for c in out.iter().filter(|c| c.name.starts_with("module-")) {
+            assert!(c.message.starts_with("not compiled into this binary"), "{c:?}");
+        }
+        let expected = ModuleSet::ALL.disabled().len()
+            + crate::compiled_modules().disabled().len();
+        assert_eq!(module_line_names(&out).len(), expected);
+    }
+
+    /// One grep prefix for both layers, so `doctor --json | grep module-`
+    /// finds every off module regardless of which layer switched it off.
+    #[test]
+    fn every_module_line_is_grep_prefixed_with_module_dash() {
+        let mut out = Vec::new();
+        module_checks(
+            ModuleSet::new(false, true, true),
+            ModuleSet::new(true, true, false),
+            Path::new("/home/u/.config/stackhour/config.json"),
+            &mut out,
+        );
+        assert_eq!(
+            module_line_names(&out),
+            vec!["module-tracker".to_string(), "module-bridge".to_string()]
+        );
+        for m in Module::ALL {
+            assert_eq!(format!("module-{}", m.name()).split('-').count(), 2);
+        }
     }
 }

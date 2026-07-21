@@ -10,8 +10,11 @@
 //! directory warns, since `cargo clean` would delete it. Atomic 0644 unit writes; linux
 //! systemctl daemon-reload + enable --now pair; darwin agent-only
 //! bootout(ignored)/bootstrap/enable/kickstart order with the gui/<uid>
-//! domain. `runInstall('server')` installs BOTH roles with exact wording.
+//! domain. `runInstall('server')` installs BOTH roles with exact wording —
+//! and because one of those roles belongs to the agent module and the other
+//! to the tracker, each is checked against the module gate individually.
 
+use stackhour_core::modules::GateContext;
 use stackhour_core::{Error, Result};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -209,31 +212,94 @@ pub fn install_service(role: &str) -> Result<Installed> {
     )))
 }
 
+/// Install every service role that `role` implies, SKIPPING any whose module
+/// is off, then print the "Installed and started ..." summary.
+///
+/// The verb gate in `main.rs` only asks which module the INVOCATION belongs
+/// to, and `install server` belongs to the tracker while installing a
+/// stackhour-agent unit as well. Without this second check, `install server`
+/// on a box with `"modules": { "agent": false }` reported success while
+/// leaving behind a `Restart=always` / `RestartSec=10` unit whose every start
+/// the gate refuses with exit 2 — a crash loop every ten seconds, forever.
+///
+/// Shared by `install <role>` and `init <role> --install` so both entry
+/// points make the same decision from the same registry table
+/// (`modules::service_roles_for`).
+pub fn install_roles_into(
+    role: &str,
+    ctx: &GateContext,
+    out: &mut dyn Write,
+    installer: &dyn Fn(&str) -> Result<()>,
+) -> Result<()> {
+    let mut installed: Vec<&str> = Vec::new();
+    for (service_role, module) in stackhour_core::modules::service_roles_for(role) {
+        let unit = format!("stackhour-{service_role}");
+        match ctx.skip_line_for(*module, &unit) {
+            Some(line) => writeln!(out, "{line}")?,
+            None => {
+                installer(service_role)?;
+                installed.push(service_role);
+            }
+        }
+    }
+    // "stackhour-server and stackhour-agent" when both roles ran — byte-identical
+    // to the line this used to hard-code — and just the surviving one when the
+    // other half was skipped. Nothing installed prints nothing at all, which is
+    // unreachable from the CLI: the verb gate refuses its own module first.
+    if !installed.is_empty() {
+        let units: Vec<String> = installed.iter().map(|r| format!("stackhour-{r}")).collect();
+        writeln!(out, "Installed and started {}", units.join(" and "))?;
+    }
+    Ok(())
+}
+
+// DELIBERATE DIVERGENCE (no Node original): this file reads NO config and
+// consults NO environment. Both gate layers arrive as a `GateContext`
+// argument — from `crate::gate_context()` on the real CLI path and from a
+// literal in every test. Do NOT read `modules` here: `run_install_gated`
+// would stop being drivable in a tempdir, and `init <role> --install` would
+// resolve a different config file than the one it had just written.
+//
+// Two DIFFERENT questions, deliberately answered in two places:
+//   * "may this command run at all?" — main's `module_gate`, by verb+role
+//     (`install server` -> tracker, `install agent` -> agent), exit 2;
+//   * "which service units may it start?" — `modules::service_roles_for`,
+//     consulted per role by `install_roles_into` above, which SKIPS a unit
+//     on stdout and still succeeds.
+// Collapsing them would either refuse `install server` outright on a box
+// that legitimately wants only the tracker, or start a stackhour-agent unit
+// whose every start the gate refuses — and that unit is `Restart=always`.
 /// The `stackhour install <server|agent>` CLI.
 pub fn run_install(args: &[String]) -> Result<()> {
     let mut out = std::io::stdout();
-    run_install_into(args, &mut out, &|role| install_service(role).map(|_| ()))
+    run_install_gated(args, &mut out, &crate::gate_context(), &|role| {
+        install_service(role).map(|_| ())
+    })
 }
 
 /// Injectable form so the exact stdout and the role ORDER can be tested
-/// without touching systemd/launchd.
+/// without touching systemd/launchd, with every module enabled. The real CLI
+/// goes through `run_install_gated` with a context read from config.json, so
+/// this convenience form exists only for the tests below.
+#[cfg(test)]
 pub fn run_install_into(
     args: &[String],
     out: &mut dyn Write,
     installer: &dyn Fn(&str) -> Result<()>,
 ) -> Result<()> {
+    run_install_gated(args, out, &GateContext::all_enabled(), installer)
+}
+
+/// `run_install_into` plus the module context that decides which of the roles
+/// are actually installed.
+pub fn run_install_gated(
+    args: &[String],
+    out: &mut dyn Write,
+    ctx: &GateContext,
+    installer: &dyn Fn(&str) -> Result<()>,
+) -> Result<()> {
     match args.first().map(String::as_str).unwrap_or("") {
-        "server" => {
-            installer("server")?;
-            installer("agent")?;
-            writeln!(out, "Installed and started stackhour-server and stackhour-agent")?;
-            Ok(())
-        }
-        "agent" => {
-            installer("agent")?;
-            writeln!(out, "Installed and started stackhour-agent")?;
-            Ok(())
-        }
+        role @ ("server" | "agent") => install_roles_into(role, ctx, out, installer),
         _ => Err(Error::msg("usage: stackhour install <server|agent>")),
     }
 }
@@ -241,6 +307,7 @@ pub fn run_install_into(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use stackhour_core::modules::ModuleSet;
     use std::cell::RefCell;
 
     fn argv(items: &[&str]) -> Vec<String> {
@@ -330,6 +397,85 @@ mod tests {
         assert_eq!(
             String::from_utf8(out).unwrap(),
             "Installed and started stackhour-agent\n"
+        );
+    }
+
+    /// The regression: `install server` is gated on the TRACKER module, so a
+    /// config with `"modules": { "agent": false }` sails past the verb gate.
+    /// It must not then install a stackhour-agent unit whose every start the
+    /// gate refuses with exit 2 — `Restart=always` turns that into a forever
+    /// crash loop that the command reports as success.
+    #[test]
+    fn install_server_skips_the_agent_service_when_the_agent_module_is_disabled() {
+        let seen = RefCell::new(Vec::new());
+        let installer = |role: &str| {
+            seen.borrow_mut().push(role.to_string());
+            Ok(())
+        };
+        let ctx = GateContext {
+            compiled: ModuleSet::ALL,
+            runtime: ModuleSet::new(true, false, true),
+            config_path: PathBuf::from("/home/u/.config/stackhour/config.json"),
+        };
+        let mut out = Vec::new();
+        run_install_gated(&argv(&["server"]), &mut out, &ctx, &installer).unwrap();
+        assert_eq!(seen.into_inner(), vec!["server"]);
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            "Skipped stackhour-agent: the agent module is disabled by \"modules.agent\": false in /home/u/.config/stackhour/config.json\n\
+             Installed and started stackhour-server\n"
+        );
+    }
+
+    /// Layer 1 gets its own wording, so nobody edits config.json to fix a
+    /// binary that simply has no agent compiled in.
+    #[test]
+    fn install_server_skips_the_agent_service_when_the_agent_module_is_not_compiled() {
+        let seen = RefCell::new(Vec::new());
+        let installer = |role: &str| {
+            seen.borrow_mut().push(role.to_string());
+            Ok(())
+        };
+        let ctx = GateContext {
+            compiled: ModuleSet::new(true, false, true),
+            runtime: ModuleSet::ALL,
+            config_path: PathBuf::from("/home/u/.config/stackhour/config.json"),
+        };
+        let mut out = Vec::new();
+        run_install_gated(&argv(&["server"]), &mut out, &ctx, &installer).unwrap();
+        assert_eq!(seen.into_inner(), vec!["server"]);
+        let out = String::from_utf8(out).unwrap();
+        assert!(
+            out.starts_with(
+                "Skipped stackhour-agent: the agent module was not compiled into this binary (rebuild with --features agent)\n"
+            ),
+            "{out}"
+        );
+        assert!(out.ends_with("Installed and started stackhour-server\n"), "{out}");
+        assert!(!out.contains("config.json"), "{out}");
+    }
+
+    /// An all-enabled context must reproduce today's bytes exactly — this is
+    /// the prime-constraint half of the split.
+    #[test]
+    fn install_server_with_every_module_enabled_is_byte_identical_to_today() {
+        let seen = RefCell::new(Vec::new());
+        let installer = |role: &str| {
+            seen.borrow_mut().push(role.to_string());
+            Ok(())
+        };
+        let mut out = Vec::new();
+        run_install_gated(
+            &argv(&["server"]),
+            &mut out,
+            &GateContext::all_enabled(),
+            &installer,
+        )
+        .unwrap();
+        assert_eq!(seen.into_inner(), vec!["server", "agent"]);
+        assert_eq!(
+            String::from_utf8(out).unwrap(),
+            "Installed and started stackhour-server and stackhour-agent\n"
         );
     }
 

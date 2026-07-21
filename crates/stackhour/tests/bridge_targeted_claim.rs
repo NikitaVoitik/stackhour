@@ -1,3 +1,8 @@
+#![cfg(feature = "bridge")]
+// Every test here drives a verb that only exists when the bridge module is
+// compiled in, and the file `use`s `stackhour_bridge` at the top level —
+// so without this gate a reduced build fails to COMPILE, which is the
+// likeliest way a feature break lands looking green.
 //! `stackhour bridge claim <target>` — the targeted half of the pull-worker
 //! protocol, driven through the REAL compiled binary.
 //!
@@ -26,10 +31,29 @@ fn runtime() -> (tempfile::TempDir, BridgePaths) {
     (dir, paths)
 }
 
+/// The binary, spawned in an ISOLATED environment.
+///
+/// `bridge claim` / `bridge return` resolve everything they touch from
+/// `--runtime-dir`, but the module gate in main.rs runs before dispatch and
+/// reads `$STACKHOUR_CONFIG` / `$HOME/.config/stackhour/config.json` to decide
+/// whether the bridge module is switched on. With an inherited environment
+/// these wire-compat tests would therefore fail on exactly the machine this
+/// feature exists for — a box whose config.json says
+/// `{"modules":{"bridge":false}}` — testing the developer's config instead of
+/// the runtime-dir protocol. HOME points at the throwaway runtime dir, where
+/// no `.config/stackhour/config.json` exists, so the gate always fails open.
+fn cli(args: &[&str], dir: &Path) -> Command {
+    let mut cmd = Command::new(BIN);
+    cmd.args(args)
+        .env_clear()
+        .env("HOME", dir)
+        .env("PATH", std::env::var("PATH").unwrap_or_default());
+    cmd
+}
+
 /// `stackhour bridge claim [target] --runtime-dir <dir>` → (exit, stdout).
 fn cli_claim(dir: &Path, target: Option<&str>) -> (i32, String) {
-    let mut cmd = Command::new(BIN);
-    cmd.args(["bridge", "claim"]);
+    let mut cmd = cli(&["bridge", "claim"], dir);
     if let Some(t) = target {
         cmd.arg(t);
     }

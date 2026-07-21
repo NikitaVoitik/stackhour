@@ -2,14 +2,17 @@
 //!
 //! NO sqlite, NO http in this crate. JS-semantics helpers, storage paths,
 //! atomic fs rituals, config load/merge, time parsing, pricing, git-based
-//! project canonicalisation, machine tokens / enrollment, and the Layer-2
-//! config-directory registry.
+//! project canonicalisation, machine tokens / enrollment, the Layer-2
+//! config-directory registry, and the compile-time/runtime module gate
+//! (`modules` — not to be confused with `registry`, the config-directory
+//! registry).
 
 use std::fmt;
 
 pub mod config;
 pub mod fsutil;
 pub mod jsnum;
+pub mod modules;
 pub mod paths;
 pub mod pricing;
 pub mod project;

@@ -8,7 +8,9 @@
 //! init_agent: --enrollment XOR explicit flags with the machine!==hostname
 //! loophole quirk, STACKHOUR_TOKEN env fallback. Exact runInit stdout
 //! including --install chaining and the 'Next:' hint lines. Secrets are
-//! never printed.
+//! never printed. `--install` routes through `install::install_roles_into`,
+//! so a service whose module is switched off is skipped rather than started
+//! into a crash loop.
 
 use crate::args::{has_flag, last_option, option_values};
 use serde_json::{json, Map, Value};
@@ -280,6 +282,19 @@ pub fn run_init(args: &[String]) -> Result<()> {
     })
 }
 
+/// The module context an `--install` decides against, read from the SAME
+/// config file this invocation writes to.
+///
+/// Deliberately NOT `crate::gate_context()`: that consults the process
+/// environment, which would make `run_init_into`'s tempdir config a lie and
+/// couple every init test to the developer's own `~/.config/stackhour`.
+fn install_context(config_path: &Path) -> stackhour_core::modules::GateContext {
+    stackhour_core::modules::GateContext::from_config_file(
+        crate::compiled_modules(),
+        config_path.to_path_buf(),
+    )
+}
+
 /// Injectable form: the config path, the stdout sink, and the installer are
 /// parameters so tests can drive the exact `runInit` output without touching
 /// the real HOME or launching services.
@@ -311,9 +326,18 @@ pub fn run_init_into(
             writeln!(out, "Public URL: {}", str_field(server, "publicUrl"))?;
             writeln!(out, "Local agent enrolled as {}", str_field(agent, "machine"))?;
             if install {
-                installer("server")?;
-                installer("agent")?;
-                writeln!(out, "Installed and started stackhour-server and stackhour-agent")?;
+                // `init server --install` starts a stackhour-agent unit too,
+                // so the agent module gets its own say — see
+                // `install::install_roles_into`.
+                //
+                // The injected installer CLOSURE is never gated, and must not
+                // be: it reaches `install_service` directly, bypassing main's
+                // `install` arm entirely, so a gate around the call site here
+                // would fire on the init path and change a pinned output line.
+                // Which roles it is handed is decided in ONE place
+                // (`modules::service_roles_for`) so `init server --install`
+                // and `install server` can never disagree.
+                crate::install::install_roles_into("server", &install_context(config_path), out, installer)?;
             }
             writeln!(out, "Next: ./bin/stackhour token create <machine>")?;
             Ok(())
@@ -347,8 +371,7 @@ pub fn run_init_into(
                 str_field(agent, "serverUrl")
             )?;
             if install {
-                installer("agent")?;
-                writeln!(out, "Installed and started stackhour-agent")?;
+                crate::install::install_roles_into("agent", &install_context(config_path), out, installer)?;
             }
             writeln!(out, "Next: ./bin/stackhour doctor")?;
             Ok(())
@@ -608,6 +631,12 @@ mod tests {
     }
 
     /// `--install` chains BOTH roles for a server, in order, and adds a line.
+    ///
+    /// Pinned to a build that has both units' modules compiled in: `--install`
+    /// routes through `install::install_roles_into`, which asks Layer 1 as
+    /// well, so a binary without the agent feature legitimately installs only
+    /// the server. Attribute only — the assertions are unchanged.
+    #[cfg(all(feature = "tracker", feature = "agent"))]
     #[test]
     fn run_init_server_with_install_chains_both_roles() {
         use std::cell::RefCell;
@@ -624,6 +653,43 @@ mod tests {
         assert!(String::from_utf8(out)
             .unwrap()
             .contains("Installed and started stackhour-server and stackhour-agent\n"));
+    }
+
+    /// The `install server` regression, through the other door: `init server`
+    /// is gated on the TRACKER module, so `--install` must still ask the agent
+    /// module before starting a stackhour-agent unit. Without this it wrote a
+    /// `Restart=always` unit that the gate refuses on every start.
+    /// Same reason as above: this pins the RUNTIME layer's skip, so Layer 1
+    /// has to be out of the way for the config block to be what decides.
+    #[cfg(all(feature = "tracker", feature = "agent"))]
+    #[test]
+    fn run_init_server_with_install_skips_the_agent_service_when_the_agent_module_is_disabled() {
+        use std::cell::RefCell;
+        let tmp = TempDir::new().unwrap();
+        let cfg = tmp.path().join("config.json");
+        // The module block has to be there BEFORE init runs; init preserves
+        // unknown root keys, so it survives into the written config.
+        std::fs::write(&cfg, r#"{"modules":{"agent":false}}"#).unwrap();
+        let seen = RefCell::new(Vec::new());
+        let installer = |role: &str| {
+            seen.borrow_mut().push(role.to_string());
+            Ok(())
+        };
+        let mut out = Vec::new();
+        run_init_into(&argv(&["server", "--install"]), &cfg, &mut out, &installer).unwrap();
+        assert_eq!(seen.into_inner(), vec!["server"]);
+        let out = String::from_utf8(out).unwrap();
+        assert!(
+            out.contains(&format!(
+                "Skipped stackhour-agent: the agent module is disabled by \"modules.agent\": false in {}\n",
+                cfg.display()
+            )),
+            "{out}"
+        );
+        assert!(out.contains("Installed and started stackhour-server\n"), "{out}");
+        assert!(!out.contains("and stackhour-agent"), "{out}");
+        // The block survived the config rewrite, so the next run agrees.
+        assert_eq!(read_json(&cfg)["modules"]["agent"], json!(false));
     }
 
     #[test]

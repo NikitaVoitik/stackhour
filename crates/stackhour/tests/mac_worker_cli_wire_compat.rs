@@ -1,3 +1,8 @@
+#![cfg(feature = "bridge")]
+// Every test here drives a verb that only exists when the bridge module is
+// compiled in, and the file `use`s `stackhour_bridge` at the top level —
+// so without this gate a reduced build fails to COMPILE, which is the
+// likeliest way a feature break lands looking green.
 //! The other half of the Mac-worker protocol: the shipped BINARY standing in
 //! for `claim.mjs` / `return.mjs`.
 //!
@@ -27,10 +32,29 @@ fn runtime() -> (tempfile::TempDir, BridgePaths) {
     (dir, paths)
 }
 
+/// The binary, spawned in an ISOLATED environment.
+///
+/// `bridge claim` / `bridge return` resolve everything they touch from
+/// `--runtime-dir`, but the module gate in main.rs runs before dispatch and
+/// reads `$STACKHOUR_CONFIG` / `$HOME/.config/stackhour/config.json` to decide
+/// whether the bridge module is switched on. With an inherited environment
+/// these wire-compat tests would therefore fail on exactly the machine this
+/// feature exists for — a box whose config.json says
+/// `{"modules":{"bridge":false}}` — testing the developer's config instead of
+/// the runtime-dir protocol. HOME points at the throwaway runtime dir, where
+/// no `.config/stackhour/config.json` exists, so the gate always fails open.
+fn cli(args: &[&str], dir: &Path) -> Command {
+    let mut cmd = Command::new(BIN);
+    cmd.args(args)
+        .env_clear()
+        .env("HOME", dir)
+        .env("PATH", std::env::var("PATH").unwrap_or_default());
+    cmd
+}
+
 /// `stackhour bridge claim --runtime-dir <dir>` → (exit code, stdout).
 fn cli_claim(dir: &Path) -> (i32, String) {
-    let out = Command::new(BIN)
-        .args(["bridge", "claim", "--runtime-dir"])
+    let out = cli(&["bridge", "claim", "--runtime-dir"], dir)
         .arg(dir)
         .output()
         .expect("spawn stackhour bridge claim");
@@ -44,8 +68,7 @@ fn cli_claim(dir: &Path) -> (i32, String) {
 /// stdin → (exit code, stderr).
 fn cli_return(dir: &Path, id: &str, payload: &str) -> (i32, String) {
     use std::io::Write as _;
-    let mut child = Command::new(BIN)
-        .args(["bridge", "return", id, "--runtime-dir"])
+    let mut child = cli(&["bridge", "return", id, "--runtime-dir"], dir)
         .arg(dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -156,8 +179,7 @@ fn an_idle_claim_blocks_for_the_claim_window_then_exits_clean() {
 #[test]
 fn a_missing_job_id_is_exit_two_with_the_reference_message() {
     let (dir, _paths) = runtime();
-    let out = Command::new(BIN)
-        .args(["bridge", "return", "--runtime-dir"])
+    let out = cli(&["bridge", "return", "--runtime-dir"], dir.path())
         .arg(dir.path())
         .stdin(Stdio::null())
         .output()

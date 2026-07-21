@@ -1,3 +1,7 @@
+#![cfg(feature = "bridge")]
+// Every test here drives a verb that only exists when the module(s) named
+// above are compiled in. Without the file-level gate a reduced-feature
+// `cargo test` would run them against a binary that answers exit 2.
 //! Parity test for `stackhour bridge migrate` over the COMMITTED fixture.
 //!
 //! The fixture at `tests-fixtures/bridge/legacy-config.json` mirrors the shape
@@ -39,8 +43,28 @@ fn fixture(name: &str) -> PathBuf {
     repo_root().join("tests-fixtures/bridge").join(name)
 }
 
+/// The binary, spawned in an ISOLATED environment.
+///
+/// `bridge migrate` takes `--from` / `--to` / `--runtime-dir` explicitly and
+/// reads nothing else off the environment, but the module gate in main.rs runs
+/// before dispatch and consults
+/// `$STACKHOUR_CONFIG` / `$HOME/.config/stackhour/config.json` to decide
+/// whether the bridge module is switched on. With an inherited environment
+/// every test in this file would fail on exactly the machine this feature
+/// exists for — a box whose config.json says `{"modules":{"bridge":false}}` —
+/// with the gate's refusal standing in for a migration result. HOME points at
+/// a throwaway dir that holds no `.config/stackhour/config.json`, so the gate
+/// always fails open. Same isolation as `mac_worker_cli_wire_compat.rs`,
+/// `bridge_targeted_claim.rs` and `session_state_parity.rs`.
 fn run(args: &[&str]) -> Output {
-    Command::new(bin()).args(args).output().expect("spawn stackhour")
+    let home = TempDir::new().expect("throwaway HOME");
+    Command::new(bin())
+        .args(args)
+        .env_clear()
+        .env("HOME", home.path())
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
+        .output()
+        .expect("spawn stackhour")
 }
 
 fn stdout(out: &Output) -> String {
@@ -336,6 +360,11 @@ fn committed_config_holds_no_credential_keys() {
 
 /// A second run over a populated tree must refuse rather than clobber, and
 /// must exit 2 so a script can tell "already migrated" from "broken".
+///
+/// The MESSAGE is asserted alongside the code: `modules.rs` (`GATED_EXIT_CODE`,
+/// "Collision note") documents that the module gate refuses with 2 as well, so
+/// a bare code check here could be satisfied by a gate refusal that never
+/// reached the migrator at all.
 #[test]
 fn a_second_migration_refuses_with_exit_2() {
     let (_dir, cfg, rt) = migrate_fixture("legacy-config.json");
@@ -353,6 +382,11 @@ fn a_second_migration_refuses_with_exit_2() {
     ]);
 
     assert_eq!(out.status.code(), Some(2), "expected the conflict exit code");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("refusing to migrate"),
+        "exit 2 did not come from the conflict check: {stderr}"
+    );
     assert_eq!(
         std::fs::read_to_string(rt.join("config.json")).unwrap(),
         before,

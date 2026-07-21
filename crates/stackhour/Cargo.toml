@@ -11,21 +11,29 @@ name = "stackhour"
 path = "src/main.rs"
 
 [dependencies]
+# The shared spine. NEVER optional — every build has it.
 stackhour-core.workspace = true
-stackhour-store.workspace = true
-stackhour-server.workspace = true
-stackhour-agent.workspace = true
-stackhour-bridge.workspace = true
-anyhow.workspace = true
-serde.workspace = true
+stackhour-store = { workspace = true, optional = true }
+stackhour-server = { workspace = true, optional = true }
+stackhour-agent = { workspace = true, optional = true }
+stackhour-bridge = { workspace = true, optional = true }
 serde_json.workspace = true
-indexmap.workspace = true
+# NOT optional: status.rs and doctor's `server_checks` both use the blocking
+# client, and neither belongs to a module.
 reqwest.workspace = true
-rusqlite.workspace = true
-chrono.workspace = true
-regex.workspace = true
+rusqlite = { workspace = true, optional = true }
 hostname.workspace = true
 libc.workspace = true
+
+[features]
+default = ["tracker", "agent", "bridge"]
+# tracker owns the server + store crates and the two rusqlite doctor checks.
+tracker = ["dep:stackhour-server", "dep:stackhour-store", "dep:rusqlite"]
+# stackhour-agent links rusqlite in its own right (the Zed threads.db
+# snapshot), so an agent build is NOT SQLite-free. `dep:rusqlite` is listed
+# here so doctor's `sqlite` check stays honest in an agent-only build.
+agent = ["dep:stackhour-agent", "dep:rusqlite"]
+bridge = ["dep:stackhour-bridge"]
 
 [dev-dependencies]
 tempfile.workspace = true
