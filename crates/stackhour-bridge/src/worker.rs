@@ -465,9 +465,9 @@ fn truncate_tail_utf16(s: &str, n: usize) -> String {
 
 /// Run the worker daemon forever.
 ///
-/// Wiring only: everything it needs already exists except
-/// [`crate::config::load_worker_cfg`], which is still a `todo!()` owned by
-/// the config layer. The moment that lands, this runs.
+/// Wiring only: every piece it composes lives elsewhere —
+/// [`crate::config::load_worker_cfg`] reads `worker-config.json`, the job
+/// protocol lives in [`crate::jobs`], and the engines run themselves.
 pub fn run_worker(runtime_dir: &Path) -> ! {
     let paths = BridgePaths::from_runtime_dir(runtime_dir);
     let _ = paths.ensure_dirs();

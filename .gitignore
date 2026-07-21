@@ -5,3 +5,6 @@ nohup.out
 # Rust
 target/
 Cargo.lock.orig
+
+# Claude Code session worktrees
+.claude/worktrees/

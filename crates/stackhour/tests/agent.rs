@@ -251,6 +251,12 @@ fn heartbeats_queue_while_the_server_is_down_and_drain_when_it_returns() {
 fn repeated_offline_ticks_accumulate_the_queue() {
     let env = Env::new();
     for name in ["a.rs", "b.rs", "c.rs"] {
+        // File mtimes come from the kernel's coarse clock, which can lag the
+        // agent's SystemTime::now by a few ms. A touch issued immediately
+        // after the previous tick exits can therefore stamp an mtime <= that
+        // tick's filesLastScan and be skipped as already-seen. Sleep first so
+        // the mtime is unambiguously after the previous scan.
+        std::thread::sleep(Duration::from_millis(50));
         touch(&env.project_root().join(name));
         // Each tick must see the file as NEW, so space them past the mtime
         // granularity of the previous scan.

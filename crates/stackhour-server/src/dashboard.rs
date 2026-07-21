@@ -4,8 +4,10 @@
 //! Resolution order: $STACKHOUR_ASSETS/dashboard.html ->
 //! <exe_dir>/../assets/dashboard.html -> <cwd>/assets/dashboard.html ->
 //! <cwd>/src/dashboard.html (dev checkout) -> include_str! fallback. The
-//! assets file is a byte-copy of src/dashboard.html — its inline JS is
-//! executed by the Node test suite and must never be templated or minified.
+//! assets file started as a copy of src/dashboard.html but has since
+//! diverged: it adds the `API_KEY`/`withKey()` wrapper that forwards
+//! `?api_key=` to every fetch, pairing with the Rust-only read-API auth
+//! gate. Its inline JS must never be templated or minified.
 
 use crate::App;
 use axum::body::Body;
@@ -62,8 +64,9 @@ impl DashboardLocator {
     ///
     /// src/server.js does a bare `fs.readFileSync` and turns a missing file
     /// into a 500. Serving the compiled-in copy instead is a deliberate
-    /// divergence: the bytes are identical to `src/dashboard.html` at build
-    /// time, so a stripped install still renders rather than 500ing.
+    /// divergence: the embedded bytes are `assets/dashboard.html` (the
+    /// api_key-forwarding variant) frozen at build time, so a stripped
+    /// install still renders rather than 500ing.
     pub fn read(&self) -> Vec<u8> {
         for path in &self.candidates {
             if let Ok(bytes) = std::fs::read(path) {
