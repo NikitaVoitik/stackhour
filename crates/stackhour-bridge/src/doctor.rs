@@ -12,7 +12,8 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::config::{
-    shell_quote, validate_coordinator_config, validate_worker_config, LAUNCHD_LABEL, SERVICE_NAME,
+    self, shell_quote, validate_coordinator_config, validate_worker_config, LAUNCHD_LABEL, SERVICE_NAME,
+    WORKER_SERVICE_NAME,
 };
 use crate::installer::{run_cmd, uid};
 
@@ -47,15 +48,29 @@ pub fn doctor_checks(
     // Mac worker runs them over SSH), so the check survives as a PATH probe,
     // name kept.
     let (node_ok, node_version) = node_version_probe();
-    check(out, &mut failures, node_ok, format!("Node.js >=22 ({node_version})"));
+    check(
+        out,
+        &mut failures,
+        node_ok,
+        format!("Node.js >=22 ({node_version})"),
+    );
 
-    let name = if role == "coordinator" { "config.json" } else { "worker-config.json" };
+    let name = if role == "coordinator" {
+        "config.json"
+    } else {
+        "worker-config.json"
+    };
     let path = runtime_dir.join(name);
     let config: Option<Value> = match std::fs::read_to_string(&path) {
         Ok(text) => Some(serde_json::from_str(&text).map_err(|e| format!("{}: {e}", path.display()))?),
         Err(_) => None,
     };
-    check(out, &mut failures, config.is_some(), format!("Config exists: {}", path.display()));
+    check(
+        out,
+        &mut failures,
+        config.is_some(),
+        format!("Config exists: {}", path.display()),
+    );
     // `if (!config) return 1` — no summary line, straight out.
     let Some(config) = config else { return Ok(1) };
 
@@ -82,30 +97,41 @@ pub fn doctor_checks(
     );
 
     // PARITY: on a missing key the Node template literal prints `undefined`;
-    // kept, so the two doctors read identically. (The Node doctor would
-    // instead CRASH on a missing `targets` object; this one just fails the
-    // checks.)
-    let local: &Value = if role == "coordinator" {
-        config.pointer("/targets/gcp").unwrap_or(&Value::Null)
+    // kept, so the two doctors read identically. DELIBERATE DIVERGENCE from
+    // the Node doctor, which only ever inspected the hardcoded `targets.gcp`
+    // (and would CRASH on a missing `targets` object): the coordinator now
+    // audits EVERY `type == "local"` target — the single-local form keeps
+    // the Node's exact lines, extra locals suffix their target name — and a
+    // leader-only roster (zero local targets) reports itself instead of
+    // failing.
+    if role == "coordinator" {
+        let locals: Vec<(&String, &Value)> = config
+            .get("targets")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter(|(name, t)| config::target_kind(name, t) == "local")
+            .collect();
+        if locals.is_empty() {
+            check(
+                out,
+                &mut failures,
+                true,
+                "leader-only coordinator (no local engines)".to_string(),
+            );
+        } else {
+            for (name, t) in &locals {
+                let suffix = if locals.len() > 1 {
+                    format!(" ({name})")
+                } else {
+                    String::new()
+                };
+                local_engine_checks(out, &mut failures, t, &suffix);
+            }
+        }
     } else {
-        &config
-    };
-    let cwd = display_str(local, "cwd");
-    check(out, &mut failures, is_directory(&cwd), format!("Working directory: {cwd}"));
-    let claude_bin = display_str(local, "claudeBin");
-    check(
-        out,
-        &mut failures,
-        is_executable(Path::new(&claude_bin)),
-        format!("Claude Code executable: {claude_bin}"),
-    );
-    let codex_bin = display_str(local, "codexBin");
-    check(
-        out,
-        &mut failures,
-        is_executable(Path::new(&codex_bin)),
-        format!("Codex executable: {codex_bin}"),
-    );
+        local_engine_checks(out, &mut failures, &config, "");
+    }
 
     // PARITY (deliberate divergence): the JS checks coordinator.mjs /
     // claim.mjs / return.mjs and worker.mjs. The Rust install replaces
@@ -132,17 +158,55 @@ pub fn doctor_checks(
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false);
-        check(out, &mut failures, active, format!("User service active: {SERVICE_NAME}"));
+        check(
+            out,
+            &mut failures,
+            active,
+            format!("User service active: {SERVICE_NAME}"),
+        );
+    }
+    if role == "coordinator" {
+        // NEW vs the Node doctor: per-target worker liveness off the
+        // heartbeat files ([`crate::jobs::worker_alive_for`] — the targeted
+        // `worker-heartbeat-<target>` first, legacy shared `worker-heartbeat`
+        // fallback). One line per worker target; the single-worker form
+        // keeps the familiar "<label> worker: online|offline" wording.
+        let paths = crate::BridgePaths::from_runtime_dir(runtime_dir);
+        let workers: Vec<(&String, &Value)> = config
+            .get("targets")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .filter(|(name, t)| config::target_kind(name, t) != "local")
+            .collect();
+        let solo = workers.len() == 1;
+        for (name, t) in workers {
+            let alive = crate::jobs::worker_alive_for(&paths, name);
+            let state = if alive { "online" } else { "offline" };
+            let message = if solo {
+                let label = t
+                    .get("label")
+                    .and_then(Value::as_str)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or(name);
+                format!("{label} worker: {state}")
+            } else {
+                format!("Worker {name}: {state}")
+            };
+            check(out, &mut failures, alive, message);
+        }
     }
     if role == "worker" {
-        let key = display_str(&config, "gcpKey");
+        // The leader keys accept either spelling (leader* preferred, the
+        // legacy gcp* fallback), exactly as the loader reads them.
+        let key = aliased_display(&config, "leaderKey", "gcpKey");
         check(
             out,
             &mut failures,
             Path::new(&key).exists() && private_mode(Path::new(&key)),
             format!("Private SSH key: {key}"),
         );
-        let gcp_ssh = display_str(&config, "gcpSsh");
+        let leader_ssh = aliased_display(&config, "leaderSsh", "gcpSsh");
         let remote_dir = display_str(&config, "remoteDir");
         let remote_check = format!(
             "test -x {} && test -f {} && test -f {}",
@@ -151,7 +215,16 @@ pub fn doctor_checks(
             shell_quote(&posix_join(&remote_dir, "return.mjs")),
         );
         let ssh_ok = std::process::Command::new("ssh")
-            .args(["-i", &key, "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", &gcp_ssh, &remote_check])
+            .args([
+                "-i",
+                &key,
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=8",
+                &leader_ssh,
+                &remote_check,
+            ])
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false);
@@ -159,15 +232,43 @@ pub fn doctor_checks(
             out,
             &mut failures,
             ssh_ok,
-            format!("SSH and remote coordinator helpers: {gcp_ssh}"),
+            format!("SSH and remote coordinator helpers: {leader_ssh}"),
         );
+        // NEW: the name this worker claims jobs under, when configured
+        // (absent = the legacy claim-anything mode).
+        if let Some(target) = config
+            .get("target")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+        {
+            check(out, &mut failures, true, format!("Claim target: {target}"));
+        }
+        // DELIBERATE DIVERGENCE: the Node doctor only knew the macOS
+        // LaunchAgent; a Linux worker checks its systemd user unit.
         if cfg!(target_os = "macos") {
             let loaded = std::process::Command::new("launchctl")
                 .args(["print", &format!("gui/{}/{LAUNCHD_LABEL}", uid())])
                 .output()
                 .map(|o| o.status.success())
                 .unwrap_or(false);
-            check(out, &mut failures, loaded, format!("LaunchAgent loaded: {LAUNCHD_LABEL}"));
+            check(
+                out,
+                &mut failures,
+                loaded,
+                format!("LaunchAgent loaded: {LAUNCHD_LABEL}"),
+            );
+        } else if cfg!(target_os = "linux") {
+            let active = std::process::Command::new("systemctl")
+                .args(["--user", "is-active", "--quiet", WORKER_SERVICE_NAME])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+            check(
+                out,
+                &mut failures,
+                active,
+                format!("User service active: {WORKER_SERVICE_NAME}"),
+            );
         }
     }
 
@@ -211,16 +312,19 @@ fn service_action(role: &str, verb: &str) -> Result<(), String> {
             return Err("Coordinator service commands require Linux.".to_string());
         }
         run_cmd("systemctl", &["--user", verb, SERVICE_NAME])
-    } else {
-        if !cfg!(target_os = "macos") {
-            return Err("Worker service commands require macOS.".to_string());
-        }
+    } else if cfg!(target_os = "macos") {
         let target = format!("gui/{}/{LAUNCHD_LABEL}", uid());
         if verb == "status" {
             run_cmd("launchctl", &["print", &target])
         } else {
             run_cmd("launchctl", &["kickstart", "-k", &target])
         }
+    } else if cfg!(target_os = "linux") {
+        // DELIBERATE DIVERGENCE: the Node CLI threw 'Worker service commands
+        // require macOS.' — Linux workers now drive their systemd user unit.
+        run_cmd("systemctl", &["--user", verb, WORKER_SERVICE_NAME])
+    } else {
+        Err("Worker service commands require Linux or macOS.".to_string())
     }
 }
 
@@ -234,6 +338,39 @@ fn check(out: &mut dyn Write, failures: &mut Vec<String>, cond: bool, message: S
     if !cond {
         failures.push(message);
     }
+}
+
+/// The three local-engine lines (cwd / claudeBin / codexBin), shared by the
+/// worker's own config and each of the coordinator's local targets. `suffix`
+/// is `" (<target>)"` when more than one local target needs telling apart.
+fn local_engine_checks(out: &mut dyn Write, failures: &mut Vec<String>, local: &Value, suffix: &str) {
+    let cwd = display_str(local, "cwd");
+    check(
+        out,
+        failures,
+        is_directory(&cwd),
+        format!("Working directory{suffix}: {cwd}"),
+    );
+    let claude_bin = display_str(local, "claudeBin");
+    check(
+        out,
+        failures,
+        is_executable(Path::new(&claude_bin)),
+        format!("Claude Code executable{suffix}: {claude_bin}"),
+    );
+    let codex_bin = display_str(local, "codexBin");
+    check(
+        out,
+        failures,
+        is_executable(Path::new(&codex_bin)),
+        format!("Codex executable{suffix}: {codex_bin}"),
+    );
+}
+
+/// A string field with a preferred/legacy spelling pair — `undefined` when
+/// neither is present, as the JS interpolation printed.
+fn aliased_display(v: &Value, preferred: &str, legacy: &str) -> String {
+    config::leader_aliased(v, preferred, legacy).unwrap_or_else(|| "undefined".to_string())
 }
 
 /// `node --version` → (major >= 22, "v22.x.y" | "not found").
@@ -390,8 +527,14 @@ mod tests {
         }
         let (_, text) = run("coordinator", rt.path(), cfg.path());
         assert!(text.contains("✓ Config validation\n"), "{text}");
-        assert!(text.contains("✓ Config permissions exclude group/other access\n"), "{text}");
-        assert!(text.contains(&format!("✓ Working directory: {}\n", rt.path().display())), "{text}");
+        assert!(
+            text.contains("✓ Config permissions exclude group/other access\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains(&format!("✓ Working directory: {}\n", rt.path().display())),
+            "{text}"
+        );
         assert!(text.contains("✓ Claude Code executable: /bin/sh\n"), "{text}");
         assert!(text.contains("✓ Installed stackhour\n"), "{text}");
         assert!(text.contains("✓ Installed claim.mjs\n"), "{text}");
@@ -410,7 +553,10 @@ mod tests {
         write_config(rt.path(), "config.json", &coordinator_config(rt.path()), 0o644);
         let (code, text) = run("coordinator", rt.path(), cfg.path());
         assert_eq!(code, 1);
-        assert!(text.contains("✗ Config permissions exclude group/other access\n"), "{text}");
+        assert!(
+            text.contains("✗ Config permissions exclude group/other access\n"),
+            "{text}"
+        );
         assert!(text.contains("check(s) failed.\n"), "{text}");
     }
 
@@ -424,7 +570,10 @@ mod tests {
         write_config(rt.path(), "config.json", &bad, 0o600);
         let (code, text) = run("coordinator", rt.path(), cfg.path());
         assert_eq!(code, 1);
-        assert!(text.contains("✗ Config validation: token is required\n"), "{text}");
+        assert!(
+            text.contains("✗ Config validation: token is required\n"),
+            "{text}"
+        );
     }
 
     /// Missing keys print as `undefined`, the JS interpolation, not a panic.
@@ -447,7 +596,11 @@ mod tests {
         let cfg = tempfile::tempdir().unwrap();
         write_config(rt.path(), "config.json", &coordinator_config(rt.path()), 0o600);
         std::fs::create_dir_all(cfg.path().join("commands")).unwrap();
-        std::fs::write(cfg.path().join("commands").join("bad.toml"), "definitely = not [ toml").unwrap();
+        std::fs::write(
+            cfg.path().join("commands").join("bad.toml"),
+            "definitely = not [ toml",
+        )
+        .unwrap();
         let (code, text) = run("coordinator", rt.path(), cfg.path());
         assert_eq!(code, 1);
         assert!(text.contains("✗ registry: "), "{text}");
@@ -471,18 +624,148 @@ mod tests {
     }
 
     /// status/restart on the wrong platform is the exact Node error.
+    /// DELIBERATE DIVERGENCE: `worker status` on Linux is no longer an error
+    /// — it drives the systemd user unit — so the old "Worker service
+    /// commands require macOS." assertion is gone.
     #[test]
     fn service_commands_are_platform_gated() {
-        #[cfg(target_os = "linux")]
-        assert_eq!(
-            service_action("worker", "status").unwrap_err(),
-            "Worker service commands require macOS."
-        );
         #[cfg(target_os = "macos")]
         assert_eq!(
             service_action("coordinator", "status").unwrap_err(),
             "Coordinator service commands require Linux."
         );
+    }
+
+    /// A decimal-ms heartbeat file, `age_secs` in the past.
+    fn write_heartbeat(path: &Path, age_secs: u64) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
+        std::fs::write(path, format!("{}", now - age_secs * 1000)).unwrap();
+    }
+
+    /// Zero local targets is not a failure — it is the leader-only topology,
+    /// and the doctor says so on its own ✓ line instead of ✗ing three
+    /// `undefined` engine checks.
+    #[test]
+    fn a_leader_only_config_prints_the_leader_only_line() {
+        let rt = tempfile::tempdir().unwrap();
+        let cfg = tempfile::tempdir().unwrap();
+        let leader = json!({
+            "token": "t", "chatId": 1, "defaultTarget": "pi",
+            "targets": { "pi": { "label": "Pi" } }
+        });
+        write_config(rt.path(), "config.json", &leader, 0o600);
+        for f in ["stackhour", "claim.mjs", "return.mjs"] {
+            installed_file(rt.path(), f);
+        }
+        // A fresh targeted heartbeat: the (single) worker line reads online
+        // in the familiar "<label> worker" wording.
+        write_heartbeat(&rt.path().join("worker-heartbeat-pi"), 5);
+        let (_, text) = run("coordinator", rt.path(), cfg.path());
+        assert!(text.contains("✓ Config validation\n"), "{text}");
+        assert!(
+            text.contains("✓ leader-only coordinator (no local engines)\n"),
+            "{text}"
+        );
+        assert!(!text.contains("Working directory"), "{text}");
+        assert!(!text.contains("Claude Code executable"), "{text}");
+        assert!(text.contains("✓ Pi worker: online\n"), "{text}");
+    }
+
+    /// Two local targets get two engine-check blocks, each line naming its
+    /// target; the single-local form (above tests) keeps the Node wording.
+    #[test]
+    fn two_local_targets_get_two_engine_check_blocks() {
+        let rt = tempfile::tempdir().unwrap();
+        let cfg = tempfile::tempdir().unwrap();
+        let dir = rt.path().display().to_string();
+        let v = json!({
+            "token": "t", "chatId": 1, "defaultTarget": "hetzner",
+            "targets": {
+                "hetzner": { "type": "local", "cwd": dir, "claudeBin": "/bin/sh", "codexBin": "/bin/sh" },
+                "attic": { "type": "local", "cwd": "/definitely/not/here", "claudeBin": "/bin/sh", "codexBin": "/bin/sh" },
+            }
+        });
+        write_config(rt.path(), "config.json", &v, 0o600);
+        let (code, text) = run("coordinator", rt.path(), cfg.path());
+        assert_eq!(code, 1, "attic's cwd is missing");
+        assert!(
+            text.contains(&format!("✓ Working directory (hetzner): {dir}\n")),
+            "{text}"
+        );
+        assert!(
+            text.contains("✗ Working directory (attic): /definitely/not/here\n"),
+            "{text}"
+        );
+        assert!(
+            text.contains("✓ Claude Code executable (hetzner): /bin/sh\n"),
+            "{text}"
+        );
+        assert!(text.contains("✓ Codex executable (attic): /bin/sh\n"), "{text}");
+        // No worker targets, no worker lines.
+        assert!(!text.contains("worker:"), "{text}");
+    }
+
+    /// Per-target worker liveness: each worker target reads its OWN
+    /// heartbeat file, and with several workers each gets its own line.
+    #[test]
+    fn worker_liveness_lines_are_per_target() {
+        let rt = tempfile::tempdir().unwrap();
+        let cfg = tempfile::tempdir().unwrap();
+        let mut v = coordinator_config(rt.path());
+        v["targets"]["pi"] = json!({});
+        write_config(rt.path(), "config.json", &v, 0o600);
+        write_heartbeat(&rt.path().join("worker-heartbeat-pi"), 5);
+        // mac has no targeted heartbeat and no legacy fallback: offline.
+        let (_, text) = run("coordinator", rt.path(), cfg.path());
+        assert!(text.contains("✗ Worker mac: offline\n"), "{text}");
+        assert!(text.contains("✓ Worker pi: online\n"), "{text}");
+
+        // Exactly one worker: the familiar single-worker wording, satisfied
+        // by the LEGACY shared heartbeat a no-arg `claim` still writes.
+        let rt = tempfile::tempdir().unwrap();
+        write_config(rt.path(), "config.json", &coordinator_config(rt.path()), 0o600);
+        write_heartbeat(&rt.path().join("worker-heartbeat"), 5);
+        let (_, text) = run("coordinator", rt.path(), cfg.path());
+        assert!(text.contains("✓ mac worker: online\n"), "{text}");
+    }
+
+    /// A worker config written with the preferred leader* spellings and a
+    /// claim target: the alias pair is accepted and the target is mentioned.
+    #[test]
+    fn a_worker_config_with_leader_spellings_and_a_target_reads_cleanly() {
+        let rt = tempfile::tempdir().unwrap();
+        let cfg = tempfile::tempdir().unwrap();
+        let key = rt.path().join("id_test");
+        std::fs::write(&key, "KEY").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let key = key.display().to_string();
+        write_config(
+            rt.path(),
+            "worker-config.json",
+            &json!({
+                "leaderSsh": "u@h", "leaderKey": key, "remoteDir": "/d", "remoteNode": "/n",
+                "target": "attic", "claudeBin": "/bin/sh", "codexBin": "/bin/sh", "cwd": "/"
+            }),
+            0o600,
+        );
+        installed_file(rt.path(), "stackhour");
+        // (The ssh probe against u@h fails fast in BatchMode; the lines we
+        // pin are the alias-driven ones.)
+        let (_, text) = run("worker", rt.path(), cfg.path());
+        assert!(text.contains("✓ Config validation\n"), "{text}");
+        assert!(text.contains(&format!("✓ Private SSH key: {key}\n")), "{text}");
+        assert!(
+            text.contains("SSH and remote coordinator helpers: u@h\n"),
+            "{text}"
+        );
+        assert!(text.contains("✓ Claim target: attic\n"), "{text}");
     }
 
     #[test]

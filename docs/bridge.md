@@ -41,6 +41,60 @@ The Linux coordinator owns the Telegram connection and can run either agent loca
 - Configuration backups, upgrades, and a built-in health check
 - No runtime npm dependencies
 
+## Topologies
+
+The Node bridge is fixed to the layout above: one Linux coordinator that also
+runs engines, plus one Mac worker. The Rust bridge generalizes this to a
+roster of named targets in `config.json` — any number of `type: "local"`
+targets (engines run on the coordinator box) and `type: "remote"` targets
+(one pull-worker each, claiming jobs under its own name).
+
+### All-in-one (the default)
+
+What `stackhour bridge install coordinator` writes when you press Enter
+through the wizard: one local `gcp` target and one `mac` worker target —
+identical to the Node layout, byte for byte.
+
+### Leader-only (a cheap VPS owns the bot; workers run every engine)
+
+Pick `[2] leader-only` at the wizard's role question, or set
+`BRIDGE_COORDINATOR_ROLE=leader-only` with `--non-interactive`. The written
+config has **zero local targets**: the leader owns the Telegram connection
+and the job queue and never runs an engine. `bridge doctor coordinator`
+prints `✓ leader-only coordinator (no local engines)` in place of the
+engine checks.
+
+The leader needs:
+
+- sshd reachable by every worker (workers dial in; the leader dials nowhere)
+- outbound HTTPS to `api.telegram.org`
+- Node.js 22+ — every worker, Node or Rust, claims by running the leader's
+  `claim.mjs`/`return.mjs` shims through the configured `remoteNode`
+  interpreter over SSH; only the daemons themselves are Node-free
+
+Enroll each worker machine with `stackhour bridge install worker`, pointing
+`leaderSsh` at the leader and giving every worker a **unique** target name
+(the wizard's "Worker target name" prompt; `BRIDGE_TARGET`
+non-interactively). Linux workers get a systemd user unit
+(`stackhour-bridge-worker.service`); macOS workers keep the LaunchAgent.
+Each named worker claims only jobs dispatched to its target and beats its
+own `worker-heartbeat-<target>` file, so `bridge doctor coordinator` reports
+every worker's online/offline on its own line.
+
+**Security notes for a public-facing leader:**
+
+- **Never let two coordinators long-poll the same bot token.** Telegram
+  hands each update to whichever poller asks first, so two coordinators
+  silently steal each other's messages.
+- The bot token lives only on the leader, in the mode-`600` `config.json`.
+  Workers never see it.
+- Workers need only *outbound* SSH to the leader — open no inbound port on
+  any worker.
+- Do not run `stackhour serve` (the time-tracking server) on a public
+  leader: its dashboard page and most of its read API answer without
+  authentication — only `/api/detail` is token-gated. Keep `stackhour serve`
+  off the leader entirely.
+
 ## Architecture
 
 ```mermaid
@@ -84,7 +138,7 @@ cd ~/stackhour
 ./bin/stackhour bridge install worker
 ```
 
-The Mac wizard verifies the SSH key and local agent paths, installs the runtime, generates and validates a LaunchAgent, and starts it.
+The Mac wizard verifies the SSH key and local agent paths, installs the runtime, generates and validates a LaunchAgent, and starts it. With the Rust binary the worker installer also runs on Linux, writing a systemd user unit (`stackhour-bridge-worker.service`) instead of a LaunchAgent — see [Topologies](#topologies).
 
 Run the end-to-end health check on each machine:
 
@@ -100,7 +154,8 @@ The worker doctor also verifies SSH connectivity and confirms that the remote qu
 The installer only writes inside the current user's home directory:
 
 - `~/.local/share/stackhour/bridge/` — runtime, private config, queue data, media, and logs
-- Linux: `~/.config/systemd/user/stackhour-bridge.service`
+- Linux coordinator: `~/.config/systemd/user/stackhour-bridge.service`
+- Linux worker (Rust installer): `~/.config/systemd/user/stackhour-bridge-worker.service`
 - macOS: `~/Library/LaunchAgents/com.stackhour.bridge-worker.plist`
 
 It does not install npm dependencies or require root. On Linux, it may recommend one explicit `sudo loginctl enable-linger <user>` command so the user service remains alive after logout.
@@ -129,16 +184,23 @@ Use `--non-interactive` in automation. Coordinator variables:
 | `BRIDGE_PERMISSION_MODE` | no | `default` or `bypassPermissions` |
 | `ELEVENLABS_API_KEY` | no | Voice transcription |
 | `STACKHOUR_BRIDGE_HOME` | no | Runtime directory |
+| `BRIDGE_COORDINATOR_ROLE` | no | Rust installer only: `all-in-one` (default) or `leader-only` |
+| `BRIDGE_TARGET` | no | Rust installer only: first worker target name (default `mac`) |
+
+With `BRIDGE_COORDINATOR_ROLE=leader-only` the engine variables
+(`BRIDGE_WORKDIR`, `CLAUDE_BIN`, `CODEX_BIN`, `BRIDGE_PERMISSION_MODE`) are
+skipped entirely — see [Topologies](#topologies).
 
 Worker variables:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `BRIDGE_GCP_SSH` | yes | Linux destination in `user@host` form |
-| `BRIDGE_GCP_KEY` | yes | SSH private key |
+| `BRIDGE_LEADER_SSH` | yes | Leader (coordinator) destination in `user@host` form; legacy `BRIDGE_GCP_SSH` still accepted |
+| `BRIDGE_LEADER_KEY` | yes | SSH private key; legacy `BRIDGE_GCP_KEY` still accepted |
 | `BRIDGE_REMOTE_DIR` | yes | Coordinator runtime directory |
-| `BRIDGE_REMOTE_NODE` | yes | Node.js executable on Linux |
-| `BRIDGE_WORKDIR` | yes | Mac agent working directory |
+| `BRIDGE_REMOTE_NODE` | yes | Node.js executable on the leader |
+| `BRIDGE_TARGET` | no | Rust installer only: this worker's target name (default `mac` on macOS, the hostname elsewhere) |
+| `BRIDGE_WORKDIR` | yes | Worker agent working directory |
 | `CLAUDE_BIN` | yes | Claude Code executable |
 | `CODEX_BIN` | yes | Codex executable |
 | `BRIDGE_PERMISSION_MODE` | no | `default` or `bypassPermissions` |

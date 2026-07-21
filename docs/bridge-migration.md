@@ -221,6 +221,32 @@ sudo systemctl enable stackhour-bridge.service
 Leaving both disabled between those two steps is the safe state — a reboot
 mid-cutover then brings up neither, rather than both.
 
+### 2.3 Moving the leader to a cheap host (later, optional)
+
+Once the Rust coordinator is live you can move it off the engine box: a
+leader-only coordinator owns the bot and the queue while every engine runs
+on pull-workers (see "Topologies" in [bridge.md](bridge.md)).
+
+1. Stop and disable the running coordinator first — the §2.2
+   stop/disable/`pgrep` sequence. The one unbreakable rule applies to the
+   old and new leader exactly as it does to Node vs Rust: never let two
+   coordinators long-poll the same bot token.
+2. Copy the runtime dir to the new host (`config.json`, `state.json`,
+   `jobs/`, `inprogress/`, `results/`, `media/`), then run
+   `stackhour bridge install coordinator` there. It reuses the copied
+   config as-is; use `--reconfigure` to answer the role question and go
+   leader-only (drop the local target, keep one entry per worker).
+3. Re-point every worker's `leaderSsh` (legacy spelling: `gcpSsh`) in its
+   `worker-config.json` at the new host and restart the workers.
+4. **Targeted-claim rollout hazard.** Upgrade the leader's `claim.mjs` shim
+   — re-running `stackhour bridge install coordinator` rewrites it —
+   **before** giving any worker a `target` name in its
+   `worker-config.json`. The ORIGINAL Node `claim.mjs` ignores its target
+   argument, so a targeted worker pointed at it silently claims **every**
+   job, including jobs dispatched to other targets. The Rust-installed shim
+   forwards the argument to `stackhour bridge claim <target>`, which is
+   what actually filters.
+
 ---
 
 ## 3. Verify the new bridge, cheapest check first

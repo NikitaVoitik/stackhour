@@ -20,9 +20,7 @@ use stackhour_core::fsutil;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use crate::config::{
-    self, validate_coordinator_config, validate_worker_config, LAUNCHD_LABEL, SERVICE_NAME,
-};
+use crate::config::{self, validate_coordinator_config, validate_worker_config, LAUNCHD_LABEL, SERVICE_NAME};
 
 /// The usage banner, byte for byte the Node `usage()` template (cli.mjs).
 pub const USAGE: &str = "stackhour bridge — install and operate the Telegram Claude + Codex bridge\n\
@@ -118,9 +116,7 @@ pub fn run_bridge_cli(args: &[String]) -> i32 {
     }
     match command {
         "install" => run_install(role, args),
-        "doctor" => {
-            crate::doctor::run_doctor(role, &resolve_runtime_dir(parsed.runtime_dir.as_deref()))
-        }
+        "doctor" => crate::doctor::run_doctor(role, &resolve_runtime_dir(parsed.runtime_dir.as_deref())),
         verb => crate::doctor::run_service_cmd(role, verb),
     }
 }
@@ -174,7 +170,11 @@ fn install(role: &str, opts: &InstallOpts) -> Result<(), String> {
         home: PathBuf::from(std::env::var("HOME").unwrap_or_default()),
     };
 
-    let name = if role == "coordinator" { "config.json" } else { "worker-config.json" };
+    let name = if role == "coordinator" {
+        "config.json"
+    } else {
+        "worker-config.json"
+    };
     let path = opts.runtime_dir.join(name);
     // `loadConfig` — a config that exists but does not parse throws, caught
     // by the shared `\nError:` printer.
@@ -247,14 +247,21 @@ pub struct StdPrompter;
 
 impl Prompter for StdPrompter {
     fn ask(&mut self, label: &str, default: &str) -> Result<String, String> {
-        let suffix = if default.is_empty() { String::new() } else { format!(" [{default}]") };
+        let suffix = if default.is_empty() {
+            String::new()
+        } else {
+            format!(" [{default}]")
+        };
         print!("{label}{suffix}: ");
         let _ = std::io::stdout().flush();
         let mut line = String::new();
-        std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line)
-            .map_err(|e| e.to_string())?;
+        std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line).map_err(|e| e.to_string())?;
         let answer = line.trim().to_string();
-        Ok(if answer.is_empty() { default.to_string() } else { answer })
+        Ok(if answer.is_empty() {
+            default.to_string()
+        } else {
+            answer
+        })
     }
 
     fn ask_secret(&mut self, label: &str, env_name: &str, optional: bool) -> Result<String, String> {
@@ -265,7 +272,9 @@ impl Prompter for StdPrompter {
         #[cfg(not(unix))]
         {
             let _ = optional;
-            Err(format!("Cannot read {label} securely here; set {env_name} and retry."))
+            Err(format!(
+                "Cannot read {label} securely here; set {env_name} and retry."
+            ))
         }
     }
 }
@@ -276,12 +285,12 @@ impl Prompter for StdPrompter {
 #[cfg(unix)]
 fn read_secret_raw(label: &str, env_name: &str, optional: bool) -> Result<String, String> {
     use std::io::Read as _;
-    let tty = unsafe {
-        libc::isatty(libc::STDIN_FILENO) == 1 && libc::isatty(libc::STDOUT_FILENO) == 1
-    };
+    let tty = unsafe { libc::isatty(libc::STDIN_FILENO) == 1 && libc::isatty(libc::STDOUT_FILENO) == 1 };
     let mut term: libc::termios = unsafe { std::mem::zeroed() };
     if !tty || unsafe { libc::tcgetattr(libc::STDIN_FILENO, &mut term) } != 0 {
-        return Err(format!("Cannot read {label} securely here; set {env_name} and retry."));
+        return Err(format!(
+            "Cannot read {label} securely here; set {env_name} and retry."
+        ));
     }
     print!("{label}{}: ", if optional { " (optional)" } else { "" });
     let _ = std::io::stdout().flush();
@@ -377,6 +386,31 @@ impl Wizard<'_> {
         Ok(value)
     }
 
+    /// [`Self::ask_required`] over an env var that grew a preferred `leader*`
+    /// spelling: the preferred variable wins, the legacy `gcp*` one still
+    /// works, and the error names the preferred spelling.
+    fn ask_required_aliased(
+        &mut self,
+        label: &str,
+        env_name: &str,
+        legacy_env: &str,
+        default: &str,
+    ) -> Result<String, String> {
+        let value = match (self.env)(env_name)
+            .filter(|v| !v.is_empty())
+            .or_else(|| (self.env)(legacy_env).filter(|v| !v.is_empty()))
+        {
+            Some(v) => v,
+            None => self.ask(label, default)?,
+        };
+        if value.is_empty() {
+            return Err(format!(
+                "{label} is required (set {env_name} for non-interactive setup)."
+            ));
+        }
+        Ok(value)
+    }
+
     /// `askSecret()` — the env check is `!== undefined`, so a SET-but-empty
     /// env var is used as-is (and later rejected by the strict validator).
     fn ask_secret(&mut self, label: &str, env_name: &str, optional: bool) -> Result<String, String> {
@@ -423,35 +457,61 @@ impl Wizard<'_> {
         Ok(mode)
     }
 
-    /// `coordinatorConfig()` — question order, key order and defaults are the
-    /// Node's, including `defaultTarget: 'gcp'` and the 512 MiB media cap.
+    /// `coordinatorConfig()`, generalized to an arbitrary target roster.
+    ///
+    /// DELIBERATE DIVERGENCE from the Node wizard, which wrote a fixed
+    /// gcp(local)+mac(remote) pair: a role question first — all-in-one vs
+    /// leader-only — then a target loop. Every default is chosen so that
+    /// pressing Enter through an all-in-one install (and the pure-env
+    /// non-interactive path) reproduces the Node's gcp+mac config byte for
+    /// byte: question order, key order, `defaultTarget: 'gcp'` and the
+    /// 512 MiB media cap included.
     pub fn coordinator_config(&mut self) -> Result<Value, String> {
         let token = self.ask_secret("Telegram bot token", "TELEGRAM_BOT_TOKEN", false)?;
         let raw_chat_id = self.ask_required("Authorized Telegram chat ID", "TELEGRAM_CHAT_ID", "")?;
-        let chat_id =
-            js_safe_integer(&raw_chat_id).ok_or("Telegram chat ID must be an integer.")?;
-        let cwd_default = self.cwd.clone();
-        let cwd = self.ask_required("Linux agent working directory", "BRIDGE_WORKDIR", &cwd_default)?;
-        ensure_workdir(&cwd)?;
-        let claude_bin = self.executable_prompt("Claude Code executable", "CLAUDE_BIN", "claude")?;
-        let codex_bin = self.executable_prompt("Codex executable", "CODEX_BIN", "codex")?;
-        let permission_mode = self.permission_mode()?;
-        let eleven_labs_api_key = self.ask_secret("ElevenLabs API key", "ELEVENLABS_API_KEY", true)?;
-        let path_env = (self.env)("PATH").unwrap_or_default();
-        let extra_path = config::merged_path(&[
-            &binary_path(&claude_bin),
-            &binary_path(&codex_bin),
-            &path_env,
-        ]);
-        Ok(json!({
-            "token": token,
-            "chatId": chat_id,
-            "defaultTarget": "gcp",
-            "maxMediaBytes": 512u64 * 1024 * 1024,
-            "elevenLabsApiKey": eleven_labs_api_key,
-            "targets": {
-                "gcp": {
-                    "label": "Linux",
+        let chat_id = js_safe_integer(&raw_chat_id).ok_or("Telegram chat ID must be an integer.")?;
+        // NEW: the topology question. "1" (the Enter / non-interactive
+        // default) keeps today's all-in-one layout; leader-only skips every
+        // local-engine prompt — the box only owns the bot and the queue.
+        let role = self.ask_required(
+            "Coordinator role — [1] all-in-one (this box also runs engines), [2] leader-only (engines run on workers)",
+            "BRIDGE_COORDINATOR_ROLE",
+            "1",
+        )?;
+        let leader_only = match role.as_str() {
+            "1" | "all-in-one" => false,
+            "2" | "leader-only" => true,
+            _ => return Err("Invalid coordinator role.".to_string()),
+        };
+
+        let mut targets = serde_json::Map::new();
+        // The first local target, else the first target — the loader's own
+        // preference order.
+        let mut default_target: Option<String> = None;
+        // The mode the legacy wizard stamped into BOTH targets; leader-only
+        // collects none and writes none.
+        let mut permission_mode = String::new();
+
+        if !leader_only {
+            let name = self.ask("Local target name", "gcp")?;
+            if name.is_empty() {
+                return Err("Target name is required.".to_string());
+            }
+            let label = self.ask("Local target label", "Linux")?;
+            let cwd_default = self.cwd.clone();
+            let cwd = self.ask_required("Linux agent working directory", "BRIDGE_WORKDIR", &cwd_default)?;
+            ensure_workdir(&cwd)?;
+            let claude_bin = self.executable_prompt("Claude Code executable", "CLAUDE_BIN", "claude")?;
+            let codex_bin = self.executable_prompt("Codex executable", "CODEX_BIN", "codex")?;
+            permission_mode = self.permission_mode()?;
+            let path_env = (self.env)("PATH").unwrap_or_default();
+            let extra_path =
+                config::merged_path(&[&binary_path(&claude_bin), &binary_path(&codex_bin), &path_env]);
+            default_target = Some(name.clone());
+            targets.insert(
+                name,
+                json!({
+                    "label": label,
                     "type": "local",
                     "cwd": cwd,
                     "claudeBin": claude_bin,
@@ -460,20 +520,80 @@ impl Wizard<'_> {
                     "permissionMode": permission_mode,
                     "model": null,
                     "codexModel": null
-                },
-                "mac": { "label": "Mac", "type": "remote", "permissionMode": permission_mode }
+                }),
+            );
+        }
+
+        // Worker (pull) targets. All-in-one suggests exactly one worker
+        // named `mac` — accepting it reproduces the legacy pair — while
+        // leader-only REQUIRES a first worker: a roster with no targets at
+        // all cannot boot.
+        let mut first_worker = true;
+        loop {
+            if first_worker && !leader_only {
+                if !is_yes(&self.ask("Add a worker target?", "y")?) {
+                    break;
+                }
+            } else if !first_worker && !is_yes(&self.ask("Add another target?", "n")?) {
+                break;
             }
+            let name = if first_worker {
+                self.ask_required("Worker target name", "BRIDGE_TARGET", "mac")?
+            } else {
+                self.ask("Worker target name", "")?
+            };
+            if name.is_empty() {
+                // A blank later name ends the loop: there is no sensible
+                // default once `mac` is taken.
+                break;
+            }
+            if targets.contains_key(&name) {
+                return Err(format!("Duplicate target name: {name}"));
+            }
+            let label = self.ask("Worker target label", &title_label(&name))?;
+            let mut t = serde_json::Map::new();
+            t.insert("label".into(), json!(label));
+            t.insert("type".into(), json!("remote"));
+            if !leader_only {
+                // The legacy wizard stamped the shared permission mode into
+                // the mac target; kept for byte parity.
+                t.insert("permissionMode".into(), json!(permission_mode));
+            }
+            default_target.get_or_insert_with(|| name.clone());
+            targets.insert(name, Value::Object(t));
+            first_worker = false;
+        }
+        if targets.is_empty() {
+            return Err("At least one target is required.".to_string());
+        }
+        let eleven_labs_api_key = self.ask_secret("ElevenLabs API key", "ELEVENLABS_API_KEY", true)?;
+        Ok(json!({
+            "token": token,
+            "chatId": chat_id,
+            "defaultTarget": default_target.expect("targets is non-empty"),
+            "maxMediaBytes": 512u64 * 1024 * 1024,
+            "elevenLabsApiKey": eleven_labs_api_key,
+            "targets": targets,
         }))
     }
 
-    /// `workerConfig()` — macOS-only, SSH-key readability checked up front.
+    /// `workerConfig()` — SSH-key readability checked up front.
+    ///
+    /// DELIBERATE DIVERGENCE from the Node wizard, which refused to run off
+    /// macOS ("The worker installer currently targets macOS.") and wrote the
+    /// `gcpSsh`/`gcpKey` spellings: Linux workers are first-class now (they
+    /// get a systemd user unit), new configs are written with the preferred
+    /// `leaderSsh`/`leaderKey` keys, and a `target` name is collected — the
+    /// name this worker claims jobs under (`bridge claim <target>`).
     pub fn worker_config(&mut self) -> Result<Value, String> {
-        if !cfg!(target_os = "macos") {
-            return Err("The worker installer currently targets macOS.".to_string());
-        }
-        let gcp_ssh = self.ask_required("Linux SSH destination (user@host)", "BRIDGE_GCP_SSH", "")?;
-        let ssh_user = if gcp_ssh.contains('@') {
-            gcp_ssh.split('@').next().unwrap_or_default().to_string()
+        let leader_ssh = self.ask_required_aliased(
+            "Leader SSH destination (user@host)",
+            "BRIDGE_LEADER_SSH",
+            "BRIDGE_GCP_SSH",
+            "",
+        )?;
+        let ssh_user = if leader_ssh.contains('@') {
+            leader_ssh.split('@').next().unwrap_or_default().to_string()
         } else {
             username()
         };
@@ -483,27 +603,49 @@ impl Wizard<'_> {
             format!("/home/{ssh_user}/.local/share/stackhour/bridge")
         };
         let key_default = self.home.join(".ssh").join("id_ed25519").display().to_string();
-        let gcp_key = self.ask_required("SSH private key", "BRIDGE_GCP_KEY", &key_default)?;
+        let leader_key = self.ask_required_aliased(
+            "SSH private key",
+            "BRIDGE_LEADER_KEY",
+            "BRIDGE_GCP_KEY",
+            &key_default,
+        )?;
         // `accessSync(gcpKey, R_OK)` — an open() probe is the same question.
-        if std::fs::File::open(&gcp_key).is_err() {
-            return Err(format!("SSH key is not readable: {gcp_key}"));
+        if std::fs::File::open(&leader_key).is_err() {
+            return Err(format!("SSH key is not readable: {leader_key}"));
         }
-        let remote_dir =
-            self.ask_required("Remote bridge runtime directory", "BRIDGE_REMOTE_DIR", &default_remote)?;
-        let remote_node =
-            self.ask_required("Remote Node.js executable", "BRIDGE_REMOTE_NODE", "/usr/local/bin/node")?;
+        let remote_dir = self.ask_required(
+            "Remote bridge runtime directory",
+            "BRIDGE_REMOTE_DIR",
+            &default_remote,
+        )?;
+        let remote_node = self.ask_required(
+            "Remote Node.js executable",
+            "BRIDGE_REMOTE_NODE",
+            "/usr/local/bin/node",
+        )?;
+        // NEW: the name this worker claims under — `mac` on macOS (the
+        // legacy worker), the machine's hostname elsewhere.
+        let target_default = if cfg!(target_os = "macos") {
+            "mac".to_string()
+        } else {
+            hostname()
+        };
+        let target = self.ask_required("Worker target name", "BRIDGE_TARGET", &target_default)?;
         let cwd_default = self.cwd.clone();
-        let cwd = self.ask_required("Mac agent working directory", "BRIDGE_WORKDIR", &cwd_default)?;
+        // DELIBERATE DIVERGENCE: the Node label was "Mac agent working
+        // directory"; the worker is no longer necessarily a Mac.
+        let cwd = self.ask_required("Worker agent working directory", "BRIDGE_WORKDIR", &cwd_default)?;
         ensure_workdir(&cwd)?;
         let claude_bin = self.executable_prompt("Claude Code executable", "CLAUDE_BIN", "claude")?;
         let codex_bin = self.executable_prompt("Codex executable", "CODEX_BIN", "codex")?;
         let permission_mode = self.permission_mode()?;
         let path_env = (self.env)("PATH").unwrap_or_default();
         Ok(json!({
-            "gcpSsh": gcp_ssh,
-            "gcpKey": gcp_key,
+            "leaderSsh": leader_ssh,
+            "leaderKey": leader_key,
             "remoteDir": remote_dir,
             "remoteNode": remote_node,
+            "target": target,
             "claudeBin": claude_bin,
             "codexBin": codex_bin,
             "cwd": cwd,
@@ -522,6 +664,33 @@ impl Wizard<'_> {
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
+
+/// A yes/no wizard answer, `/^y/i`-style.
+fn is_yes(answer: &str) -> bool {
+    answer.trim().to_ascii_lowercase().starts_with('y')
+}
+
+/// The default label for a worker target: the name with its first letter
+/// upper-cased (`mac` → `Mac`, the legacy label).
+fn title_label(name: &str) -> String {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
+    }
+}
+
+/// The machine's short hostname (the first DNS label — `pi.lan` makes a poor
+/// target name), the non-macOS default worker target name. Falls back to
+/// `worker` rather than erroring: it only seeds a prompt.
+fn hostname() -> String {
+    hostname::get()
+        .map(|h| h.to_string_lossy().into_owned())
+        .ok()
+        .and_then(|h| h.split('.').next().map(str::to_string))
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "worker".to_string())
+}
 
 /// `binaryPath` — dirname when absolute, `''` otherwise.
 fn binary_path(binary: &str) -> String {
@@ -620,8 +789,7 @@ pub fn save_config(path: &Path, config: &Value) -> Result<(), String> {
         }
         println!("Backed up existing config to {}", backup.display());
     }
-    let mut body =
-        serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
+    let mut body = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     body.push('\n');
     fsutil::atomic_write_0600(path, body.as_bytes()).map_err(|e| format!("{}: {e}", path.display()))
 }
@@ -714,45 +882,48 @@ pub fn node_shim(verb: &str) -> String {
 // Services
 // ---------------------------------------------------------------------------
 
-/// `installCoordinatorService` — user systemd unit + daemon-reload +
-/// enable --now + the linger note.
-fn install_coordinator_service(
-    config: &Value,
-    runtime_dir: &Path,
+/// The PATH the coordinator's unit exports: the defaultTarget's `extraPath`
+/// when that target is local, else the FIRST local target's, else `""` — a
+/// leader-only unit runs no engines and needs no engine PATH.
+///
+/// DELIBERATE DIVERGENCE from the Node installer, which read the hardcoded
+/// `targets.gcp.extraPath`.
+fn unit_extra_path(config: &Value) -> String {
+    let Some(targets) = config.get("targets").and_then(Value::as_object) else {
+        return String::new();
+    };
+    let is_local = |(name, t): &(&String, &Value)| config::target_kind(name, t) == "local";
+    config
+        .get("defaultTarget")
+        .and_then(Value::as_str)
+        .and_then(|d| targets.get_key_value(d))
+        .filter(|e| is_local(e))
+        .or_else(|| targets.iter().find(is_local))
+        .and_then(|(_, t)| t.get("extraPath").and_then(Value::as_str))
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// The shared systemd tail both user-unit installers run: write the unit,
+/// daemon-reload, enable --now, the recap line, the linger note.
+fn install_systemd_user_unit(
+    unit_name: &str,
+    unit: &str,
     home: &Path,
     start: bool,
+    role: &str,
 ) -> Result<(), String> {
-    if !cfg!(target_os = "linux") {
-        return Err("The coordinator service installer requires Linux with systemd.".to_string());
-    }
     if config::find_executable("systemctl").is_none() {
         return Err("systemctl was not found.".to_string());
     }
-    // PARITY (deliberate divergence): the Node installer also demanded a node
-    // binary ('Node.js was not found.') because its unit ran
-    // `node coordinator.mjs`. This unit execs the installed stackhour binary,
-    // so node is not a hard requirement here; `bridge doctor` still probes it
-    // for the claim/return shims' sake.
     let unit_dir = home.join(".config").join("systemd").join("user");
     ensure_dir(&unit_dir, 0o700)?;
-    let unit_path = unit_dir.join(SERVICE_NAME);
-    let exec = runtime_dir.join("stackhour");
-    let extra_path = config
-        .pointer("/targets/gcp/extraPath")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    let unit = config::render_systemd_unit(
-        &exec.display().to_string(),
-        &runtime_dir.display().to_string(),
-        &home.display().to_string(),
-        extra_path,
-    )
-    .map_err(|e| e.message().to_string())?;
+    let unit_path = unit_dir.join(unit_name);
     fsutil::atomic_write_0600(&unit_path, unit.as_bytes())
         .map_err(|e| format!("{}: {e}", unit_path.display()))?;
     run_cmd("systemctl", &["--user", "daemon-reload"])?;
     if start {
-        run_cmd("systemctl", &["--user", "enable", "--now", SERVICE_NAME])?;
+        run_cmd("systemctl", &["--user", "enable", "--now", unit_name])?;
     }
     println!("Installed user service: {}", unit_path.display());
     if config::find_executable("loginctl").is_some() {
@@ -765,45 +936,93 @@ fn install_coordinator_service(
             .unwrap_or(false);
         if !lingering {
             println!(
-                "Note: run \"sudo loginctl enable-linger {user}\" once to keep the coordinator running after logout."
+                "Note: run \"sudo loginctl enable-linger {user}\" once to keep the {role} running after logout."
             );
         }
     }
     Ok(())
 }
 
+/// `installCoordinatorService` — user systemd unit + daemon-reload +
+/// enable --now + the linger note.
+fn install_coordinator_service(
+    config: &Value,
+    runtime_dir: &Path,
+    home: &Path,
+    start: bool,
+) -> Result<(), String> {
+    if !cfg!(target_os = "linux") {
+        return Err("The coordinator service installer requires Linux with systemd.".to_string());
+    }
+    // PARITY (deliberate divergence): the Node installer also demanded a node
+    // binary ('Node.js was not found.') because its unit ran
+    // `node coordinator.mjs`. This unit execs the installed stackhour binary,
+    // so node is not a hard requirement here; `bridge doctor` still probes it
+    // for the claim/return shims' sake.
+    let exec = runtime_dir.join("stackhour");
+    let unit = config::render_systemd_unit(
+        &exec.display().to_string(),
+        &runtime_dir.display().to_string(),
+        &home.display().to_string(),
+        &unit_extra_path(config),
+    )
+    .map_err(|e| e.message().to_string())?;
+    install_systemd_user_unit(SERVICE_NAME, &unit, home, start, "coordinator")
+}
+
 /// `installWorkerService` — LaunchAgent plist + plutil lint +
-/// bootout(ignored)/bootstrap/kickstart.
+/// bootout(ignored)/bootstrap/kickstart on macOS; DELIBERATE DIVERGENCE on
+/// Linux (which the Node worker installer refused outright): a systemd user
+/// unit through the same machinery as the coordinator's.
 fn install_worker_service(
     config: &Value,
     runtime_dir: &Path,
     home: &Path,
     start: bool,
 ) -> Result<(), String> {
-    let agents = home.join("Library").join("LaunchAgents");
-    ensure_dir(&agents, 0o755)?;
-    let plist_path = agents.join(format!("{LAUNCHD_LABEL}.plist"));
     let exec = runtime_dir.join("stackhour");
-    let extra_path = config.get("extraPath").and_then(Value::as_str).unwrap_or_default();
-    let plist = config::render_launch_agent(
-        &exec.display().to_string(),
-        &runtime_dir.display().to_string(),
-        &home.display().to_string(),
-        extra_path,
-    );
-    fsutil::atomic_write_0600(&plist_path, plist.as_bytes())
-        .map_err(|e| format!("{}: {e}", plist_path.display()))?;
-    let plist_str = plist_path.display().to_string();
-    run_cmd("plutil", &["-lint", &plist_str])?;
-    if start {
-        let domain = format!("gui/{}", uid());
-        // bootout is allowFailure: it fails when nothing is loaded yet.
-        let _ = run_cmd("launchctl", &["bootout", &format!("{domain}/{LAUNCHD_LABEL}")]);
-        run_cmd("launchctl", &["bootstrap", &domain, &plist_str])?;
-        run_cmd("launchctl", &["kickstart", "-k", &format!("{domain}/{LAUNCHD_LABEL}")])?;
+    let extra_path = config
+        .get("extraPath")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if cfg!(target_os = "macos") {
+        let agents = home.join("Library").join("LaunchAgents");
+        ensure_dir(&agents, 0o755)?;
+        let plist_path = agents.join(format!("{LAUNCHD_LABEL}.plist"));
+        let plist = config::render_launch_agent(
+            &exec.display().to_string(),
+            &runtime_dir.display().to_string(),
+            &home.display().to_string(),
+            extra_path,
+        );
+        fsutil::atomic_write_0600(&plist_path, plist.as_bytes())
+            .map_err(|e| format!("{}: {e}", plist_path.display()))?;
+        let plist_str = plist_path.display().to_string();
+        run_cmd("plutil", &["-lint", &plist_str])?;
+        if start {
+            let domain = format!("gui/{}", uid());
+            // bootout is allowFailure: it fails when nothing is loaded yet.
+            let _ = run_cmd("launchctl", &["bootout", &format!("{domain}/{LAUNCHD_LABEL}")]);
+            run_cmd("launchctl", &["bootstrap", &domain, &plist_str])?;
+            run_cmd(
+                "launchctl",
+                &["kickstart", "-k", &format!("{domain}/{LAUNCHD_LABEL}")],
+            )?;
+        }
+        println!("Installed LaunchAgent: {}", plist_path.display());
+        Ok(())
+    } else if cfg!(target_os = "linux") {
+        let unit = config::render_worker_systemd_unit(
+            &exec.display().to_string(),
+            &runtime_dir.display().to_string(),
+            &home.display().to_string(),
+            extra_path,
+        )
+        .map_err(|e| e.message().to_string())?;
+        install_systemd_user_unit(config::WORKER_SERVICE_NAME, &unit, home, start, "worker")
+    } else {
+        Err("The worker service installer requires macOS (launchd) or Linux (systemd).".to_string())
     }
-    println!("Installed LaunchAgent: {}", plist_path.display());
-    Ok(())
 }
 
 #[cfg(test)]
@@ -844,11 +1063,21 @@ mod tests {
     }
     impl Prompter for Scripted {
         fn ask(&mut self, label: &str, default: &str) -> Result<String, String> {
-            let answer = self.answers.pop_front().unwrap_or_else(|| panic!("no scripted answer for {label}"));
-            Ok(if answer.is_empty() { default.to_string() } else { answer.to_string() })
+            let answer = self
+                .answers
+                .pop_front()
+                .unwrap_or_else(|| panic!("no scripted answer for {label}"));
+            Ok(if answer.is_empty() {
+                default.to_string()
+            } else {
+                answer.to_string()
+            })
         }
         fn ask_secret(&mut self, label: &str, _env: &str, optional: bool) -> Result<String, String> {
-            let answer = self.secrets.pop_front().unwrap_or_else(|| panic!("no scripted secret for {label}"));
+            let answer = self
+                .secrets
+                .pop_front()
+                .unwrap_or_else(|| panic!("no scripted secret for {label}"));
             if answer.is_empty() && !optional {
                 return Err(format!("{label} is required."));
             }
@@ -891,7 +1120,12 @@ mod tests {
     #[test]
     fn flags_parse_in_any_position_with_both_runtime_dir_forms() {
         let p = parse_bridge_args(&argv(&[
-            "install", "--runtime-dir", "/rt", "coordinator", "--no-start", "--non-interactive",
+            "install",
+            "--runtime-dir",
+            "/rt",
+            "coordinator",
+            "--no-start",
+            "--non-interactive",
         ]))
         .unwrap();
         assert_eq!(p.positionals, vec!["install", "coordinator"]);
@@ -912,9 +1146,11 @@ mod tests {
         assert!(parse_bridge_args(&argv(&["install", "--frobnicate"]))
             .unwrap_err()
             .contains("Unknown option '--frobnicate'"));
-        assert!(parse_bridge_args(&argv(&["install", "coordinator", "--runtime-dir"]))
-            .unwrap_err()
-            .contains("argument missing"));
+        assert!(
+            parse_bridge_args(&argv(&["install", "coordinator", "--runtime-dir"]))
+                .unwrap_err()
+                .contains("argument missing")
+        );
     }
 
     /// An explicit flag beats env beats the default, with JS `||` falsiness.
@@ -1036,17 +1272,39 @@ mod tests {
         let keys: Vec<&str> = cfg.as_object().unwrap().keys().map(String::as_str).collect();
         assert_eq!(
             keys,
-            ["token", "chatId", "defaultTarget", "maxMediaBytes", "elevenLabsApiKey", "targets"]
+            [
+                "token",
+                "chatId",
+                "defaultTarget",
+                "maxMediaBytes",
+                "elevenLabsApiKey",
+                "targets"
+            ]
         );
         assert_eq!(cfg["token"], "tok-123");
         assert_eq!(cfg["chatId"], -100123);
         assert_eq!(cfg["maxMediaBytes"], 512 * 1024 * 1024);
         // Optional secret, absent from env, non-interactive -> ''.
         assert_eq!(cfg["elevenLabsApiKey"], "");
-        let gcp_keys: Vec<&str> = cfg["targets"]["gcp"].as_object().unwrap().keys().map(String::as_str).collect();
+        let gcp_keys: Vec<&str> = cfg["targets"]["gcp"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
         assert_eq!(
             gcp_keys,
-            ["label", "type", "cwd", "claudeBin", "codexBin", "extraPath", "permissionMode", "model", "codexModel"]
+            [
+                "label",
+                "type",
+                "cwd",
+                "claudeBin",
+                "codexBin",
+                "extraPath",
+                "permissionMode",
+                "model",
+                "codexModel"
+            ]
         );
         assert_eq!(cfg["targets"]["gcp"]["label"], "Linux");
         assert_eq!(cfg["targets"]["gcp"]["permissionMode"], "default");
@@ -1055,13 +1313,12 @@ mod tests {
         // mergedPath(binDir(claude), binDir(codex), PATH) — bin dirs first,
         // deduped (both fakes share a dir).
         let extra = cfg["targets"]["gcp"]["extraPath"].as_str().unwrap();
-        assert_eq!(
-            extra,
-            format!("{}:/usr/bin:/bin", tmp.path().display())
-        );
+        assert_eq!(extra, format!("{}:/usr/bin:/bin", tmp.path().display()));
     }
 
     /// The interactive path: scripted answers, Enter-for-default behaviour.
+    /// Pressing Enter through every new roster question must reproduce the
+    /// Node's gcp+mac config.
     #[test]
     fn the_interactive_wizard_walks_the_node_question_order() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1071,9 +1328,25 @@ mod tests {
         let codex_static: &'static str = Box::leak(codex.into_boxed_str());
         let env = env_of(&[]);
         let mut prompter = Scripted {
-            // chat id, workdir (Enter = cwd default), claude, codex,
-            // permission mode (Enter = default).
-            answers: VecDeque::from(["42", "", claude_static, codex_static, ""]),
+            // chat id, role (Enter = all-in-one), local name (Enter = gcp),
+            // local label (Enter = Linux), workdir (Enter = cwd default),
+            // claude, codex, permission mode (Enter = default), add-worker
+            // (Enter = yes), worker name (Enter = mac), worker label
+            // (Enter = Mac), add-another (Enter = no).
+            answers: VecDeque::from([
+                "42",
+                "",
+                "",
+                "",
+                "",
+                claude_static,
+                codex_static,
+                "",
+                "",
+                "",
+                "",
+                "",
+            ]),
             // token, elevenlabs (optional, empty).
             secrets: VecDeque::from(["sekrit", ""]),
         };
@@ -1087,15 +1360,210 @@ mod tests {
         let cfg = wiz.coordinator_config().expect("builds");
         assert_eq!(cfg["token"], "sekrit");
         assert_eq!(cfg["chatId"], 42);
+        assert_eq!(cfg["defaultTarget"], "gcp");
+        assert_eq!(cfg["targets"]["gcp"]["label"], "Linux");
         assert_eq!(cfg["targets"]["gcp"]["cwd"], tmp.path().display().to_string());
         assert_eq!(cfg["targets"]["gcp"]["permissionMode"], "default");
+        // Enter-through ends on the legacy mac worker, byte for byte.
+        assert_eq!(
+            cfg["targets"]["mac"],
+            json!({ "label": "Mac", "type": "remote", "permissionMode": "default" })
+        );
         assert!(validate_coordinator_config(&cfg).is_empty());
     }
 
-    /// The worker wizard is macOS-only, with the Node error text.
-    #[cfg(target_os = "linux")]
+    /// The role question's leader-only arm: no engine env, no engine
+    /// prompts, zero local targets, and the strict validator is happy.
     #[test]
-    fn the_worker_wizard_refuses_to_run_off_macos() {
+    fn a_leader_only_environment_yields_a_workerless_roster() {
+        for role in ["leader-only", "2"] {
+            let pairs = [
+                ("TELEGRAM_BOT_TOKEN", "tok"),
+                ("TELEGRAM_CHAT_ID", "7"),
+                ("BRIDGE_COORDINATOR_ROLE", role),
+            ];
+            let env = env_of(&pairs);
+            let mut prompter = NoPrompts;
+            let mut wiz = Wizard {
+                env: &env,
+                non_interactive: true,
+                prompter: &mut prompter,
+                cwd: "/".into(),
+                home: PathBuf::from("/h"),
+            };
+            let cfg = wiz
+                .coordinator_config()
+                .expect("builds with no engine env at all");
+            assert!(validate_coordinator_config(&cfg).is_empty());
+            assert_eq!(cfg["defaultTarget"], "mac");
+            assert_eq!(cfg["targets"].as_object().unwrap().len(), 1);
+            // No permissionMode: leader-only never asked for one.
+            assert_eq!(cfg["targets"]["mac"], json!({ "label": "Mac", "type": "remote" }));
+        }
+    }
+
+    #[test]
+    fn an_invalid_coordinator_role_is_rejected() {
+        assert_eq!(
+            wizard_err(&[
+                ("TELEGRAM_BOT_TOKEN", "t"),
+                ("TELEGRAM_CHAT_ID", "1"),
+                ("BRIDGE_COORDINATOR_ROLE", "cluster"),
+            ]),
+            "Invalid coordinator role."
+        );
+    }
+
+    /// The target loop itself: a leader-only wizard collecting two named
+    /// workers, defaultTarget falling on the first.
+    #[test]
+    fn the_interactive_wizard_collects_extra_leader_only_targets() {
+        let env = env_of(&[]);
+        let mut prompter = Scripted {
+            // chat id, role, worker name, worker label (Enter = Pi),
+            // add-another (yes), name, label, add-another (Enter = no).
+            answers: VecDeque::from(["7", "2", "pi", "", "y", "attic", "Attic loft", ""]),
+            secrets: VecDeque::from(["tok", ""]),
+        };
+        let mut wiz = Wizard {
+            env: &env,
+            non_interactive: false,
+            prompter: &mut prompter,
+            cwd: "/".into(),
+            home: PathBuf::from("/h"),
+        };
+        let cfg = wiz.coordinator_config().expect("builds");
+        assert!(validate_coordinator_config(&cfg).is_empty());
+        assert_eq!(cfg["defaultTarget"], "pi");
+        let names: Vec<&str> = cfg["targets"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(names, ["pi", "attic"]);
+        assert_eq!(cfg["targets"]["pi"], json!({ "label": "Pi", "type": "remote" }));
+        assert_eq!(cfg["targets"]["attic"]["label"], "Attic loft");
+    }
+
+    /// A worker name colliding with an existing target is caught before any
+    /// write.
+    #[test]
+    fn a_duplicate_target_name_is_rejected() {
+        let tmp = tempfile::tempdir().unwrap();
+        let claude = fake_bin(tmp.path(), "claude");
+        let codex = fake_bin(tmp.path(), "codex");
+        let workdir = tmp.path().display().to_string();
+        let pairs = [
+            ("TELEGRAM_BOT_TOKEN", "t"),
+            ("TELEGRAM_CHAT_ID", "1"),
+            ("BRIDGE_WORKDIR", workdir.as_str()),
+            ("CLAUDE_BIN", claude.as_str()),
+            ("CODEX_BIN", codex.as_str()),
+            // The all-in-one local target defaults to `gcp`; naming the
+            // first worker `gcp` too must fail.
+            ("BRIDGE_TARGET", "gcp"),
+        ];
+        assert_eq!(wizard_err(&pairs), "Duplicate target name: gcp");
+    }
+
+    /// DELIBERATE DIVERGENCE: the Node wizard refused off macOS. A Linux
+    /// worker now configures fine, written with the leader* spellings and a
+    /// claim target.
+    #[test]
+    fn the_worker_wizard_writes_leader_spellings_and_a_target() {
+        let tmp = tempfile::tempdir().unwrap();
+        let claude = fake_bin(tmp.path(), "claude");
+        let codex = fake_bin(tmp.path(), "codex");
+        let key = tmp.path().join("id_test");
+        std::fs::write(&key, "KEY").unwrap();
+        let key = key.display().to_string();
+        let workdir = tmp.path().display().to_string();
+        let pairs = [
+            ("BRIDGE_LEADER_SSH", "user@leader.example"),
+            ("BRIDGE_LEADER_KEY", key.as_str()),
+            ("BRIDGE_TARGET", "attic"),
+            ("BRIDGE_WORKDIR", workdir.as_str()),
+            ("CLAUDE_BIN", claude.as_str()),
+            ("CODEX_BIN", codex.as_str()),
+            ("PATH", "/usr/bin:/bin"),
+        ];
+        let env = env_of(&pairs);
+        let mut prompter = NoPrompts;
+        let mut wiz = Wizard {
+            env: &env,
+            non_interactive: true,
+            prompter: &mut prompter,
+            cwd: "/".into(),
+            home: PathBuf::from("/h"),
+        };
+        let cfg = wiz.worker_config().expect("builds");
+        assert!(validate_worker_config(&cfg).is_empty());
+        let keys: Vec<&str> = cfg.as_object().unwrap().keys().map(String::as_str).collect();
+        assert_eq!(
+            keys,
+            [
+                "leaderSsh",
+                "leaderKey",
+                "remoteDir",
+                "remoteNode",
+                "target",
+                "claudeBin",
+                "codexBin",
+                "cwd",
+                "extraPath",
+                "permissionMode",
+                "model",
+                "codexModel"
+            ]
+        );
+        assert_eq!(cfg["leaderSsh"], "user@leader.example");
+        assert_eq!(cfg["leaderKey"], key);
+        assert_eq!(cfg["target"], "attic");
+        assert!(
+            cfg.get("gcpSsh").is_none(),
+            "new configs use the leader spellings"
+        );
+        // The remoteDir default still derives from the ssh user.
+        assert_eq!(cfg["remoteDir"], "/home/user/.local/share/stackhour/bridge");
+    }
+
+    /// The legacy BRIDGE_GCP_* env spellings still drive a non-interactive
+    /// worker install, and the missing-env error names the preferred one.
+    #[test]
+    fn the_worker_wizard_accepts_the_legacy_gcp_env_spellings() {
+        let tmp = tempfile::tempdir().unwrap();
+        let claude = fake_bin(tmp.path(), "claude");
+        let codex = fake_bin(tmp.path(), "codex");
+        let key = tmp.path().join("id_test");
+        std::fs::write(&key, "KEY").unwrap();
+        let key = key.display().to_string();
+        let workdir = tmp.path().display().to_string();
+        let pairs = [
+            ("BRIDGE_GCP_SSH", "user@example.com"),
+            ("BRIDGE_GCP_KEY", key.as_str()),
+            ("BRIDGE_WORKDIR", workdir.as_str()),
+            ("CLAUDE_BIN", claude.as_str()),
+            ("CODEX_BIN", codex.as_str()),
+        ];
+        let env = env_of(&pairs);
+        let mut prompter = NoPrompts;
+        let mut wiz = Wizard {
+            env: &env,
+            non_interactive: true,
+            prompter: &mut prompter,
+            cwd: "/".into(),
+            home: PathBuf::from("/h"),
+        };
+        let cfg = wiz.worker_config().expect("legacy env spellings still work");
+        assert_eq!(cfg["leaderSsh"], "user@example.com");
+        assert_eq!(cfg["leaderKey"], key);
+        // No BRIDGE_TARGET: the non-macOS default is the short hostname
+        // (never empty — `worker` is the last resort).
+        let target = cfg["target"].as_str().unwrap();
+        assert!(!target.is_empty() && !target.contains('.'), "{target}");
+
+        // Neither spelling set: the error names the preferred variable.
         let env = env_of(&[]);
         let mut prompter = NoPrompts;
         let mut wiz = Wizard {
@@ -1107,8 +1575,28 @@ mod tests {
         };
         assert_eq!(
             wiz.worker_config().unwrap_err(),
-            "The worker installer currently targets macOS."
+            "Leader SSH destination (user@host) is required (set BRIDGE_LEADER_SSH for non-interactive setup)."
         );
+    }
+
+    /// The coordinator unit's PATH follows the defaultTarget when it is
+    /// local, else the first local target, else nothing (leader-only).
+    #[test]
+    fn the_unit_extra_path_prefers_the_default_then_the_first_local_target() {
+        let legacy = json!({
+            "defaultTarget": "gcp",
+            "targets": { "gcp": { "extraPath": "/a:/b" }, "mac": {} }
+        });
+        assert_eq!(unit_extra_path(&legacy), "/a:/b");
+        // A non-local defaultTarget falls through to the first local.
+        let v = json!({
+            "defaultTarget": "pi",
+            "targets": { "pi": {}, "attic": { "type": "local", "extraPath": "/x" } }
+        });
+        assert_eq!(unit_extra_path(&v), "/x");
+        // Leader-only: no engines, no engine PATH.
+        let leader = json!({ "defaultTarget": "pi", "targets": { "pi": {}, "attic": {} } });
+        assert_eq!(unit_extra_path(&leader), "");
     }
 
     // ---- writes ----------------------------------------------------------
@@ -1167,7 +1655,10 @@ mod tests {
         copy_runtime("worker", worker.path()).unwrap();
         assert!(worker.path().join("stackhour").is_file());
         assert!(worker.path().join("tg-send.mjs").is_file());
-        assert!(!worker.path().join("claim.mjs").exists(), "claim/return are coordinator-side");
+        assert!(
+            !worker.path().join("claim.mjs").exists(),
+            "claim/return are coordinator-side"
+        );
     }
 
     /// Each shim must be a plausible ESM node script wrapping the right verb.

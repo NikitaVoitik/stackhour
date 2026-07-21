@@ -22,7 +22,9 @@ struct Sandbox {
 
 impl Sandbox {
     fn new() -> Self {
-        Sandbox { home: TempDir::new().unwrap() }
+        Sandbox {
+            home: TempDir::new().unwrap(),
+        }
     }
 
     fn run(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
@@ -74,7 +76,10 @@ fn bridge_help_prints_the_usage_banner_and_exits_zero() {
             text.starts_with("stackhour bridge — install and operate the Telegram Claude + Codex bridge\n"),
             "{args:?}: {text}"
         );
-        assert!(text.contains("stackhour bridge install <coordinator|worker>"), "{text}");
+        assert!(
+            text.contains("stackhour bridge install <coordinator|worker>"),
+            "{text}"
+        );
         assert_eq!(stderr(&out), "", "help must keep stderr clean");
     }
 }
@@ -110,7 +115,14 @@ fn non_interactive_install_fails_before_any_write_when_env_is_missing() {
     let rt_str = rt.display().to_string();
 
     let out = sb.run(
-        &["bridge", "install", "coordinator", "--non-interactive", "--runtime-dir", &rt_str],
+        &[
+            "bridge",
+            "install",
+            "coordinator",
+            "--non-interactive",
+            "--runtime-dir",
+            &rt_str,
+        ],
         &[],
     );
     assert_eq!(out.status.code(), Some(1));
@@ -122,7 +134,14 @@ fn non_interactive_install_fails_before_any_write_when_env_is_missing() {
     assert!(!rt.exists(), "a refused install must write nothing");
 
     let out = sb.run(
-        &["bridge", "install", "coordinator", "--non-interactive", "--runtime-dir", &rt_str],
+        &[
+            "bridge",
+            "install",
+            "coordinator",
+            "--non-interactive",
+            "--runtime-dir",
+            &rt_str,
+        ],
         &[("TELEGRAM_BOT_TOKEN", "tok")],
     );
     assert!(
@@ -160,7 +179,15 @@ fn coordinator_install_writes_config_runtime_and_unit() {
     ];
 
     let out = sb.run(
-        &["bridge", "install", "coordinator", "--non-interactive", "--no-start", "--runtime-dir", &rt_str],
+        &[
+            "bridge",
+            "install",
+            "coordinator",
+            "--non-interactive",
+            "--no-start",
+            "--runtime-dir",
+            &rt_str,
+        ],
         &env,
     );
     // Exit 0 with a session bus, exit 1 at daemon-reload without one; either
@@ -168,13 +195,16 @@ fn coordinator_install_writes_config_runtime_and_unit() {
     assert_ne!(out.status.code(), Some(101), "panicked: {}", stderr(&out));
     assert!(!stderr(&out).contains("not implemented in the Rust port yet"));
     if out.status.code() == Some(1) {
-        assert!(stderr(&out).contains("systemctl"), "unexpected failure: {}", stderr(&out));
+        assert!(
+            stderr(&out).contains("systemctl"),
+            "unexpected failure: {}",
+            stderr(&out)
+        );
     }
 
     // Config: 0600, the Node key set, the answers we fed in.
     let cfg_path = rt.join("config.json");
-    let cfg: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(&cfg_path).unwrap()).unwrap();
+    let cfg: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&cfg_path).unwrap()).unwrap();
     assert_eq!(cfg["token"], "tok-abc");
     assert_eq!(cfg["chatId"], -100123);
     assert_eq!(cfg["defaultTarget"], "gcp");
@@ -210,24 +240,41 @@ fn coordinator_install_writes_config_runtime_and_unit() {
         .join(".config/systemd/user/stackhour-bridge.service");
     let unit = std::fs::read_to_string(&unit_path).expect("unit file written");
     assert!(
-        unit.contains(&format!("ExecStart=\"{}\" bridge coordinator", rt.join("stackhour").display())),
+        unit.contains(&format!(
+            "ExecStart=\"{}\" bridge coordinator",
+            rt.join("stackhour").display()
+        )),
         "{unit}"
     );
     assert!(!unit.contains("coordinator.mjs"), "{unit}");
 
     // Re-running reuses the config rather than reprompting.
     let out = sb.run(
-        &["bridge", "install", "coordinator", "--non-interactive", "--no-start", "--runtime-dir", &rt_str],
+        &[
+            "bridge",
+            "install",
+            "coordinator",
+            "--non-interactive",
+            "--no-start",
+            "--runtime-dir",
+            &rt_str,
+        ],
         &[],
     );
     assert!(
-        stdout(&out).contains(&format!("Reusing {}; pass --reconfigure to replace it.", cfg_path.display())),
+        stdout(&out).contains(&format!(
+            "Reusing {}; pass --reconfigure to replace it.",
+            cfg_path.display()
+        )),
         "{}",
         stdout(&out)
     );
 
     // ...and doctor now sees the installed runtime.
-    let out = sb.run(&["bridge", "doctor", "coordinator", "--runtime-dir", &rt_str], &env);
+    let out = sb.run(
+        &["bridge", "doctor", "coordinator", "--runtime-dir", &rt_str],
+        &env,
+    );
     let text = stdout(&out);
     for line in [
         "✓ Config exists: ",
@@ -240,6 +287,176 @@ fn coordinator_install_writes_config_runtime_and_unit() {
         assert!(text.contains(line), "missing {line:?} in:\n{text}");
     }
     assert!(text.contains("Node.js >=22 ("), "{text}");
+}
+
+/// A leader-only non-interactive install: no engine env at all, zero local
+/// targets in the written config (which still passes the strict validator),
+/// and doctor prints the leader-only line.
+#[cfg(target_os = "linux")]
+#[test]
+fn leader_only_coordinator_install_writes_a_workerless_roster() {
+    let sb = Sandbox::new();
+    let rt = sb.home.path().join("rt");
+    let rt_str = rt.display().to_string();
+    let env: Vec<(&str, &str)> = vec![
+        ("TELEGRAM_BOT_TOKEN", "tok"),
+        ("TELEGRAM_CHAT_ID", "7"),
+        ("BRIDGE_COORDINATOR_ROLE", "leader-only"),
+    ];
+
+    let out = sb.run(
+        &[
+            "bridge",
+            "install",
+            "coordinator",
+            "--non-interactive",
+            "--no-start",
+            "--runtime-dir",
+            &rt_str,
+        ],
+        &env,
+    );
+    assert_ne!(out.status.code(), Some(101), "panicked: {}", stderr(&out));
+    if out.status.code() == Some(1) {
+        assert!(
+            stderr(&out).contains("systemctl"),
+            "unexpected failure: {}",
+            stderr(&out)
+        );
+    }
+
+    let cfg: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(rt.join("config.json")).unwrap()).unwrap();
+    assert!(
+        stackhour_bridge::config::validate_coordinator_config(&cfg).is_empty(),
+        "strict validator must accept the leader-only config: {cfg}"
+    );
+    assert_eq!(cfg["defaultTarget"], "mac");
+    let targets = cfg["targets"].as_object().unwrap();
+    assert_eq!(targets.len(), 1);
+    assert!(
+        targets.values().all(|t| t["type"] == "remote"),
+        "zero local targets: {cfg}"
+    );
+    assert!(
+        cfg["targets"]["mac"].get("cwd").is_none(),
+        "no engine keys anywhere"
+    );
+
+    // The unit is still written (the leader runs the bot + queue), with no
+    // engine PATH to export.
+    let unit = std::fs::read_to_string(
+        sb.home
+            .path()
+            .join(".config/systemd/user/stackhour-bridge.service"),
+    )
+    .expect("unit file written");
+    assert!(unit.contains("bridge coordinator"), "{unit}");
+    assert!(
+        unit.contains("Environment=\"PATH=\""),
+        "leader-only exports no engine PATH: {unit}"
+    );
+
+    let out = sb.run(
+        &["bridge", "doctor", "coordinator", "--runtime-dir", &rt_str],
+        &env,
+    );
+    let text = stdout(&out);
+    assert!(
+        text.contains("✓ leader-only coordinator (no local engines)"),
+        "{text}"
+    );
+    assert!(!text.contains("Working directory"), "{text}");
+}
+
+/// The Linux worker install: no macOS refusal, leader* config spellings and
+/// a claim target, plus a systemd user unit that runs `bridge worker`.
+#[cfg(target_os = "linux")]
+#[test]
+fn worker_install_on_linux_writes_config_and_a_systemd_unit() {
+    let sb = Sandbox::new();
+    let rt = sb.home.path().join("rt");
+    let rt_str = rt.display().to_string();
+    let bins = sb.home.path().join("bins");
+    std::fs::create_dir(&bins).unwrap();
+    let claude = fake_bin(&bins, "claude");
+    let codex = fake_bin(&bins, "codex");
+    let work = sb.home.path().join("work");
+    std::fs::create_dir(&work).unwrap();
+    let key = sb.home.path().join("id_test");
+    std::fs::write(&key, "KEY").unwrap();
+    let key = key.display().to_string();
+    let env: Vec<(&str, &str)> = vec![
+        ("BRIDGE_LEADER_SSH", "user@leader.example"),
+        ("BRIDGE_LEADER_KEY", &key),
+        ("BRIDGE_TARGET", "attic"),
+        ("BRIDGE_WORKDIR", work.to_str().unwrap()),
+        ("CLAUDE_BIN", &claude),
+        ("CODEX_BIN", &codex),
+    ];
+
+    let out = sb.run(
+        &[
+            "bridge",
+            "install",
+            "worker",
+            "--non-interactive",
+            "--no-start",
+            "--runtime-dir",
+            &rt_str,
+        ],
+        &env,
+    );
+    assert_ne!(out.status.code(), Some(101), "panicked: {}", stderr(&out));
+    assert!(
+        !stderr(&out).contains("The worker installer currently targets macOS."),
+        "{}",
+        stderr(&out)
+    );
+    if out.status.code() == Some(1) {
+        assert!(
+            stderr(&out).contains("systemctl"),
+            "unexpected failure: {}",
+            stderr(&out)
+        );
+    }
+
+    let cfg: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(rt.join("worker-config.json")).unwrap()).unwrap();
+    assert!(
+        stackhour_bridge::config::validate_worker_config(&cfg).is_empty(),
+        "{cfg}"
+    );
+    assert_eq!(cfg["leaderSsh"], "user@leader.example");
+    assert_eq!(cfg["leaderKey"], key);
+    assert_eq!(cfg["target"], "attic");
+    assert!(
+        cfg.get("gcpSsh").is_none(),
+        "new configs use the leader spellings: {cfg}"
+    );
+
+    // Runtime: the binary + the worker-side tg-send shim only.
+    assert!(rt.join("stackhour").is_file());
+    assert!(rt.join("tg-send.mjs").is_file());
+    assert!(
+        !rt.join("claim.mjs").exists(),
+        "claim/return are coordinator-side"
+    );
+
+    // The systemd user unit execs the installed binary with `bridge worker`.
+    let unit = std::fs::read_to_string(
+        sb.home
+            .path()
+            .join(".config/systemd/user/stackhour-bridge-worker.service"),
+    )
+    .expect("worker unit written");
+    assert!(
+        unit.contains(&format!(
+            "ExecStart=\"{}\" bridge worker",
+            rt.join("stackhour").display()
+        )),
+        "{unit}"
+    );
 }
 
 /// The claim/return shims the installer writes must be REAL node scripts that
@@ -260,7 +477,15 @@ fn the_installed_shims_speak_the_job_protocol_under_node() {
     let claude = fake_bin(&bins, "claude");
     let codex = fake_bin(&bins, "codex");
     let out = sb.run(
-        &["bridge", "install", "coordinator", "--non-interactive", "--no-start", "--runtime-dir", &rt_str],
+        &[
+            "bridge",
+            "install",
+            "coordinator",
+            "--non-interactive",
+            "--no-start",
+            "--runtime-dir",
+            &rt_str,
+        ],
         &[
             ("TELEGRAM_BOT_TOKEN", "tok"),
             ("TELEGRAM_CHAT_ID", "1"),
@@ -269,7 +494,11 @@ fn the_installed_shims_speak_the_job_protocol_under_node() {
             ("CODEX_BIN", &codex),
         ],
     );
-    assert!(rt.join("claim.mjs").is_file(), "install did not write shims: {}", stderr(&out));
+    assert!(
+        rt.join("claim.mjs").is_file(),
+        "install did not write shims: {}",
+        stderr(&out)
+    );
 
     // A job in the exact dispatch shape, claimed through `node claim.mjs`.
     const ID: &str = "45f2db13-ee19-4487-96e3-5a1467041246";
@@ -308,7 +537,12 @@ fn the_installed_shims_speak_the_job_protocol_under_node() {
         .write_all(format!("{{\"id\":\"{ID}\",\"text\":\"4\",\"code\":0}}").as_bytes())
         .unwrap();
     let out = child.wait_with_output().unwrap();
-    assert_eq!(out.status.code(), Some(0), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert!(rt.join("results").join(format!("{ID}.json")).exists());
     assert!(!rt.join("inprogress").join(format!("{ID}.json")).exists());
 }
@@ -321,7 +555,13 @@ fn bridge_doctor_reports_a_missing_config_and_exits_one() {
     let rt = sb.home.path().join("rt");
     std::fs::create_dir(&rt).unwrap();
     let out = sb.run(
-        &["bridge", "doctor", "coordinator", "--runtime-dir", &rt.display().to_string()],
+        &[
+            "bridge",
+            "doctor",
+            "coordinator",
+            "--runtime-dir",
+            &rt.display().to_string(),
+        ],
         &[],
     );
     assert_eq!(out.status.code(), Some(1));
@@ -339,20 +579,28 @@ fn bridge_status_and_restart_are_dispatched() {
     for verb in ["status", "restart"] {
         let out = sb.run(&["bridge", verb, "coordinator"], &[]);
         assert_ne!(out.status.code(), Some(101), "{verb} panicked: {}", stderr(&out));
-        assert!(!stderr(&out).contains("not implemented in the Rust port yet"), "{verb}");
+        assert!(
+            !stderr(&out).contains("not implemented in the Rust port yet"),
+            "{verb}"
+        );
         if !out.status.success() {
             assert!(stderr(&out).contains("Error: "), "{verb}: {}", stderr(&out));
         }
-        // The worker role is macOS-only, with the exact Node error.
+        // DELIBERATE DIVERGENCE: the worker role is no longer macOS-only —
+        // on Linux it drives the systemd user unit. In the sandbox there is
+        // no user manager, so it fails through the clean error path.
         #[cfg(target_os = "linux")]
         {
             let out = sb.run(&["bridge", verb, "worker"], &[]);
-            assert_eq!(out.status.code(), Some(1));
+            assert_ne!(out.status.code(), Some(101), "{verb} panicked: {}", stderr(&out));
             assert!(
-                stderr(&out).contains("Error: Worker service commands require macOS."),
+                !stderr(&out).contains("Worker service commands require macOS."),
                 "{verb}: {}",
                 stderr(&out)
             );
+            if !out.status.success() {
+                assert!(stderr(&out).contains("Error: "), "{verb}: {}", stderr(&out));
+            }
         }
     }
 }
@@ -376,7 +624,11 @@ fn an_unknown_flag_is_a_clean_error() {
     let sb = Sandbox::new();
     let out = sb.run(&["bridge", "install", "coordinator", "--frobnicate"], &[]);
     assert_eq!(out.status.code(), Some(1));
-    assert!(stderr(&out).contains("Error: Unknown option '--frobnicate'"), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("Error: Unknown option '--frobnicate'"),
+        "{}",
+        stderr(&out)
+    );
 }
 
 fn find_node() -> Option<PathBuf> {

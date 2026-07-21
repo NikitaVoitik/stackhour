@@ -82,6 +82,9 @@ pub struct WorkerCfg {
 
 /// The systemd unit name the coordinator installs as.
 pub const SERVICE_NAME: &str = "stackhour-bridge.service";
+/// The systemd unit name a LINUX pull-worker installs as. NEW vs the Node
+/// bridge, whose worker installer was macOS-only.
+pub const WORKER_SERVICE_NAME: &str = "stackhour-bridge-worker.service";
 /// The launchd label the mac worker installs as.
 pub const LAUNCHD_LABEL: &str = "com.stackhour.bridge-worker";
 
@@ -146,13 +149,7 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
                     // `targets[name]?.label || name` — the Node label() fallback.
                     label: truthy_str(t, "label").unwrap_or_else(|| name.clone()),
                     // The JSON key is `type`; `kind` is the Rust-side name.
-                    kind: truthy_str(t, "type").unwrap_or_else(|| {
-                        if name == "gcp" {
-                            "local".into()
-                        } else {
-                            "remote".into()
-                        }
-                    }),
+                    kind: target_kind(name, t),
                     cwd: truthy_str(t, "cwd"),
                     claude_bin: truthy_str(t, "claudeBin"),
                     codex_bin: truthy_str(t, "codexBin"),
@@ -204,8 +201,21 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
 /// A worker-config key that grew a `leader*` spelling: the preferred key is
 /// read first, then the legacy `gcp*` fallback. JSON back-compat is
 /// mandatory — every existing worker-config.json keeps loading unchanged.
-fn leader_aliased(v: &Value, preferred: &str, legacy: &str) -> Option<String> {
+pub(crate) fn leader_aliased(v: &Value, preferred: &str, legacy: &str) -> Option<String> {
     truthy_str(v, preferred).or_else(|| truthy_str(v, legacy))
+}
+
+/// The effective kind of a raw `targets` entry: its JSON `type` when truthy,
+/// else the legacy name-keyed default — `gcp` is local, anything else is
+/// remote (the same rule the loader and the strict validator apply).
+pub(crate) fn target_kind(name: &str, t: &Value) -> String {
+    truthy_str(t, "type").unwrap_or_else(|| {
+        if name == "gcp" {
+            "local".into()
+        } else {
+            "remote".into()
+        }
+    })
 }
 
 /// Load + runtime-LOOSE validate the worker config (5-key check, defaults).
@@ -287,15 +297,8 @@ pub fn validate_coordinator_config(v: &Value) -> Vec<String> {
     }
     for (name, t) in targets.into_iter().flatten() {
         // The JSON key is `type`, with the legacy name-keyed default: gcp is
-        // local, anything else is remote (see the loader).
-        let kind = truthy_str(t, "type").unwrap_or_else(|| {
-            if name == "gcp" {
-                "local".into()
-            } else {
-                "remote".into()
-            }
-        });
-        if kind != "local" {
+        // local, anything else is remote (see [`target_kind`]).
+        if target_kind(name, t) != "local" {
             continue;
         }
         for key in ["cwd", "claudeBin", "codexBin"] {
@@ -367,7 +370,8 @@ fn systemd_quote(s: &str) -> String {
     format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-/// Render the systemd unit text (double-quote escaping, newline rejection).
+/// Render the coordinator's systemd unit text (double-quote escaping,
+/// newline rejection).
 ///
 /// `exec` is the stackhour binary, not a Node shim — the unit runs
 /// `<exec> bridge coordinator`.
@@ -377,6 +381,19 @@ fn systemd_quote(s: &str) -> String {
 /// newline there would inject arbitrary directives into the unit file — an
 /// escalation, since the unit is what systemd executes.
 pub fn render_systemd_unit(exec: &str, dir: &str, home: &str, path: &str) -> Result<String> {
+    render_systemd_unit_for("coordinator", exec, dir, home, path)
+}
+
+/// Render a LINUX pull-worker's systemd unit text: identical machinery to
+/// the coordinator unit, execing `<exec> bridge worker`. NEW vs the Node
+/// bridge, whose worker only ever ran under launchd.
+pub fn render_worker_systemd_unit(exec: &str, dir: &str, home: &str, path: &str) -> Result<String> {
+    render_systemd_unit_for("worker", exec, dir, home, path)
+}
+
+/// The shared unit body behind both renderers; `role` is the `bridge <role>`
+/// daemon verb and lands in the Description line too.
+fn render_systemd_unit_for(role: &str, exec: &str, dir: &str, home: &str, path: &str) -> Result<String> {
     for (name, value) in [("exec", exec), ("dir", dir), ("home", home), ("path", path)] {
         if value.contains('\n') || value.contains('\r') {
             return Err(stackhour_core::Error::msg(format!(
@@ -386,14 +403,14 @@ pub fn render_systemd_unit(exec: &str, dir: &str, home: &str, path: &str) -> Res
     }
     Ok(format!(
         "[Unit]\n\
-         Description=Stackhour Telegram bridge coordinator for Claude Code and Codex\n\
+         Description=Stackhour Telegram bridge {role} for Claude Code and Codex\n\
          After=network-online.target\n\
          Wants=network-online.target\n\
          \n\
          [Service]\n\
          Type=simple\n\
          WorkingDirectory={dir_q}\n\
-         ExecStart={exec_q} bridge coordinator\n\
+         ExecStart={exec_q} bridge {role}\n\
          Restart=always\n\
          RestartSec=5\n\
          UMask=0077\n\
@@ -927,6 +944,27 @@ mod tests {
         for bad in ["CHANGE_ME", "__HOME__", "User=", "coordinator.mjs", "node"] {
             assert!(!unit.contains(bad), "{bad} leaked into the unit:\n{unit}");
         }
+    }
+
+    /// The Linux worker unit shares the coordinator's machinery verbatim,
+    /// differing only in the daemon verb (and the Description that names it).
+    #[test]
+    fn the_worker_systemd_unit_execs_the_worker_verb() {
+        let unit = render_worker_systemd_unit(
+            "/usr/local/bin/stackhour",
+            "/home/me/.local/share/stackhour/bridge",
+            "/home/me",
+            "/usr/bin:/bin",
+        )
+        .unwrap();
+        assert!(
+            unit.contains(r#"ExecStart="/usr/local/bin/stackhour" bridge worker"#),
+            "{unit}"
+        );
+        assert!(unit.contains("bridge worker for Claude Code and Codex"), "{unit}");
+        assert!(!unit.contains("bridge coordinator"), "{unit}");
+        // The same newline-injection gate guards this renderer too.
+        assert!(render_worker_systemd_unit("/bin/x\nExecStartPre=/bin/evil", "/d", "/h", "/p").is_err());
     }
 
     #[test]
