@@ -1,0 +1,42 @@
+# The Rust workspace. Separate from ci.yml (which runs the Node suite) because
+# nothing there would catch a Cargo feature-combination break: the bin crate's
+# three modules — tracker / agent / bridge — can each be compiled out, and a
+# reduced build fails at COMPILE time, long before any assertion runs.
+name: rust
+
+on:
+  push:
+    branches: [master, rust-rewrite]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  cargo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      # The default build is the prime constraint: every module on, every
+      # existing test unchanged.
+      - run: cargo test --workspace
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      # Each reduced combination must COMPILE and PASS, not merely compile.
+      - run: cargo test -p stackhour --no-default-features --features bridge
+      - run: cargo test -p stackhour --no-default-features --features tracker
+      - run: cargo test -p stackhour --no-default-features --features agent
+      - run: cargo test -p stackhour --no-default-features --features tracker,agent
+      - run: cargo build -p stackhour --no-default-features
+      # The size win, asserted rather than assumed: a bridge-only leader VPS
+      # links no SQLite and no HTTP server.
+      - run: "! cargo tree -p stackhour --no-default-features --features bridge -i libsqlite3-sys 2>/dev/null"
+      - run: "! cargo tree -p stackhour --no-default-features --features bridge -i rusqlite 2>/dev/null"
+      - run: "! cargo tree -p stackhour --no-default-features --features bridge -i axum 2>/dev/null"
+      # And the honest non-claim: tokio IS still linked, via reqwest::blocking,
+      # which the bridge needs for Telegram long-polling. If this step ever
+      # starts failing, the claim in README/docs must be updated — do not
+      # "fix" it by deleting the step.
+      - run: cargo tree -p stackhour --no-default-features --features bridge -i tokio

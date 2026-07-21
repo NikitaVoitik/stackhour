@@ -342,6 +342,71 @@ worker, which are unimplemented stubs, so **no running program reads these
 directories today**. The `stackhour bridge doctor` command that the schema
 README says will report validation errors does not exist yet.
 
+## Modules (compile-time and runtime)
+
+Stackhour is three products sharing one binary: a time **tracker**, a local
+**agent**, and the Telegram **bridge**. Not every machine wants all three, so
+each can be switched off at either of two layers.
+
+| Module | Verbs |
+|---|---|
+| `tracker` | `serve`, `status`, `token`, `data`, `backup`, `import-wakatime`, `init server`, `install server` |
+| `agent` | `agent`, `init agent`, `install agent` |
+| `bridge` | `bridge *` |
+
+`doctor` belongs to no module and is never gated — it is the diagnostic of
+last resort. `stackhour-core` (config, paths, tokens, the registries) is the
+shared spine and is never optional.
+
+### Runtime: the `modules` block
+
+```json
+{ "modules": { "tracker": true, "agent": true, "bridge": false } }
+```
+
+The gate fails open. An absent `modules` key, an absent sub-key, `null`, or a
+malformed block (`3`, `[]`, a string) all mean **everything enabled** — a
+config written before this feature existed behaves exactly as it always did.
+Only an explicitly present, JS-falsy value disables: `false`, `0`, `""`.
+
+**`"bridge": "false"` ENABLES the bridge.** A non-empty string is truthy in
+JavaScript, and this config reads through the same coercion as every other
+toggle in it. Write the bare `false` literal, not a quoted one.
+
+### Compile time: build without a module
+
+```sh
+cargo build -p stackhour --no-default-features --features bridge   # cheap leader VPS
+cargo build -p stackhour --no-default-features --features agent    # worker box
+```
+
+A bridge-only build drops 20 crates from the dependency closure (134 → 114),
+including `axum`, `rusqlite`, `libsqlite3-sys`, and the bundled SQLite C
+amalgamation. **tokio is still linked** — the bridge needs
+`reqwest::blocking` for Telegram long-polling, which pulls tokio and hyper.
+An agent-only build still links `rusqlite` for the Zed `threads.db` snapshot;
+only a bridge-only build is SQLite-free. A plain `cargo build` turns
+everything on and is unchanged.
+
+### When a verb refuses
+
+```
+stackhour: bridge needs the bridge module, which was not compiled into this binary (rebuild with --features bridge)
+stackhour: serve needs the tracker module, which is disabled by "modules.tracker": false in /home/you/.config/stackhour/config.json
+```
+
+`not compiled into this binary` means **rebuild**; it never names a config
+key, because editing config cannot fix it. `disabled by "modules.X": false`
+means **edit that config file**, whose path the message spells out.
+
+Both exit **2** — which `bridge migrate` also uses for "destinations exist",
+`bridge return` for a missing job id, and `bridge tg-send` for an unreadable
+bridge config. Match on the message, not on the code.
+
+See [docs/modules.md](docs/modules.md) for the full model: the registry API,
+resolution order, the feature/crate matrix, and how `install server` handles
+a disabled agent module.
+
 ## Health and service operations
 
 `stackhour doctor` is read-only. It checks the runtime and SQLite support,
@@ -349,6 +414,14 @@ config permissions, project roots, watcher inputs, queue state, server
 authentication, database integrity, versions, clock skew, parser silence, and
 user services. The Rust build reports its runtime check as
 `rust <version> (no node runtime required)`.
+
+It also appends one `✓ module-<name>` line for each module that is off,
+naming either the config key to edit or the Cargo feature to rebuild with —
+and the `database` check is absent entirely from a build without the
+`tracker` feature, while the `sqlite` check is absent only when neither
+`tracker` nor `agent` is compiled in (i.e. a bridge-only build, which links
+no SQLite at all). An agent-only worker box still reports `sqlite`. Those
+absences are what the `module-*` lines are there to explain.
 
 ```sh
 ./bin/stackhour doctor

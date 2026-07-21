@@ -95,6 +95,26 @@ every worker's online/offline on its own line.
   authentication — only `/api/detail` is token-gated. Keep `stackhour serve`
   off the leader entirely.
 
+The last point can be enforced rather than remembered. Put this in the
+leader's `config.json` and `serve`, `status`, `data`, `backup`, and the agent
+all refuse with exit 2 instead of starting:
+
+```json
+{ "modules": { "tracker": false, "agent": false, "bridge": true } }
+```
+
+Or leave them out of the binary altogether, which also drops `axum`,
+`rusqlite`, and the bundled SQLite amalgamation — 20 crates, worth having on
+a small VPS:
+
+```sh
+cargo build -p stackhour --no-default-features --features bridge
+```
+
+`stackhour bridge *` is unaffected either way, and `stackhour doctor` still
+runs and prints a `module-tracker` line explaining why the tracker checks are
+missing. See [modules.md](modules.md).
+
 ## Architecture
 
 ```mermaid
