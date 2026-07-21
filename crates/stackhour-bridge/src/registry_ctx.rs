@@ -48,13 +48,24 @@ impl RegistryCtx {
     /// the shipped bridge. Whatever errors the initial load produced are
     /// available from `new_errors()` so startup can log them once.
     pub fn new(paths: &StoragePaths) -> Self {
-        let registry = registry::load(&paths.config_dir);
-        let fresh: Vec<String> = registry.errors.iter().map(ToString::to_string).collect();
-        RegistryCtx {
-            reported: fresh.clone(),
-            fresh,
-            current: Arc::new(registry),
-        }
+        Self::from_registry(registry::load(&paths.config_dir))
+    }
+
+    /// [`new`](Self::new) with an explicit target roster and fallback
+    /// default target (the coordinator plumbs its config's targets in here).
+    /// The roster survives every `tick()` reload — `Registry::rebuild`
+    /// replays it.
+    pub fn new_with_targets(
+        paths: &StoragePaths,
+        targets: &[registry::TargetSpec],
+        default_target: &str,
+    ) -> Self {
+        Self::from_registry(registry::load_with_targets(
+            &paths.config_dir,
+            registry::EnvSource::Process,
+            targets,
+            default_target,
+        ))
     }
 
     /// Build a context around an already-loaded registry (tests, doctor).
@@ -81,8 +92,9 @@ impl RegistryCtx {
         }
         // The Arc is shared with in-flight jobs, so the rebuild produces a
         // FRESH Registry which then replaces the Arc. Jobs holding the old
-        // one are untouched.
-        let next = registry::load_with(self.current.root(), self.current.env_source().clone());
+        // one are untouched. `rebuild` replays the same env layer and target
+        // roster the current registry was loaded with.
+        let next = self.current.rebuild();
 
         let all: Vec<String> = next.errors.iter().map(ToString::to_string).collect();
         self.fresh = all

@@ -222,6 +222,12 @@ pub const DEFAULTS: &[PromptDefault] = &[
         // config at all `/help` must be byte-identical to the JS bridge. An
         // override that DOES use {{commands}} gets the generated table
         // instead — see `stackhour_bridge::commands::help_text`.
+        //
+        // This body is the LEGACY-ROSTER reference rendering. The store
+        // regenerates the per-target lines from whatever roster it is built
+        // with (`PromptStore::new_with_targets`, via [`HELP_HEAD`] +
+        // [`HELP_TAIL`]); a test pins that the legacy roster reproduces this
+        // exact string.
         name: "help",
         body: "<b>Claude + Codex bridge</b> (distributed)\n\n🧠 /claude — use Claude Code\n🛠 /codex — use Codex\n🖥️ /mac — run on the Mac\n☁️ /gcp — run on the GCP box\n🚀 /ship — ship a Blort task (Notion→PR)\nℹ️ /where — active engine, target &amp; session\n🆕 /new — fresh session for this engine + target\n⏹ /stop — kill/cancel the running job\n🎛 /menu — tap-button controls\n\n<i>Anything else → selected engine on the active target.</i>",
         placeholders: &[
@@ -490,6 +496,15 @@ pub const DEFAULTS: &[PromptDefault] = &[
 
 /// The `{{error}}` slot every error template shares.
 const P_ERROR: Placeholder = ph("error", "the failure message, unescaped", true);
+
+/// The `help` body above the generated per-target lines. Byte-identical to
+/// the corresponding slice of the frozen legacy blob in [`DEFAULTS`].
+pub const HELP_HEAD: &str =
+    "<b>Claude + Codex bridge</b> (distributed)\n\n🧠 /claude — use Claude Code\n🛠 /codex — use Codex\n";
+
+/// The `help` body below the generated per-target lines. Byte-identical to
+/// the corresponding slice of the frozen legacy blob in [`DEFAULTS`].
+pub const HELP_TAIL: &str = "🚀 /ship — ship a Blort task (Notion→PR)\nℹ️ /where — active engine, target &amp; session\n🆕 /new — fresh session for this engine + target\n⏹ /stop — kill/cancel the running job\n🎛 /menu — tap-button controls\n\n<i>Anything else → selected engine on the active target.</i>";
 
 /// The four slots `mediaPrompt` fills, shared by both media templates.
 const MEDIA_PLACEHOLDERS: &[Placeholder] = &[

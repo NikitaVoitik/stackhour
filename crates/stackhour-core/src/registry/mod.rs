@@ -62,12 +62,88 @@ const AGENT_MANIFEST: &str = "agent.toml";
 const SKILL_MANIFEST: &str = "skill.toml";
 /// The legacy settings file. Only its optional `bridge` object is read here.
 const CONFIG_JSON: &str = "config.json";
-/// The two runnable targets, and the default when nothing configures one.
-const TARGETS: &[&str] = &["gcp", "mac"];
+/// The default target of the LEGACY roster, used when nothing configures one.
 const DEFAULT_TARGET: &str = "gcp";
 /// The engine selected when nothing configures one — matches the JS
 /// coordinator's initial state, so an unconfigured user sees no change.
 const DEFAULT_ENGINE: &str = "claude";
+
+/// One runnable target the bridge can switch to.
+///
+/// DELIBERATE DIVERGENCE from the Node bridge: the JS coordinator hardcoded
+/// the gcp+mac pair everywhere. The registry is now loaded with a roster of
+/// these, so the switch commands, the target validation and the help text all
+/// follow whatever targets a deployment actually has. The legacy entry points
+/// ([`load`], [`load_with`]) still load the historical pair via
+/// [`legacy_targets`], so an unconfigured bridge is byte-identical to before.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TargetSpec {
+    /// Roster name (`gcp`, `mac`, …). Doubles as the switch-command name, so
+    /// it should satisfy Telegram's command-name rule.
+    pub name: String,
+    /// Human label ("GCP", "Mac", …), used on buttons and in help lines.
+    pub label: String,
+    /// `"local"` = runs on the coordinator's own box; anything else is a
+    /// worker / remote lane.
+    pub kind: String,
+}
+
+impl TargetSpec {
+    pub fn new(name: impl Into<String>, label: impl Into<String>, kind: impl Into<String>) -> Self {
+        TargetSpec {
+            name: name.into(),
+            label: label.into(),
+            kind: kind.into(),
+        }
+    }
+
+    /// Whether this target runs on the coordinator's own box.
+    pub fn is_local(&self) -> bool {
+        self.kind == "local"
+    }
+
+    /// The emoji on this target's button and `/help` line. Inherited from the
+    /// legacy pair, where the LOCAL box was the GCP cloud instance (☁️) and
+    /// the remote worker was the Mac (🖥️).
+    pub(crate) fn emoji(&self) -> &'static str {
+        if self.is_local() {
+            "☁️"
+        } else {
+            "🖥️"
+        }
+    }
+
+    /// The "run on …" phrase used in descriptions, toasts and help lines.
+    /// The two legacy names keep their historical wording byte-for-byte; any
+    /// other target reads as its label.
+    pub(crate) fn phrase(&self) -> &str {
+        match self.name.as_str() {
+            "mac" => "the Mac",
+            "gcp" => "the GCP box",
+            _ => &self.label,
+        }
+    }
+}
+
+/// The historical gcp+mac roster every legacy entry point loads with.
+///
+/// Listed mac-first because that is the shipped command-table order (/mac
+/// precedes /gcp; buttons 20 and 21). `(known: …)` error tails are sorted
+/// like every other known-list in this module, so their wording stays
+/// "gcp, mac" regardless.
+pub fn legacy_targets() -> Vec<TargetSpec> {
+    vec![
+        TargetSpec::new("mac", "Mac", "remote"),
+        TargetSpec::new("gcp", "GCP", "local"),
+    ]
+}
+
+/// Sorted target-name list used for `(known: a, b)` error tails.
+pub(crate) fn sorted_target_names(targets: &[TargetSpec]) -> Vec<&str> {
+    let mut names: Vec<&str> = targets.iter().map(|t| t.name.as_str()).collect();
+    names.sort_unstable();
+    names
+}
 
 /// Which registry surface a validation error belongs to; determines the
 /// doctor check name (`registry`, `engine-<id>`, `agent-<name>`, …).
@@ -192,6 +268,11 @@ pub struct Registry {
     pub errors: Vec<RegistryError>,
     /// Scalar defaults resolved across embedded < config.json < env.
     pub defaults: ResolvedDefaults,
+    /// The target roster this registry was loaded with, in roster order.
+    pub targets: Vec<TargetSpec>,
+    /// The fallback default target, replayed on reload ([`Registry::defaults`]
+    /// holds the RESOLVED value, which config.json / env may have overridden).
+    pub(crate) default_target: String,
     /// Registry root (= config_dir), kept for reloads.
     pub(crate) root: PathBuf,
     /// Subdir mtimes at load time, for `reload_if_changed`.
@@ -209,8 +290,23 @@ pub fn load(config_dir: &Path) -> Registry {
 }
 
 /// `load` with an explicit env layer. Used by tests and by callers that have
-/// already captured their environment.
+/// already captured their environment. Loads the legacy gcp+mac roster.
 pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
+    load_with_targets(config_dir, env, &legacy_targets(), DEFAULT_TARGET)
+}
+
+/// `load_with` with an explicit target roster and fallback default target.
+///
+/// Everything target-shaped is derived from the roster: the generated switch
+/// commands (see [`command::builtin_commands_for`]), `target` validation in
+/// command files, `bridge.defaultTarget` / `STACKHOUR_TARGET` validation, and
+/// the generated `/help` target lines.
+pub fn load_with_targets(
+    config_dir: &Path,
+    env: EnvSource,
+    targets: &[TargetSpec],
+    default_target: &str,
+) -> Registry {
     let root = config_dir.to_path_buf();
     // Stat BEFORE scanning: a change landing mid-scan yields differing
     // mtimes on the next `reload_if_changed` stat, so it is never missed.
@@ -246,11 +342,14 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
     // and on-disk overrides, and a stem that matches no built-in defines a
     // NEW template.
     // ------------------------------------------------------------------
-    let prompts = PromptStore::new(if root.is_dir() {
-        Some(root.join(PROMPTS_DIR))
-    } else {
-        None
-    });
+    let prompts = PromptStore::new_with_targets(
+        if root.is_dir() {
+            Some(root.join(PROMPTS_DIR))
+        } else {
+            None
+        },
+        targets,
+    );
 
     // ------------------------------------------------------------------
     // Skills. Before agents, because agents reference skills and a skill
@@ -346,7 +445,7 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
     let mut user_commands: IndexMap<String, CommandDef> = IndexMap::new();
     let mut command_files: IndexMap<String, PathBuf> = IndexMap::new();
     for (name, path) in scan_toml_files(&root.join(COMMANDS_DIR), &mut errors) {
-        match read_toml(&path).and_then(|v| CommandDef::from_toml(&name, &v)) {
+        match read_toml(&path).and_then(|v| CommandDef::from_toml_with_targets(&name, &v, targets)) {
             Ok(def) => {
                 command_files.insert(name.clone(), path);
                 user_commands.insert(name, def);
@@ -359,7 +458,7 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
             }),
         }
     }
-    let mut commands = command::effective_table(&user_commands);
+    let mut commands = command::effective_table_for(&user_commands, targets);
     apply_cycle_check(
         &mut commands,
         command_steps,
@@ -385,12 +484,20 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
     // reverting to the built-in — the exact opposite of the documented "a
     // broken user command leaves the shipped one it would have replaced
     // intact". Put the built-ins back, in their original slots.
-    restore_dropped_builtin_commands(&mut commands);
+    restore_dropped_builtin_commands(&mut commands, targets);
 
     // ------------------------------------------------------------------
     // Layers 2 and 4: config.json's `bridge` object, then env.
     // ------------------------------------------------------------------
-    let defaults = resolve_defaults(&root, &env, &agents, &engines, &mut errors);
+    let defaults = resolve_defaults(
+        &root,
+        &env,
+        &agents,
+        &engines,
+        targets,
+        default_target,
+        &mut errors,
+    );
 
     Registry {
         engines,
@@ -400,6 +507,8 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
         prompts,
         errors,
         defaults,
+        targets: targets.to_vec(),
+        default_target: default_target.to_string(),
         root,
         mtimes,
         env,
@@ -415,15 +524,17 @@ pub fn load_with(config_dir: &Path, env: EnvSource) -> Registry {
 // ---------------------------------------------------------------------------
 
 /// Re-insert any shipped command that validation dropped, restoring both the
-/// definition and its slot in the shipped order.
+/// definition and its slot in the shipped order. The shipped table includes
+/// one generated switch command per roster target, so EVERY target's switch
+/// command is guaranteed-restored — not just the legacy `/gcp` and `/mac`.
 ///
 /// `Registry.commands` must always be the EFFECTIVE table a consumer can act
 /// on. Leaving a hole here made the field a trap: it happened to look right
 /// only because both current consumers redundantly re-applied
 /// `command::effective_table`, and the next consumer (a doctor listing the
 /// effective table, say) would have silently lost `/gcp`.
-fn restore_dropped_builtin_commands(commands: &mut IndexMap<String, CommandDef>) {
-    let builtins = command::builtin_commands();
+fn restore_dropped_builtin_commands(commands: &mut IndexMap<String, CommandDef>, targets: &[TargetSpec]) {
+    let builtins = command::builtin_commands_for(targets);
     if builtins.keys().all(|name| commands.contains_key(name)) {
         return;
     }
@@ -505,9 +616,14 @@ fn resolve_defaults(
     env: &EnvSource,
     agents: &IndexMap<String, AgentDef>,
     engines: &IndexMap<String, EngineDef>,
+    targets: &[TargetSpec],
+    default_target: &str,
     errors: &mut Vec<RegistryError>,
 ) -> ResolvedDefaults {
-    let mut out = ResolvedDefaults::default();
+    let mut out = ResolvedDefaults {
+        target: default_target.to_string(),
+        ..ResolvedDefaults::default()
+    };
     let config_json = root.join(CONFIG_JSON);
 
     // --- Layer 2: the optional "bridge" object in config.json. ---------
@@ -545,7 +661,14 @@ fn resolve_defaults(
             "bridge.defaultEngine",
             errors,
         );
-        apply_default_target(&mut out, target, &config_json, "bridge.defaultTarget", errors);
+        apply_default_target(
+            &mut out,
+            target,
+            targets,
+            &config_json,
+            "bridge.defaultTarget",
+            errors,
+        );
     }
 
     // --- Layer 4: env, highest precedence. -----------------------------
@@ -569,6 +692,7 @@ fn resolve_defaults(
     apply_default_target(
         &mut out,
         env.get("STACKHOUR_TARGET"),
+        targets,
         &env_file,
         "STACKHOUR_TARGET",
         errors,
@@ -619,18 +743,30 @@ fn apply_default_engine(
 fn apply_default_target(
     out: &mut ResolvedDefaults,
     value: Option<String>,
+    targets: &[TargetSpec],
     file: &Path,
     key: &str,
     errors: &mut Vec<RegistryError>,
 ) {
     let Some(name) = value else { return };
-    if TARGETS.contains(&name.as_str()) {
+    if targets.iter().any(|t| t.name == name) {
         out.target = name;
         return;
     }
+    // DELIBERATE DIVERGENCE from the Node throw string (`must be "gcp" or
+    // "mac"`): the roster is no longer a fixed pair, so the error names
+    // whatever roster this registry was loaded with, sorted like every other
+    // known-list tail.
+    let quoted: Vec<String> = sorted_target_names(targets)
+        .iter()
+        .map(|n| format!("\"{n}\""))
+        .collect();
     errors.push(defaults_error(
         file,
-        FieldError::key(key, format!("must be \"gcp\" or \"mac\" (got '{name}')")),
+        FieldError::key(
+            key,
+            format!("must be one of {} (got '{name}')", quoted.join(", ")),
+        ),
     ));
 }
 
@@ -697,10 +833,16 @@ impl Registry {
         if !self.changed_on_disk() {
             return false;
         }
-        let root = self.root.clone();
-        let env = self.env.clone();
-        *self = load_with(&root, env);
+        *self = self.rebuild();
         true
+    }
+
+    /// Load a fresh registry from the same root, replaying the same env
+    /// layer, target roster and default target. This is what a caller that
+    /// shares the registry behind an `Arc` (and therefore cannot take `&mut`)
+    /// uses to produce the replacement snapshot.
+    pub fn rebuild(&self) -> Registry {
+        load_with_targets(&self.root, self.env.clone(), &self.targets, &self.default_target)
     }
 
     /// Six `stat` calls: has anything the loader watches changed since this
@@ -1642,7 +1784,7 @@ mod tests {
             vec![
                 "key `bridge.defaultAgent`: references unknown agent 'ghost'",
                 "key `bridge.defaultEngine`: references unknown engine 'nope' (known: claude, codex)",
-                "key `bridge.defaultTarget`: must be \"gcp\" or \"mac\" (got 'moon')",
+                "key `bridge.defaultTarget`: must be one of \"gcp\", \"mac\" (got 'moon')",
             ]
         );
         assert!(reg
@@ -1727,9 +1869,116 @@ mod tests {
         assert_eq!(reg.errors[0].file.as_deref(), Some(Path::new("<env>")));
         assert_eq!(
             reg.errors[0].message,
-            "key `STACKHOUR_TARGET`: must be \"gcp\" or \"mac\" (got 'moon')"
+            "key `STACKHOUR_TARGET`: must be one of \"gcp\", \"mac\" (got 'moon')"
         );
         assert_eq!(reg.defaults.target, DEFAULT_TARGET);
+    }
+
+    // ---------------------------------------------------------------
+    // The target roster (DELIBERATE DIVERGENCE from the Node bridge:
+    // targets are no longer the hardcoded gcp+mac pair).
+    // ---------------------------------------------------------------
+
+    fn moon_sun() -> Vec<TargetSpec> {
+        vec![
+            TargetSpec::new("moon", "Moonbase", "local"),
+            TargetSpec::new("sun", "Sunspot", "worker"),
+        ]
+    }
+
+    #[test]
+    fn a_custom_roster_generates_its_switch_commands_and_default() {
+        let dir = tmpdir();
+        let reg = load_with_targets(dir.path(), EnvSource::fixed(&[]), &moon_sun(), "moon");
+        assert!(reg.errors.is_empty(), "{:?}", reg.errors);
+        assert_eq!(
+            reg.commands.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["claude", "codex", "moon", "sun", "ship", "where", "new", "stop", "menu", "help"]
+        );
+        assert_eq!(reg.commands["moon"].kind, CommandKind::Target);
+        assert_eq!(reg.commands["moon"].button_order, Some(20));
+        assert_eq!(reg.commands["sun"].button_order, Some(21));
+        assert_eq!(reg.defaults.target, "moon");
+        assert_eq!(reg.targets, moon_sun());
+        // The generated help lists the roster, not the legacy pair.
+        let help = reg.prompts.render("help", &[]);
+        assert!(help.contains("☁️ /moon — run on Moonbase"), "got: {help}");
+        assert!(help.contains("🖥️ /sun — run on Sunspot"), "got: {help}");
+        assert!(!help.contains("/gcp"), "got: {help}");
+    }
+
+    #[test]
+    fn a_custom_roster_validates_the_default_target_against_itself() {
+        let dir = tmpdir();
+        fs::write(
+            dir.path().join("config.json"),
+            r#"{"bridge":{"defaultTarget":"sun"}}"#,
+        )
+        .unwrap();
+        let reg = load_with_targets(dir.path(), EnvSource::fixed(&[]), &moon_sun(), "moon");
+        assert!(reg.errors.is_empty(), "{:?}", reg.errors);
+        assert_eq!(reg.defaults.target, "sun");
+
+        // An unknown name is reported against the roster and falls back.
+        let reg = load_with_targets(
+            dir.path(),
+            EnvSource::fixed(&[("STACKHOUR_TARGET", "gcp")]),
+            &moon_sun(),
+            "moon",
+        );
+        assert_eq!(reg.errors.len(), 1);
+        assert_eq!(
+            reg.errors[0].message,
+            "key `STACKHOUR_TARGET`: must be one of \"moon\", \"sun\" (got 'gcp')"
+        );
+        assert_eq!(reg.defaults.target, "sun", "falls back to the config.json layer");
+    }
+
+    #[test]
+    fn a_custom_roster_target_command_names_pass_command_validation() {
+        let dir = tmpdir();
+        write(
+            dir.path(),
+            "commands/warp.toml",
+            "description = \"Warp\"\nkind = \"target\"\ntarget = \"sun\"\n",
+        );
+        let reg = load_with_targets(dir.path(), EnvSource::fixed(&[]), &moon_sun(), "moon");
+        assert!(reg.errors.is_empty(), "{:?}", reg.errors);
+        assert_eq!(reg.commands["warp"].target.as_deref(), Some("sun"));
+    }
+
+    #[test]
+    fn every_roster_switch_command_is_guaranteed_restored() {
+        // A broken user override of a GENERATED switch command must revert to
+        // the generated one, exactly as /gcp used to.
+        let dir = tmpdir();
+        write(
+            dir.path(),
+            "commands/moon.toml",
+            "description = \"Mine\"\nkind = \"prompt\"\ntemplate = \"no-such-template\"\n",
+        );
+        let reg = load_with_targets(dir.path(), EnvSource::fixed(&[]), &moon_sun(), "moon");
+        assert_eq!(reg.errors.len(), 1, "{:?}", reg.errors);
+        let moon = &reg.commands["moon"];
+        assert_eq!(moon.kind, CommandKind::Target, "the generated command is back");
+        assert_eq!(moon.target.as_deref(), Some("moon"));
+        assert_eq!(reg.commands.get_index_of("moon"), Some(2), "…in its shipped slot");
+    }
+
+    #[test]
+    fn reload_replays_the_same_target_roster() {
+        let dir = tmpdir();
+        let mut reg = load_with_targets(dir.path(), EnvSource::fixed(&[]), &moon_sun(), "moon");
+        write(
+            dir.path(),
+            "engines/ollama.toml",
+            "bin = \"ollama\"\nkind = \"plain-lines\"\n",
+        );
+        assert!(reg.reload_if_changed());
+        assert!(reg.engines.contains_key("ollama"));
+        assert_eq!(reg.targets, moon_sun(), "the roster must survive reload");
+        assert_eq!(reg.defaults.target, "moon");
+        assert!(reg.commands.contains_key("sun"));
     }
 
     // ---------------------------------------------------------------

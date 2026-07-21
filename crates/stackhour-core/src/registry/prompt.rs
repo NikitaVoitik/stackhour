@@ -39,6 +39,8 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
+use super::{legacy_targets, TargetSpec};
+
 #[path = "prompt_defaults.rs"]
 pub mod prompt_defaults;
 
@@ -64,12 +66,33 @@ pub fn placeholders(name: &str) -> &'static [Placeholder] {
 /// Named prompt templates: built-ins + optional on-disk overrides.
 #[derive(Debug)]
 pub struct PromptStore {
-    /// Built-in template bodies by name, in catalogue order.
-    builtins: IndexMap<String, &'static str>,
+    /// Built-in template bodies by name, in catalogue order. Owned rather
+    /// than `&'static str` because the `help` body is generated from the
+    /// target roster the store is built with.
+    builtins: IndexMap<String, String>,
     /// `prompts/` directory, when the registry root exists.
     dir: Option<PathBuf>,
     /// mtime cache of on-disk overrides.
     cache: Mutex<IndexMap<String, (SystemTime, String)>>,
+}
+
+/// The shipped `help` body for a target roster.
+///
+/// DELIBERATE DIVERGENCE from the Node bridge, whose HELP constant hardcoded
+/// the `/mac` and `/gcp` lines: the per-target lines are now generated from
+/// the roster, in roster order. With the legacy roster the output is
+/// byte-identical to the frozen blob in [`prompt_defaults::DEFAULTS`]
+/// (pinned by a test).
+fn generated_help_body(targets: &[TargetSpec]) -> String {
+    let target_lines: String = targets
+        .iter()
+        .map(|t| format!("{} /{} — run on {}\n", t.emoji(), t.name, t.phrase()))
+        .collect();
+    format!(
+        "{}{target_lines}{}",
+        prompt_defaults::HELP_HEAD,
+        prompt_defaults::HELP_TAIL
+    )
 }
 
 /// A template name that is safe to map to `prompts/<name>.md`: non-empty, no
@@ -79,12 +102,22 @@ fn safe_name(name: &str) -> bool {
 }
 
 impl PromptStore {
-    /// Build a store over the given prompts dir (None = built-ins only).
+    /// Build a store over the given prompts dir (None = built-ins only),
+    /// with the `help` template listing the legacy gcp+mac roster.
     pub fn new(dir: Option<PathBuf>) -> Self {
-        let mut map: IndexMap<String, &'static str> = IndexMap::new();
+        Self::new_with_targets(dir, &legacy_targets())
+    }
+
+    /// [`new`](Self::new) with an explicit target roster: the shipped `help`
+    /// body's per-target lines are generated from it. An on-disk
+    /// `prompts/help.md` override still wins, exactly as before.
+    pub fn new_with_targets(dir: Option<PathBuf>, targets: &[TargetSpec]) -> Self {
+        let mut map: IndexMap<String, String> = IndexMap::new();
         for d in DEFAULTS {
-            map.insert(d.name.to_string(), d.body);
+            map.insert(d.name.to_string(), d.body.to_string());
         }
+        // Replacing an existing key keeps its catalogue slot.
+        map.insert("help".to_string(), generated_help_body(targets));
         PromptStore {
             builtins: map,
             dir,
@@ -134,7 +167,7 @@ impl PromptStore {
         if let Some(text) = self.override_body(name) {
             return Some(text);
         }
-        self.builtins.get(name).map(|s| s.to_string())
+        self.builtins.get(name).cloned()
     }
 
     /// Whether this name is currently served by a file rather than the
@@ -358,6 +391,40 @@ mod tests {
         ]
         .join("\n");
         assert_eq!(PromptStore::new(None).render("help", &[]), expected);
+    }
+
+    /// The generated help body (roster-driven target lines) must be
+    /// byte-identical to the frozen legacy blob when built with the legacy
+    /// roster — that is the rendering-parity gate for the divergence.
+    #[test]
+    fn the_generated_help_body_reproduces_the_frozen_legacy_blob() {
+        let frozen = DEFAULTS
+            .iter()
+            .find(|d| d.name == "help")
+            .expect("help is shipped")
+            .body;
+        assert_eq!(generated_help_body(&legacy_targets()), frozen);
+        assert_eq!(PromptStore::new(None).render("help", &[]), frozen);
+    }
+
+    #[test]
+    fn a_custom_roster_generates_its_own_help_target_lines() {
+        let targets = vec![
+            TargetSpec::new("hetzner", "Hetzner", "local"),
+            TargetSpec::new("pi", "Pi", "worker"),
+        ];
+        let store = PromptStore::new_with_targets(None, &targets);
+        let help = store.render("help", &[]);
+        assert!(
+            help.contains("🛠 /codex — use Codex\n☁️ /hetzner — run on Hetzner\n🖥️ /pi — run on Pi\n🚀 /ship"),
+            "got: {help}"
+        );
+        assert!(!help.contains("/mac") && !help.contains("/gcp"), "got: {help}");
+        // An on-disk override still wins over the generated body.
+        let dir = tmpdir();
+        fs::write(dir.path().join("help.md"), "MY HELP").unwrap();
+        let store = PromptStore::new_with_targets(Some(dir.path().to_path_buf()), &targets);
+        assert_eq!(store.render("help", &[]), "MY HELP");
     }
 
     /// `{{commands}}` is documented but deliberately absent from the shipped

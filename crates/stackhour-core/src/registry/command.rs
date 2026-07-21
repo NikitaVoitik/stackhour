@@ -8,17 +8,18 @@
 //! | `prompt`   | render a named prompt template, route it like typed text  |
 //! | `agent`    | switch the active named agent                             |
 //! | `engine`   | switch the active engine                                  |
-//! | `target`   | switch the active target (`gcp` / `mac`)                  |
+//! | `target`   | switch the active target (a roster name)                  |
 //! | `shell`    | run a FIXED argv, never shell-interpolated                |
 //! | `skill`    | invoke a named skill with the bound args                  |
 //! | `sequence` | run other commands in order, aborting on first failure    |
 //! | `builtin`  | EMBEDDED ONLY — the irreducible bridge verbs              |
 //!
-//! The ten verbs the JS coordinator registered with Telegram now live in
-//! [`builtin_commands`], parsed from the embedded TOML text in
-//! [`BUILTIN_COMMANDS_TOML`], so the shipped table and a user's table are
-//! literally the same schema and `bridge init` can write that text out
-//! verbatim.
+//! The verbs the JS coordinator registered with Telegram now live in
+//! [`builtin_commands`]: the non-target verbs are parsed from the embedded
+//! TOML text in [`BUILTIN_COMMANDS_TOML`] (so the shipped table and a user's
+//! table are literally the same schema and `bridge init` can write that text
+//! out verbatim), while the target switch commands (`/mac`, `/gcp`, …) are
+//! GENERATED from the target roster — see [`builtin_commands_for`].
 //!
 //! **Behavioural change vs. the JS bridge:** only `/start`, `/help`, `/menu`
 //! and `/stop` are still [`RESERVED`]. Every other built-in verb (`claude`,
@@ -40,7 +41,7 @@
 //! template     = "deploy"                # kind=prompt
 //! agent        = "reviewer"              # kind=agent, or an optional pre-switch
 //! engine       = "codex"                 # kind=engine
-//! target       = "gcp"                   # kind=target ("gcp" | "mac")
+//! target       = "gcp"                   # kind=target (a roster target name)
 //! argv         = ["./deploy.sh"]         # kind=shell, non-empty
 //! skill        = "review"                # kind=skill
 //! steps        = ["build", "deploy"]     # kind=sequence, non-empty
@@ -63,6 +64,7 @@ use super::args::{self, ArgSpec};
 use super::cycle;
 use super::error::FieldError;
 use super::toml_util::{self, Table};
+use super::{legacy_targets, sorted_target_names, TargetSpec};
 
 /// The built-in command names that can NEVER be shadowed by a user file.
 ///
@@ -73,9 +75,6 @@ pub const RESERVED: &[&str] = &["start", "help", "menu", "stop"];
 /// Telegram bot-command name limit (`setMyCommands`: 1-32 chars of lowercase
 /// English letters, digits and underscores).
 const MAX_COMMAND_NAME_LEN: usize = 32;
-
-/// The two runnable targets a command may switch to.
-const TARGETS: &[&str] = &["gcp", "mac"];
 
 /// What a declarative command does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -172,7 +171,7 @@ pub struct CommandDef {
     pub agent: Option<String>,
     /// kind=engine target engine name.
     pub engine: Option<String>,
-    /// Optional target override (`gcp` | `mac`).
+    /// Optional target override (a roster target name).
     pub target: Option<String>,
     /// kind=shell: the FIXED argv (program + args).
     pub argv: Option<Vec<String>>,
@@ -217,16 +216,27 @@ impl Default for CommandDef {
 }
 
 impl CommandDef {
-    /// Parse a `commands/<name>.toml` document written by a USER: `kind =
-    /// "builtin"` is rejected and [`RESERVED`] names are refused.
+    /// [`parse_with_targets`](Self::parse_with_targets) against the legacy
+    /// gcp+mac roster.
     pub fn parse(name: &str, v: &toml::Value) -> Result<Self, FieldError> {
+        Self::parse_with_targets(name, v, &legacy_targets())
+    }
+
+    /// Parse a `commands/<name>.toml` document written by a USER: `kind =
+    /// "builtin"` is rejected and [`RESERVED`] names are refused. A `target`
+    /// key must name one of the given roster targets.
+    pub fn parse_with_targets(
+        name: &str,
+        v: &toml::Value,
+        targets: &[TargetSpec],
+    ) -> Result<Self, FieldError> {
         if RESERVED.contains(&name) {
             return Err(FieldError::file_level(format!(
                 "'{name}' is a reserved built-in command and cannot be redefined (reserved: {})",
                 RESERVED.join(", ")
             )));
         }
-        let def = Self::parse_inner(name, v, true)?;
+        let def = Self::parse_inner(name, v, true, targets)?;
         if def.kind == CommandKind::Builtin {
             return Err(FieldError::key(
                 "kind",
@@ -236,13 +246,28 @@ impl CommandDef {
         Ok(def)
     }
 
-    /// The loader entry point: the same validation, with the error rendered
-    /// as `key: message` (the file lives in `RegistryError::file`).
+    /// [`from_toml_with_targets`](Self::from_toml_with_targets) against the
+    /// legacy gcp+mac roster.
     pub fn from_toml(name: &str, v: &toml::Value) -> Result<Self, String> {
         Self::parse(name, v).map_err(|e| e.message())
     }
 
-    fn parse_inner(name: &str, v: &toml::Value, user: bool) -> Result<Self, FieldError> {
+    /// The loader entry point: the same validation, with the error rendered
+    /// as `key: message` (the file lives in `RegistryError::file`).
+    pub fn from_toml_with_targets(
+        name: &str,
+        v: &toml::Value,
+        targets: &[TargetSpec],
+    ) -> Result<Self, String> {
+        Self::parse_with_targets(name, v, targets).map_err(|e| e.message())
+    }
+
+    fn parse_inner(
+        name: &str,
+        v: &toml::Value,
+        user: bool,
+        targets: &[TargetSpec],
+    ) -> Result<Self, FieldError> {
         let table = toml_util::root_table(v, "command file")?;
 
         if !valid_command_name(name) {
@@ -292,10 +317,12 @@ impl CommandDef {
         let args = args::parse_arg_specs(table)?;
 
         // Wherever a target appears (kind=target or a pre-switch), it must
-        // name one of the two runnable targets.
+        // name one of the roster's runnable targets. The known-list is
+        // sorted, like every other `(known: …)` tail the registry emits.
         if let Some(t) = &target {
-            if !TARGETS.contains(&t.as_str()) {
-                return Err(FieldError::key("target", format!("unknown target '{t}'")).with_known(TARGETS));
+            if !targets.iter().any(|spec| spec.name == *t) {
+                return Err(FieldError::key("target", format!("unknown target '{t}'"))
+                    .with_known(&sorted_target_names(targets)));
             }
         }
 
@@ -500,12 +527,15 @@ fn validate_aliases(name: &str, aliases: &[String], user: bool) -> Result<(), Fi
 // Embedded defaults
 // ---------------------------------------------------------------------------
 
-/// The command table shipped with the bridge, as the exact TOML text
+/// The NON-TARGET commands shipped with the bridge, as the exact TOML text
 /// `bridge init --config-dir` writes into `commands/`. Parsed at startup, so
 /// the embedded layer and the on-disk layer cannot drift.
 ///
 /// Order is the `setMyCommands` order the JS coordinator used; `button_order`
-/// reproduces its control keyboard row for row.
+/// reproduces its control keyboard row for row. The target switch commands
+/// (`/mac`, `/gcp` in the legacy roster) used to be embedded here too; they
+/// are now generated from the target roster and spliced in at
+/// [`TARGET_COMMANDS_SLOT`] — see [`builtin_commands_for`].
 pub const BUILTIN_COMMANDS_TOML: &[(&str, &str)] = &[
     (
         "claude",
@@ -527,30 +557,6 @@ keyboard = true
 button = "🛠 Codex"
 button_order = 11
 toast = "Using Codex"
-"#,
-    ),
-    (
-        "mac",
-        r#"description = "Run on the Mac 🖥️"
-kind = "target"
-target = "mac"
-aliases = ["local"]
-keyboard = true
-button = "🖥️ Mac"
-button_order = 20
-toast = "On the Mac 🖥️"
-"#,
-    ),
-    (
-        "gcp",
-        r#"description = "Run on the GCP box ☁️"
-kind = "target"
-target = "gcp"
-aliases = ["remote"]
-keyboard = true
-button = "☁️ GCP"
-button_order = 21
-toast = "On the GCP box ☁️"
 "#,
     ),
     (
@@ -613,30 +619,94 @@ aliases = ["start"]
     ),
 ];
 
-/// The shipped command table, parsed from [`BUILTIN_COMMANDS_TOML`].
+/// Where the generated target switch commands sit in the shipped table: after
+/// the two engine commands (`claude`, `codex`), before `ship` — exactly the
+/// slot the embedded `/mac` + `/gcp` pair occupied in the JS coordinator's
+/// `setMyCommands` order.
+const TARGET_COMMANDS_SLOT: usize = 2;
+
+/// The first `button_order` of the generated target commands; each roster
+/// target gets `20 + its roster index`, reproducing the legacy /mac = 20,
+/// /gcp = 21 keyboard row.
+const TARGET_BUTTON_ORDER_BASE: i64 = 20;
+
+/// One generated `kind = "target"` switch command for a roster target.
+///
+/// DELIBERATE DIVERGENCE from the Node bridge: `/mac` and `/gcp` used to be
+/// embedded TOML in [`BUILTIN_COMMANDS_TOML`]; the roster is now arbitrary,
+/// so every switch command is derived from its [`TargetSpec`]. The two legacy
+/// names keep their historical aliases and wording byte-for-byte (see
+/// [`TargetSpec::phrase`]), which is what keeps a default bridge
+/// indistinguishable from the JS coordinator.
+fn target_command(spec: &TargetSpec, index: usize) -> CommandDef {
+    let emoji = spec.emoji();
+    let phrase = spec.phrase();
+    // The legacy aliases stay glued to their legacy names — and only exist
+    // when a target of that name is actually in the roster.
+    let aliases = match spec.name.as_str() {
+        "mac" => vec!["local".to_string()],
+        "gcp" => vec!["remote".to_string()],
+        _ => Vec::new(),
+    };
+    CommandDef {
+        command: spec.name.clone(),
+        description: format!("Run on {phrase} {emoji}"),
+        aliases,
+        keyboard: true,
+        button: Some(format!("{emoji} {}", spec.label)),
+        button_order: Some(TARGET_BUTTON_ORDER_BASE + index as i64),
+        toast: Some(format!("On {phrase} {emoji}")),
+        kind: CommandKind::Target,
+        target: Some(spec.name.clone()),
+        ..CommandDef::default()
+    }
+}
+
+/// The shipped command table for the legacy gcp+mac roster.
+pub fn builtin_commands() -> IndexMap<String, CommandDef> {
+    builtin_commands_for(&legacy_targets())
+}
+
+/// The shipped command table for a target roster: the embedded non-target
+/// verbs from [`BUILTIN_COMMANDS_TOML`], with one generated switch command
+/// per roster target spliced in at [`TARGET_COMMANDS_SLOT`].
 ///
 /// Panics only if the embedded text is malformed, which
 /// `embedded_table_parses_and_matches_the_js_payload` makes impossible to
 /// ship.
-pub fn builtin_commands() -> IndexMap<String, CommandDef> {
-    let mut out = IndexMap::with_capacity(BUILTIN_COMMANDS_TOML.len());
-    for (name, text) in BUILTIN_COMMANDS_TOML {
+pub fn builtin_commands_for(targets: &[TargetSpec]) -> IndexMap<String, CommandDef> {
+    let mut out = IndexMap::with_capacity(BUILTIN_COMMANDS_TOML.len() + targets.len());
+    for (i, (name, text)) in BUILTIN_COMMANDS_TOML.iter().enumerate() {
+        if i == TARGET_COMMANDS_SLOT {
+            for (index, spec) in targets.iter().enumerate() {
+                let def = target_command(spec, index);
+                out.insert(def.command.clone(), def);
+            }
+        }
         let value: toml::Value = text
             .parse()
             .unwrap_or_else(|e| panic!("embedded command '{name}' is not valid TOML: {e}"));
-        let def = CommandDef::parse_inner(name, &value, false)
+        let def = CommandDef::parse_inner(name, &value, false, targets)
             .unwrap_or_else(|e| panic!("embedded command '{name}' is invalid: {e}"));
         out.insert(def.command.clone(), def);
     }
     out
 }
 
+/// [`effective_table_for`] over the legacy gcp+mac roster.
+pub fn effective_table(user: &IndexMap<String, CommandDef>) -> IndexMap<String, CommandDef> {
+    effective_table_for(user, &legacy_targets())
+}
+
 /// The effective command table: the shipped commands with any user command of
 /// the same name substituted IN PLACE (keeping its `/help`, keyboard and
 /// `setMyCommands` slot), followed by the remaining user commands in load
 /// order.
-pub fn effective_table(user: &IndexMap<String, CommandDef>) -> IndexMap<String, CommandDef> {
-    let mut out = builtin_commands();
+pub fn effective_table_for(
+    user: &IndexMap<String, CommandDef>,
+    targets: &[TargetSpec],
+) -> IndexMap<String, CommandDef> {
+    let mut out = builtin_commands_for(targets);
     for (name, def) in user {
         // IndexMap::insert on an existing key replaces the value and keeps
         // the entry's position — that is what preserves the slot.
@@ -1310,6 +1380,133 @@ rest = true
         );
         assert_eq!(table["gcp"].description, "My GCP");
         assert_eq!(table["gcp"].kind, CommandKind::Shell);
+    }
+
+    // ---- roster-generated target commands ----
+
+    fn roster(specs: &[(&str, &str, &str)]) -> Vec<TargetSpec> {
+        specs
+            .iter()
+            .map(|(name, label, kind)| TargetSpec::new(*name, *label, *kind))
+            .collect()
+    }
+
+    #[test]
+    fn a_custom_roster_generates_switch_commands_in_the_target_slot() {
+        let targets = roster(&[("hetzner", "Hetzner", "local"), ("pi", "Pi", "worker")]);
+        let t = builtin_commands_for(&targets);
+        assert_eq!(
+            t.keys().map(String::as_str).collect::<Vec<_>>(),
+            vec!["claude", "codex", "hetzner", "pi", "ship", "where", "new", "stop", "menu", "help"],
+            "target commands take the legacy mac/gcp slot"
+        );
+
+        let hetzner = &t["hetzner"];
+        assert_eq!(hetzner.kind, CommandKind::Target);
+        assert_eq!(hetzner.target.as_deref(), Some("hetzner"));
+        assert_eq!(hetzner.description, "Run on Hetzner ☁️");
+        assert_eq!(hetzner.button.as_deref(), Some("☁️ Hetzner"));
+        assert_eq!(hetzner.button_order, Some(20));
+        assert_eq!(hetzner.toast.as_deref(), Some("On Hetzner ☁️"));
+        assert!(hetzner.keyboard);
+        assert!(hetzner.aliases.is_empty(), "legacy aliases stay on legacy names");
+
+        let pi = &t["pi"];
+        assert_eq!(pi.kind, CommandKind::Target);
+        assert_eq!(pi.target.as_deref(), Some("pi"));
+        assert_eq!(pi.description, "Run on Pi 🖥️");
+        assert_eq!(pi.button.as_deref(), Some("🖥️ Pi"));
+        assert_eq!(pi.button_order, Some(21));
+        assert_eq!(pi.toast.as_deref(), Some("On Pi 🖥️"));
+        assert!(pi.aliases.is_empty());
+    }
+
+    #[test]
+    fn the_unknown_target_error_lists_the_custom_roster() {
+        let targets = roster(&[("pi", "Pi", "worker"), ("hetzner", "Hetzner", "local")]);
+        let v: toml::Value = "description=\"d\"\nkind=\"target\"\ntarget=\"moon\"\n"
+            .parse()
+            .unwrap();
+        let err = CommandDef::parse_with_targets("x", &v, &targets).unwrap_err();
+        assert_eq!(err.key, "target");
+        // The known-list is sorted, like every other `(known: …)` tail.
+        assert_eq!(err.msg, "unknown target 'moon' (known: hetzner, pi)");
+        // ...and a roster name passes.
+        let ok: toml::Value = "description=\"d\"\nkind=\"target\"\ntarget=\"pi\"\n"
+            .parse()
+            .unwrap();
+        let def = CommandDef::parse_with_targets("x", &ok, &targets).expect("roster target is valid");
+        assert_eq!(def.target.as_deref(), Some("pi"));
+    }
+
+    /// The backward-compatibility gate for the generated switch commands:
+    /// the legacy roster must reproduce the exact commands the embedded TOML
+    /// used to declare (which in turn matched the JS coordinator).
+    #[test]
+    fn the_legacy_roster_reproduces_the_historical_mac_and_gcp_commands() {
+        // The two entries as they were embedded in BUILTIN_COMMANDS_TOML
+        // before the roster existed, verbatim.
+        let historical = [
+            (
+                "mac",
+                r#"description = "Run on the Mac 🖥️"
+kind = "target"
+target = "mac"
+aliases = ["local"]
+keyboard = true
+button = "🖥️ Mac"
+button_order = 20
+toast = "On the Mac 🖥️"
+"#,
+            ),
+            (
+                "gcp",
+                r#"description = "Run on the GCP box ☁️"
+kind = "target"
+target = "gcp"
+aliases = ["remote"]
+keyboard = true
+button = "☁️ GCP"
+button_order = 21
+toast = "On the GCP box ☁️"
+"#,
+            ),
+        ];
+        let t = builtin_commands();
+        for (name, text) in historical {
+            let v: toml::Value = text.parse().unwrap();
+            let want = CommandDef::parse_inner(name, &v, false, &legacy_targets()).unwrap();
+            let got = &t[name];
+            assert_eq!(got.command, want.command);
+            assert_eq!(got.description, want.description, "/{name} description");
+            assert_eq!(got.aliases, want.aliases, "/{name} aliases");
+            assert_eq!(got.hidden, want.hidden);
+            assert_eq!(got.keyboard, want.keyboard);
+            assert_eq!(got.button, want.button, "/{name} button");
+            assert_eq!(got.button_order, want.button_order, "/{name} order");
+            assert_eq!(got.toast, want.toast, "/{name} toast");
+            assert_eq!(got.kind, want.kind);
+            assert_eq!(got.target, want.target);
+            assert_eq!(got.confirm, want.confirm);
+            assert!(got.args.is_empty() && got.steps.is_empty());
+            assert!(got.template.is_none() && got.agent.is_none() && got.engine.is_none());
+            assert!(got.argv.is_none() && got.skill.is_none() && got.builtin.is_none());
+        }
+        // ...and in the historical slots: mac third, gcp fourth.
+        assert_eq!(t.get_index_of("mac"), Some(2));
+        assert_eq!(t.get_index_of("gcp"), Some(3));
+    }
+
+    #[test]
+    fn legacy_aliases_attach_only_when_their_target_is_in_the_roster() {
+        // A roster that keeps /gcp but not /mac: /remote survives, /local
+        // does not exist anywhere.
+        let targets = roster(&[("gcp", "GCP", "local"), ("pi", "Pi", "worker")]);
+        let t = builtin_commands_for(&targets);
+        assert_eq!(t["gcp"].aliases, vec!["remote"]);
+        assert!(lookup(&t, "remote").is_some());
+        assert!(lookup(&t, "local").is_none());
+        assert!(alias_conflicts(&t).is_empty());
     }
 
     #[test]
