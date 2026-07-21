@@ -208,7 +208,12 @@ fn main() -> ExitCode {
                     }
                 };
                 let code = if verb == "claim" {
-                    stackhour_bridge::jobs::run_claim(&paths)
+                    // `bridge claim [target]`: the optional positional names
+                    // the target this worker claims for. No positional = the
+                    // legacy claim-anything mode the live Node Mac worker
+                    // drives through the claim.mjs shim.
+                    let target = positional_after(&tail[1..]);
+                    stackhour_bridge::jobs::run_claim(&paths, target.as_deref())
                 } else {
                     // `argv[2]` in return.mjs: the first positional after the
                     // verb, ignoring the --runtime-dir pair. A missing id is

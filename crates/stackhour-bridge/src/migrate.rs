@@ -59,7 +59,10 @@ use std::path::{Path, PathBuf};
 /// (coordinator.mjs:33 — `CONFIG.maxMediaBytes || 512 * 1024 * 1024`).
 pub const LEGACY_MAX_MEDIA_BYTES: u64 = 512 * 1024 * 1024;
 
-/// The two runnable targets the registry accepts (`registry::TARGETS`).
+/// The two targets the NODE bridge's fixed switch surface knew (`/gcp` and
+/// `/mac`). The Rust registry now generates a switch command for EVERY
+/// config target, so this list only marks where the migrated bridge will
+/// DIVERGE from the Node one the user is leaving.
 const KNOWN_TARGETS: &[&str] = &["gcp", "mac"];
 
 /// The legacy `/help` body (coordinator.mjs:338), joined with `\n`.
@@ -435,7 +438,7 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
         }
         if !KNOWN_TARGETS.contains(&name.as_str()) {
             warnings.push(format!(
-                "target '{name}' is outside the registry's switch surface (targets are pinned to {}); only /ship reaches it, via the runtime 'ship' key",
+                "target '{name}' had no switch command in the Node bridge (its surface is fixed to {}); after cutover the registry generates a /{name} switch command, so it WILL appear in the switch surface",
                 KNOWN_TARGETS.join("|")
             ));
         }
@@ -1185,7 +1188,8 @@ mod tests {
         assert!(plan
             .warnings
             .iter()
-            .any(|w| w.contains("'blort' is outside the registry's switch surface")));
+            .any(|w| w.contains("'blort' had no switch command in the Node bridge")
+                && w.contains("registry generates a /blort switch command")));
     }
 
     // ---- generated registry files load ----------------------------------

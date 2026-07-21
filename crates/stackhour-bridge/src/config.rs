@@ -51,13 +51,18 @@ pub struct CoordinatorCfg {
     pub eleven_labs_endpoint: Option<String>,
 }
 
-/// `<runtime_dir>/worker-config.json` — the mac worker config.
+/// `<runtime_dir>/worker-config.json` — a pull-worker config.
 #[derive(Debug, Clone)]
 pub struct WorkerCfg {
     /// Raw file contents, key order + unknown keys preserved.
     pub raw: Value,
-    pub gcp_ssh: String,
-    pub gcp_key: Option<String>,
+    /// SSH destination of the coordinator (leader) box. JSON `leaderSsh`,
+    /// with the legacy `gcpSsh` spelling accepted as a fallback — the field
+    /// predates arbitrary topologies, when the leader was always "the GCP
+    /// box".
+    pub leader_ssh: String,
+    /// SSH key for the leader. JSON `leaderKey`, legacy `gcpKey` fallback.
+    pub leader_key: Option<String>,
     pub remote_dir: String,
     pub remote_node: String,
     pub claude_bin: Option<String>,
@@ -68,6 +73,11 @@ pub struct WorkerCfg {
     pub permission_mode: Option<String>,
     pub model: Option<String>,
     pub codex_model: Option<String>,
+    /// The target name this worker claims jobs under (JSON `target`). Absent
+    /// = legacy claim-anything mode: the worker takes the oldest job
+    /// regardless of which target it was dispatched to — exactly what the
+    /// live Node Mac worker does.
+    pub target: Option<String>,
 }
 
 /// The systemd unit name the coordinator installs as.
@@ -102,20 +112,28 @@ fn read_raw(path: &Path) -> Result<Value> {
     Ok(serde_json::from_str(&text)?)
 }
 
-/// Load + runtime-LOOSE validate the coordinator config (exact throw strings).
+/// Load + runtime-LOOSE validate the coordinator config.
 ///
-/// The loose gate is coordinator.mjs's, verbatim: token, a safe-integer
-/// chatId, and BOTH targets. Everything else is defaulted rather than
-/// rejected, so a half-filled config still boots — the installer's STRICT
+/// DELIBERATE DIVERGENCE from coordinator.mjs, whose loose gate demanded
+/// BOTH the `gcp` and `mac` targets by name (throw string: `config.json must
+/// define token, an integer chatId, and gcp/mac targets.`). Targets are now
+/// an arbitrary roster — any names, zero or more `type == "local"` entries
+/// (zero = a leader-only coordinator that only dispatches to pull-workers) —
+/// so the gate asks for token, a safe-integer chatId, and AT LEAST ONE
+/// target. Everything else is defaulted rather than rejected, so a
+/// half-filled config still boots — the installer's STRICT
 /// [`validate_coordinator_config`] is where a human gets told off.
 pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
     let raw = read_raw(path)?;
     let token = truthy_str(&raw, "token");
     let chat_id = safe_integer(raw.get("chatId"));
-    let targets_of = |name: &str| raw.get("targets").and_then(|t| t.get(name));
-    if token.is_none() || chat_id.is_none() || targets_of("gcp").is_none() || targets_of("mac").is_none() {
+    let has_targets = raw
+        .get("targets")
+        .and_then(Value::as_object)
+        .is_some_and(|t| !t.is_empty());
+    if token.is_none() || chat_id.is_none() || !has_targets {
         return Err(stackhour_core::Error::msg(
-            "config.json must define token, an integer chatId, and gcp/mac targets.",
+            "config.json must define token, an integer chatId, and at least one target.",
         ));
     }
 
@@ -154,9 +172,21 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
         // CONFIG.defaultTarget` with no validation, so a config missing
         // defaultTarget leaves `active` undefined and every later
         // `targets[active]` lookup silently misses. That is plainly a bug, so
-        // an absent/blank defaultTarget falls back to "gcp" here. The
-        // installer's STRICT validator still rejects the key outright.
-        default_target: truthy_str(&raw, "defaultTarget").unwrap_or_else(|| "gcp".into()),
+        // an absent/blank defaultTarget falls back to "gcp" when a gcp
+        // target exists (the legacy behaviour), else to the FIRST target in
+        // config file order (serde_json preserves it). The installer's
+        // STRICT validator still rejects an absent-but-wrong key outright.
+        default_target: truthy_str(&raw, "defaultTarget").unwrap_or_else(|| {
+            if targets.contains_key("gcp") {
+                "gcp".into()
+            } else {
+                targets
+                    .keys()
+                    .next()
+                    .cloned()
+                    .expect("gated above: at least one target")
+            }
+        }),
         max_media_bytes: raw
             .get("maxMediaBytes")
             .and_then(Value::as_u64)
@@ -171,30 +201,43 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
     })
 }
 
+/// A worker-config key that grew a `leader*` spelling: the preferred key is
+/// read first, then the legacy `gcp*` fallback. JSON back-compat is
+/// mandatory — every existing worker-config.json keeps loading unchanged.
+fn leader_aliased(v: &Value, preferred: &str, legacy: &str) -> Option<String> {
+    truthy_str(v, preferred).or_else(|| truthy_str(v, legacy))
+}
+
 /// Load + runtime-LOOSE validate the worker config (5-key check, defaults).
 ///
 /// worker.mjs gates on exactly five keys — gcpKey, gcpSsh, remoteDir,
 /// claudeBin, cwd — and defaults remoteNode to `node` and codexBin to
 /// `codex`. Note it does NOT require codexBin or remoteNode, so a
-/// claude-only worker boots fine.
+/// claude-only worker boots fine. `leaderSsh`/`leaderKey` are accepted as
+/// preferred spellings of `gcpSsh`/`gcpKey` (the leader is no longer
+/// necessarily a GCP box); the PARITY throw string keeps the legacy names.
 pub fn load_worker_cfg(path: &Path) -> Result<WorkerCfg> {
     let raw = read_raw(path)?;
-    let (gcp_key, gcp_ssh, remote_dir, claude_bin, cwd) = (
-        truthy_str(&raw, "gcpKey"),
-        truthy_str(&raw, "gcpSsh"),
+    let (leader_key, leader_ssh, remote_dir, claude_bin, cwd) = (
+        leader_aliased(&raw, "leaderKey", "gcpKey"),
+        leader_aliased(&raw, "leaderSsh", "gcpSsh"),
         truthy_str(&raw, "remoteDir"),
         truthy_str(&raw, "claudeBin"),
         truthy_str(&raw, "cwd"),
     );
-    if gcp_key.is_none() || gcp_ssh.is_none() || remote_dir.is_none() || claude_bin.is_none() || cwd.is_none()
+    if leader_key.is_none()
+        || leader_ssh.is_none()
+        || remote_dir.is_none()
+        || claude_bin.is_none()
+        || cwd.is_none()
     {
         return Err(stackhour_core::Error::msg(
             "worker-config.json must define gcpKey, gcpSsh, remoteDir, claudeBin, and cwd.",
         ));
     }
     Ok(WorkerCfg {
-        gcp_ssh: gcp_ssh.expect("gated above"),
-        gcp_key,
+        leader_ssh: leader_ssh.expect("gated above"),
+        leader_key,
         remote_dir: remote_dir.expect("gated above"),
         remote_node: truthy_str(&raw, "remoteNode").unwrap_or_else(|| "node".into()),
         claude_bin,
@@ -204,6 +247,7 @@ pub fn load_worker_cfg(path: &Path) -> Result<WorkerCfg> {
         permission_mode: truthy_str(&raw, "permissionMode"),
         model: truthy_str(&raw, "model"),
         codex_model: truthy_str(&raw, "codexModel"),
+        target: truthy_str(&raw, "target"),
         raw,
     })
 }
@@ -223,31 +267,46 @@ pub fn validate_coordinator_config(v: &Value) -> Vec<String> {
     if safe_integer(v.get("chatId")).is_none() {
         errors.push("chatId must be an integer".into());
     }
-    if !matches!(
-        v.get("defaultTarget").and_then(Value::as_str),
-        Some("gcp" | "mac")
-    ) {
-        errors.push("defaultTarget must be gcp or mac".into());
+    // DELIBERATE DIVERGENCE from validateCoordinatorConfig, which pinned
+    // `defaultTarget must be gcp or mac`, required both of those targets by
+    // name, and only inspected targets.gcp's local keys. The roster is now
+    // arbitrary: at least one target of any name, defaultTarget (when
+    // present) must name one of them, and EVERY `type == "local"` target
+    // needs the keys a local run requires. Zero local targets is a valid
+    // leader-only coordinator.
+    let targets = v.get("targets").and_then(Value::as_object);
+    match targets {
+        Some(t) if !t.is_empty() => {}
+        _ => errors.push("targets must define at least one target".into()),
     }
-    for name in ["gcp", "mac"] {
-        if v.get("targets").and_then(|t| t.get(name)).is_none() {
-            errors.push(format!("targets.{name} is required"));
+    if let Some(want) = v.get("defaultTarget").and_then(Value::as_str) {
+        let known = targets.is_some_and(|t| t.contains_key(want));
+        if !known {
+            errors.push(format!("defaultTarget '{want}' is not a configured target"));
         }
     }
-    if let Some(local) = v.get("targets").and_then(|t| t.get("gcp")) {
-        for (key, label) in [
-            ("cwd", "cwd"),
-            ("claudeBin", "claudeBin"),
-            ("codexBin", "codexBin"),
-        ] {
-            if truthy_str(local, key).is_none() {
-                errors.push(format!("targets.gcp.{label} is required"));
+    for (name, t) in targets.into_iter().flatten() {
+        // The JSON key is `type`, with the legacy name-keyed default: gcp is
+        // local, anything else is remote (see the loader).
+        let kind = truthy_str(t, "type").unwrap_or_else(|| {
+            if name == "gcp" {
+                "local".into()
+            } else {
+                "remote".into()
+            }
+        });
+        if kind != "local" {
+            continue;
+        }
+        for key in ["cwd", "claudeBin", "codexBin"] {
+            if truthy_str(t, key).is_none() {
+                errors.push(format!("targets.{name}.{key} is required"));
             }
         }
         // `local.permissionMode || 'default'` — absent is legal, wrong is not.
-        let mode = truthy_str(local, "permissionMode").unwrap_or_else(|| "default".into());
+        let mode = truthy_str(t, "permissionMode").unwrap_or_else(|| "default".into());
         if mode != "default" && mode != "bypassPermissions" {
-            errors.push("targets.gcp.permissionMode is invalid".into());
+            errors.push(format!("targets.{name}.permissionMode is invalid"));
         }
     }
     errors
@@ -259,15 +318,13 @@ pub fn validate_worker_config(v: &Value) -> Vec<String> {
     if !v.is_object() {
         return vec!["config must be an object".into()];
     }
-    for key in [
-        "gcpSsh",
-        "gcpKey",
-        "remoteDir",
-        "remoteNode",
-        "claudeBin",
-        "codexBin",
-        "cwd",
-    ] {
+    // The two leader keys accept either spelling; the error names both.
+    for (preferred, legacy) in [("leaderSsh", "gcpSsh"), ("leaderKey", "gcpKey")] {
+        if leader_aliased(v, preferred, legacy).is_none() {
+            errors.push(format!("{preferred} (or {legacy}) is required"));
+        }
+    }
+    for key in ["remoteDir", "remoteNode", "claudeBin", "codexBin", "cwd"] {
         if truthy_str(v, key).is_none() {
             errors.push(format!("{key} is required"));
         }
@@ -495,25 +552,93 @@ mod tests {
         assert!(validate_worker_config(&worker_fixture()).is_empty());
     }
 
-    /// The JS test asserts >= 4 and >= 7 problems for empty objects.
+    /// DELIBERATE DIVERGENCE from the JS test (>= 4 coordinator problems):
+    /// the roster is arbitrary now, so an empty coordinator config is
+    /// missing exactly three things — token, chatId and any target at all —
+    /// and the worker's two leader keys name both accepted spellings.
     #[test]
     fn empty_configs_report_every_missing_key() {
         let c = validate_coordinator_config(&json!({}));
-        assert!(c.len() >= 4, "{c:?}");
         assert_eq!(
             c,
             [
                 "token is required",
                 "chatId must be an integer",
-                "defaultTarget must be gcp or mac",
-                "targets.gcp is required",
-                "targets.mac is required",
+                "targets must define at least one target",
             ]
         );
         let w = validate_worker_config(&json!({}));
         assert!(w.len() >= 7, "{w:?}");
-        assert_eq!(w[0], "gcpSsh is required");
+        assert_eq!(w[0], "leaderSsh (or gcpSsh) is required");
+        assert_eq!(w[1], "leaderKey (or gcpKey) is required");
         assert_eq!(w.last().unwrap(), "cwd is required");
+    }
+
+    /// The strict gate over the generalized roster: any names, every local
+    /// target audited under its own key, defaultTarget checked against the
+    /// roster, and zero local targets (leader-only) fully valid.
+    #[test]
+    fn the_strict_gate_audits_every_local_target_by_name() {
+        // A leader-only config: arbitrary names, no local target at all.
+        let leader_only = json!({
+            "token": "t", "chatId": 7, "defaultTarget": "pi",
+            "targets": { "pi": {}, "attic": {} },
+        });
+        assert!(validate_coordinator_config(&leader_only).is_empty());
+
+        // Every `type == "local"` target needs the local-run keys, and the
+        // error names the actual target.
+        let two_locals = json!({
+            "token": "t", "chatId": 7, "defaultTarget": "hetzner",
+            "targets": {
+                "hetzner": { "type": "local" },
+                "pi": {},
+                "attic": { "type": "local", "cwd": "/w", "claudeBin": "/c",
+                           "codexBin": "/x", "permissionMode": "yolo" },
+            },
+        });
+        assert_eq!(
+            validate_coordinator_config(&two_locals),
+            [
+                "targets.hetzner.cwd is required",
+                "targets.hetzner.claudeBin is required",
+                "targets.hetzner.codexBin is required",
+                "targets.attic.permissionMode is invalid",
+            ]
+        );
+
+        // defaultTarget must name a configured target — when present.
+        let bad_default = json!({
+            "token": "t", "chatId": 7, "defaultTarget": "moon",
+            "targets": { "pi": {} },
+        });
+        assert_eq!(
+            validate_coordinator_config(&bad_default),
+            ["defaultTarget 'moon' is not a configured target"]
+        );
+        let absent_default = json!({ "token": "t", "chatId": 7, "targets": { "pi": {} } });
+        assert!(
+            validate_coordinator_config(&absent_default).is_empty(),
+            "an absent defaultTarget is legal — the loader falls back"
+        );
+    }
+
+    /// A bare `gcp` target still defaults to `type: local` in the STRICT
+    /// gate too, so the legacy fixture keeps demanding its local keys.
+    #[test]
+    fn the_strict_gate_keeps_the_name_keyed_type_default() {
+        let c = validate_coordinator_config(&json!({
+            "token": "t", "chatId": 7, "defaultTarget": "gcp",
+            "targets": { "gcp": {} },
+        }));
+        assert_eq!(
+            c,
+            [
+                "targets.gcp.cwd is required",
+                "targets.gcp.claudeBin is required",
+                "targets.gcp.codexBin is required",
+            ]
+        );
     }
 
     #[test]
@@ -632,26 +757,41 @@ mod tests {
         );
     }
 
-    /// The loose gate is coordinator.mjs's, and its message is the contract.
+    /// DELIBERATE DIVERGENCE from the Node throw string (`…and gcp/mac
+    /// targets.`): the loose gate now accepts any roster with at least one
+    /// target, and its message says so.
     #[test]
-    fn the_loose_coordinator_gate_matches_the_node_throw_string() {
+    fn the_loose_coordinator_gate_accepts_any_roster_of_at_least_one_target() {
         let tmp = tempfile::tempdir().unwrap();
         for bad in [
             json!({ "chatId": 1, "targets": { "gcp": {}, "mac": {} } }),
             json!({ "token": "t", "targets": { "gcp": {}, "mac": {} } }),
-            json!({ "token": "t", "chatId": 1, "targets": { "gcp": {} } }),
             json!({ "token": "t", "chatId": 1.5, "targets": { "gcp": {}, "mac": {} } }),
+            json!({ "token": "t", "chatId": 1 }),
+            json!({ "token": "t", "chatId": 1, "targets": {} }),
+            json!({ "token": "t", "chatId": 1, "targets": "nope" }),
         ] {
             let p = write(tmp.path(), "config.json", &bad);
             let err = load_coordinator_cfg(&p).expect_err("must reject");
             assert_eq!(
                 err.message(),
-                "config.json must define token, an integer chatId, and gcp/mac targets."
+                "config.json must define token, an integer chatId, and at least one target."
             );
         }
+
+        // One target of ANY name now boots — the Node gate demanded gcp+mac.
+        let p = write(
+            tmp.path(),
+            "config.json",
+            &json!({ "token": "t", "chatId": 1, "targets": { "pi": {} } }),
+        );
+        let cfg = load_coordinator_cfg(&p).expect("a one-target roster boots");
+        assert_eq!(cfg.targets.len(), 1);
+        assert_eq!(cfg.targets["pi"].kind, "remote", "non-gcp names default remote");
     }
 
-    /// A config with no defaultTarget must not leave the active target unset.
+    /// A config with no defaultTarget must not leave the active target unset:
+    /// "gcp" when a gcp target exists, else the first target in file order.
     #[test]
     fn an_absent_default_target_falls_back_to_gcp() {
         let tmp = tempfile::tempdir().unwrap();
@@ -659,6 +799,57 @@ mod tests {
         v.as_object_mut().unwrap().remove("defaultTarget");
         let p = write(tmp.path(), "config.json", &v);
         assert_eq!(load_coordinator_cfg(&p).unwrap().default_target, "gcp");
+
+        // No gcp target: the FIRST target in config file order wins.
+        let p = write(
+            tmp.path(),
+            "config.json",
+            &json!({ "token": "t", "chatId": 1, "targets": { "pi": {}, "attic": {} } }),
+        );
+        assert_eq!(load_coordinator_cfg(&p).unwrap().default_target, "pi");
+    }
+
+    /// (d) The worker config's leaderSsh/leaderKey aliases and the new
+    /// `target` field, round-tripped through the loader.
+    #[test]
+    fn the_worker_loader_reads_the_leader_aliases_and_the_target_field() {
+        let tmp = tempfile::tempdir().unwrap();
+
+        // Preferred spellings + a target: the new-style config.
+        let v = json!({
+            "leaderSsh": "user@leader.example",
+            "leaderKey": "/tmp/leader-key",
+            "remoteDir": "/srv/bridge",
+            "claudeBin": "/bin/claude",
+            "cwd": "/tmp/work",
+            "target": "attic",
+        });
+        let p = write(tmp.path(), "worker-config.json", &v);
+        let cfg = load_worker_cfg(&p).expect("leader spellings load");
+        assert_eq!(cfg.leader_ssh, "user@leader.example");
+        assert_eq!(cfg.leader_key.as_deref(), Some("/tmp/leader-key"));
+        assert_eq!(cfg.target.as_deref(), Some("attic"));
+        // The raw value keeps the spelling the user wrote.
+        assert!(cfg.raw.get("leaderSsh").is_some() && cfg.raw.get("gcpSsh").is_none());
+
+        // Legacy spellings, no target: the live Mac worker's config.
+        let cfg = load_worker_cfg(&write(tmp.path(), "w2.json", &worker_fixture())).unwrap();
+        assert_eq!(cfg.leader_ssh, "user@example.com");
+        assert_eq!(cfg.leader_key.as_deref(), Some("/tmp/key"));
+        assert_eq!(cfg.target, None, "absent target = legacy claim-anything mode");
+
+        // Both spellings present: the preferred one wins.
+        let mut v = worker_fixture();
+        v["leaderSsh"] = json!("user@new-leader");
+        let cfg = load_worker_cfg(&write(tmp.path(), "w3.json", &v)).unwrap();
+        assert_eq!(cfg.leader_ssh, "user@new-leader");
+
+        // The strict validator accepts either spelling.
+        let mut v = worker_fixture();
+        let obj = v.as_object_mut().unwrap();
+        let ssh = obj.remove("gcpSsh").unwrap();
+        obj.insert("leaderSsh".into(), ssh);
+        assert!(validate_worker_config(&v).is_empty());
     }
 
     #[test]
@@ -671,7 +862,7 @@ mod tests {
         let cfg = load_worker_cfg(&p).unwrap();
         assert_eq!(cfg.remote_node, "node");
         assert_eq!(cfg.codex_bin, "codex");
-        assert_eq!(cfg.gcp_ssh, "user@example.com");
+        assert_eq!(cfg.leader_ssh, "user@example.com");
     }
 
     /// worker.mjs gates on exactly these five keys — and NOT on codexBin or

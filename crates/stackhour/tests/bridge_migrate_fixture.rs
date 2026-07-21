@@ -392,7 +392,8 @@ fn verify_is_clean_right_after_migrating() {
 /// PARITY GAP (the migration never wrote that key, so `/ship` parked on gcp
 /// after cutover); the migration now materialises the live destination. The
 /// blort target must still survive in `targets`, and the migrator must still
-/// disclose that blort is reachable only through `/ship`.
+/// disclose the divergence from the Node bridge's fixed /gcp /mac surface:
+/// after cutover blort GAINS a generated /blort switch command.
 #[test]
 fn the_ship_destination_is_carried_into_the_runtime_config() {
     let dir = TempDir::new().unwrap();
@@ -418,10 +419,16 @@ fn the_ship_destination_is_carried_into_the_runtime_config() {
     assert_eq!(runtime["ship"]["target"], "blort");
     assert_eq!(runtime["ship"]["engine"], "claude");
 
-    // blort's second-class status has to stay disclosed on the way out.
+    // The divergence from the Node bridge's fixed switch surface has to
+    // stay disclosed on the way out: blort will now get a switch command.
+    let printed = stdout(&out);
     assert!(
-        stdout(&out).contains("only /ship reaches it"),
-        "the migration stopped disclosing that blort is /ship-only"
+        printed.contains("target 'blort' had no switch command in the Node bridge"),
+        "the migration stopped disclosing the blort switch-surface divergence:\n{printed}"
+    );
+    assert!(
+        printed.contains("registry generates a /blort switch command"),
+        "the warning no longer says blort will appear in the switch surface:\n{printed}"
     );
 }
 

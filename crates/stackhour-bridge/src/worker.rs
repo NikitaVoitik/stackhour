@@ -1,4 +1,4 @@
-//! The mac worker daemon — the Mac-side half of the macqueue lane.
+//! The pull-worker daemon — the remote half of the worker lane.
 //!
 //! Outbound only. The worker never listens: it repeatedly SSHes into the GCP
 //! coordinator to claim a `mac` job, runs the engine locally, and pipes the
@@ -136,14 +136,24 @@ pub struct Worker {
     registry: Arc<Registry>,
     /// Where downloaded attachments land on the Mac.
     media_dir: PathBuf,
-    /// The coordinator's runtime dir, as seen from the GCP box.
+    /// The coordinator's runtime dir, as seen from the leader box.
     remote_dir: String,
-    /// The node binary on the GCP box (the claim/return shims are node).
+    /// The node binary on the leader box (the claim/return shims are node).
     remote_node: String,
+    /// The target name this worker claims for (`worker-config.json`'s
+    /// `target`). `None` = the legacy claim-anything mode.
+    ///
+    /// CAVEAT: the target only reaches the coordinator if the remote
+    /// claim.mjs forwards its argv to `stackhour bridge claim` (the
+    /// Rust-installed shim does). A targeted worker pointed at the ORIGINAL
+    /// Node claim.mjs — which ignores argv — silently claims EVERYTHING,
+    /// exactly like a legacy worker. Phase 3 documents this rollout hazard.
+    target: Option<String>,
     log_path: PathBuf,
 }
 
 impl Worker {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         remote: Arc<dyn Remote>,
         runner: Arc<dyn EngineRunner>,
@@ -151,6 +161,7 @@ impl Worker {
         media_dir: PathBuf,
         remote_dir: String,
         remote_node: String,
+        target: Option<String>,
         log_path: PathBuf,
     ) -> Worker {
         Worker {
@@ -160,6 +171,7 @@ impl Worker {
             media_dir,
             remote_dir,
             remote_node,
+            target,
             log_path,
         }
     }
@@ -170,7 +182,12 @@ impl Worker {
 
     /// One iteration of the claim loop, without the sleep.
     pub fn poll_once(&self) -> Poll {
-        let cmd = format!("{} {}/claim.mjs", self.remote_node, self.remote_dir);
+        // A configured target rides along as claim.mjs's argv, which the
+        // shim forwards to `stackhour bridge claim <target>`.
+        let cmd = match &self.target {
+            Some(target) => format!("{} {}/claim.mjs {target}", self.remote_node, self.remote_dir),
+            None => format!("{} {}/claim.mjs", self.remote_node, self.remote_dir),
+        };
         let res = self.remote.ssh(&cmd, None);
         if res.code != 0 {
             self.log(&format!(
@@ -483,8 +500,8 @@ pub fn run_worker(runtime_dir: &Path) -> ! {
     let registry = Arc::new(stackhour_core::registry::load(&paths.runtime_dir));
 
     let remote: Arc<dyn Remote> = Arc::new(SshRemote {
-        key: cfg.gcp_key.clone(),
-        host: cfg.gcp_ssh.clone(),
+        key: cfg.leader_key.clone(),
+        host: cfg.leader_ssh.clone(),
     });
     let runner: Arc<dyn EngineRunner> = Arc::new(RegistryRunner {
         registry: Arc::clone(&registry),
@@ -497,6 +514,7 @@ pub fn run_worker(runtime_dir: &Path) -> ! {
         paths.media_dir.clone(),
         cfg.remote_dir.clone(),
         cfg.remote_node.clone(),
+        cfg.target.clone(),
         log_path,
     );
     worker.run_forever(&paths.media_dir)
@@ -669,6 +687,7 @@ mod tests {
             dir.path().join("media"),
             "/remote/bridge".to_string(),
             "node".to_string(),
+            None,
             dir.path().join("worker.log"),
         );
         Harness {
@@ -1022,6 +1041,7 @@ mod tests {
             dir.path().join("media"),
             "/remote/bridge".into(),
             "node".into(),
+            None,
             log.clone(),
         );
         worker.poll_once();
@@ -1061,6 +1081,31 @@ mod tests {
         assert!(calls[1].1.is_some(), "return takes the payload on stdin");
     }
 
+    /// A worker with a configured target passes it as claim.mjs's argument;
+    /// the return path is unchanged.
+    #[test]
+    fn a_configured_target_rides_the_remote_claim_invocation() {
+        let dir = tempfile::tempdir().unwrap();
+        let remote = Arc::new(FakeRemote::claiming(&job(json!({ "target": "attic" }))));
+        let worker = Worker::new(
+            Arc::clone(&remote) as Arc<dyn Remote>,
+            FakeRunner::with(vec![]) as Arc<dyn EngineRunner>,
+            Arc::new(stackhour_core::registry::load(Path::new("/nonexistent-cfg"))),
+            dir.path().join("media"),
+            "/remote/bridge".into(),
+            "node".into(),
+            Some("attic".into()),
+            dir.path().join("worker.log"),
+        );
+        assert_eq!(worker.poll_once(), Poll::Handled);
+        let calls = remote.calls.lock().unwrap().clone();
+        assert_eq!(calls[0].0, "node /remote/bridge/claim.mjs attic");
+        assert_eq!(
+            calls[1].0, "node /remote/bridge/return.mjs 3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+            "the return path carries no target"
+        );
+    }
+
     /// One failed return permanently loses the result. Reference behaviour;
     /// the test exists so nobody "fixes" it without noticing.
     #[test]
@@ -1081,6 +1126,7 @@ mod tests {
             dir.path().join("media"),
             "/remote/bridge".into(),
             "node".into(),
+            None,
             log.clone(),
         );
         assert_eq!(worker.poll_once(), Poll::Handled);

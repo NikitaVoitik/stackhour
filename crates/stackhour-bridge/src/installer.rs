@@ -684,7 +684,10 @@ fn install_binary(runtime_dir: &Path) -> Result<PathBuf, String> {
 /// where tg-send.mjs read its credentials.
 pub fn node_shim(verb: &str) -> String {
     let argv = match verb {
-        "claim" => "['bridge', 'claim', '--runtime-dir', here]",
+        // claim forwards its argv (the optional target for `bridge claim
+        // <target>`); the ORIGINAL Node claim.mjs ignored argv, so this line
+        // is what lets a targeted worker actually filter.
+        "claim" => "['bridge', 'claim', ...process.argv.slice(2), '--runtime-dir', here]",
         "return" => "['bridge', 'return', ...process.argv.slice(2), '--runtime-dir', here]",
         _ => "['bridge', 'tg-send', ...process.argv.slice(2)]",
     };
@@ -1180,6 +1183,10 @@ mod tests {
         // claim/return pin the runtime dir; tg-send instead pins the adjacent
         // config.json (and must NOT smuggle --runtime-dir into its message).
         assert!(node_shim("claim").contains("'--runtime-dir', here"));
+        assert!(
+            node_shim("claim").contains("...process.argv.slice(2)"),
+            "the claim shim must forward argv so `claim.mjs <target>` reaches `bridge claim <target>`"
+        );
         assert!(node_shim("return").contains("'--runtime-dir', here"));
         assert!(!node_shim("tg-send").contains("--runtime-dir"));
         assert!(node_shim("tg-send").contains("CLAUDE_REMOTE_CONFIG"));

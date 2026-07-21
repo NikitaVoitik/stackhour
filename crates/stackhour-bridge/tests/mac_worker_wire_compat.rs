@@ -7,10 +7,10 @@
 //! they run it, with `node`, as a real child process, against a temp runtime
 //! directory:
 //!
-//! * the coordinator's [`MacLane::dispatch`] writes a job → the real
+//! * the coordinator's [`WorkerLane::dispatch`] writes a job → the real
 //!   `claim.mjs` claims it, atomically, and prints it back;
 //! * the real `return.mjs` publishes a result → the coordinator's
-//!   [`MacLane::poll_results`] picks it up and delivers the answer.
+//!   [`WorkerLane::poll_results`] picks it up and delivers the answer.
 //!
 //! SAFETY: the Telegram half runs against the local mock in
 //! `common/mock_bot_api.rs`, never `api.telegram.org`. The filesystem half
@@ -28,8 +28,8 @@ mod mock;
 use mock::{MockApi, Reply};
 use serde_json::{json, Value};
 use stackhour_bridge::local_lane::{LaneContext, LocalTarget};
-use stackhour_bridge::macqueue::{MacContext, MacLane};
 use stackhour_bridge::telegram::{Tg, TgConfig};
+use stackhour_bridge::worker_lane::{WorkerContext, WorkerLane};
 use stackhour_bridge::{jobs, BridgePaths};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -80,15 +80,19 @@ impl LaneContext for Ctx {
     }
 }
 
-impl MacContext for Ctx {
-    fn mac_label(&self) -> String {
-        "🖥️ Mac".to_string()
+impl WorkerContext for Ctx {
+    fn worker_label(&self, target: &str) -> String {
+        if target == "mac" {
+            "🖥️ Mac".to_string()
+        } else {
+            target.to_string()
+        }
     }
 }
 
 struct Harness {
     api: MockApi,
-    lane: MacLane,
+    lane: WorkerLane,
     ctx: Arc<Ctx>,
     dir: tempfile::TempDir,
     paths: BridgePaths,
@@ -113,10 +117,11 @@ fn harness() -> Harness {
         logs: Mutex::new(Vec::new()),
         sessions: Mutex::new(Vec::new()),
     });
-    let lane = MacLane::new(
+    let lane = WorkerLane::new(
         Arc::new(Tg::with_config(cfg)),
-        Arc::clone(&ctx) as Arc<dyn MacContext>,
+        Arc::clone(&ctx) as Arc<dyn WorkerContext>,
         paths.clone(),
+        "mac",
     );
     Harness {
         api,
@@ -220,6 +225,10 @@ fn a_rust_dispatched_job_is_claimed_intact_by_the_real_claim_mjs() {
     assert_eq!(job["engine"], "codex");
     assert_eq!(job["media"], Value::Null, "an explicit null, not a missing key");
     assert_eq!(job["sessionId"], Value::Null);
+    assert_eq!(
+        job["target"], "mac",
+        "the roster stamp — an unknown field the Node worker ignores"
+    );
     assert!(job["ts"].is_number());
 
     // The rename IS the claim: gone from jobs/, present in inprogress/.

@@ -3,17 +3,21 @@
 //! Three directories and one file, all under the runtime dir:
 //!
 //! ```text
-//! jobs/<uuid-v4>.json        written by the coordinator, claimed by the Mac
+//! jobs/<uuid-v4>.json        written by the coordinator, claimed by a worker
 //! inprogress/<uuid-v4>.json  claimed but not yet returned
 //! results/<uuid-v4>.json     the worker's answer, consumed by the coordinator
-//! worker-heartbeat           bare ms epoch, rewritten by every claim poll
+//! worker-heartbeat           bare ms epoch, rewritten by every no-arg claim
+//! worker-heartbeat-<target>  the same, rewritten by every TARGETED claim
 //! ```
 //!
-//! `claim` (hidden verb `stackhour bridge claim`, invoked over SSH by the
-//! Mac) polls for ~25s at 1s cadence, writes the heartbeat EVERY iteration,
-//! takes files in lexicographic order, tolerates rename races (a lost rename
-//! just moves to the next file), prints the raw job JSON to stdout and exits
-//! 0. `return` (`stackhour bridge return <id>`) gates on the strict UUID
+//! `claim` (hidden verb `stackhour bridge claim [target]`, invoked over SSH
+//! by a worker) polls for ~25s at 1s cadence, writes the heartbeat EVERY
+//! iteration, takes files in lexicographic order, tolerates rename races (a
+//! lost rename just moves to the next file), prints the raw job JSON to
+//! stdout and exits 0. With no target argument it claims ANY job and beats
+//! the shared legacy heartbeat — the live Node Mac worker's contract; with a
+//! target it claims only that target's jobs (see [`try_claim_target`]).
+//! `return` (`stackhour bridge return <id>`) gates on the strict UUID
 //! regex (exit 2), pipes stdin to `results/<id>.json.tmp` then renames it
 //! into place (direct-write fallback), and clears the inprogress marker. The
 //! installer writes node-invokable claim.mjs/return.mjs shims that exec these
@@ -101,9 +105,11 @@ pub fn uuid_ok(s: &str) -> bool {
 /// Write a job file into `jobs_dir`; returns the generated job id (uuid v4).
 ///
 /// The id is generated here and inserted as the FIRST key, so the on-disk key
-/// order is `id, prompt, engine, media, sessionId, ts` exactly as
-/// `dispatchMac` produces it. Compact JSON, no indent — the file is machine
-/// traffic, not something a human reads.
+/// order is `id, prompt, engine, media, sessionId, target, ts` — the legacy
+/// `dispatchMac` order with the roster's `target` stamp spliced in before
+/// `ts` (wire-safe: the live Node claim.mjs prints the raw JSON and the Node
+/// worker ignores unknown fields). Compact JSON, no indent — the file is
+/// machine traffic, not something a human reads.
 pub fn write_job(jobs_dir: &Path, job: &Value) -> Result<String> {
     let id = uuid::Uuid::new_v4().to_string();
     let mut out: Map<String, Value> = Map::new();
@@ -184,7 +190,27 @@ pub fn worker_alive(heartbeat_path: &Path) -> bool {
 /// The `rename` IS the claim: it is atomic within a filesystem, so two
 /// concurrent claimers can never both win the same file. A lost race fails,
 /// and the loser just moves to the next candidate.
+///
+/// [`try_claim_target`] with no filter — exactly the legacy behaviour the
+/// live Node Mac worker depends on: the first claimable job regardless of
+/// which target it was dispatched to.
 pub fn try_claim(jobs_dir: &Path, inprogress_dir: &Path) -> Option<String> {
+    try_claim_target(jobs_dir, inprogress_dir, None)
+}
+
+/// [`try_claim`] with an optional target filter.
+///
+/// * `None` — claim the first job regardless of target (legacy single-worker
+///   mode).
+/// * `Some(name)` — claim only jobs whose `target` field equals `name`. A
+///   job with NO `target` field (written by a pre-roster coordinator)
+///   matches no filter: only a legacy no-filter worker may take it.
+///
+/// A filtered claim has to READ a candidate before renaming it (the rename
+/// is the claim, and an already-claimed job cannot be un-claimed). The
+/// read-then-rename window is racy in the harmless direction: losing the
+/// rename just moves to the next candidate, same as the unfiltered path.
+pub fn try_claim_target(jobs_dir: &Path, inprogress_dir: &Path, target: Option<&str>) -> Option<String> {
     let mut files: Vec<PathBuf> = std::fs::read_dir(jobs_dir)
         .ok()?
         .filter_map(std::result::Result::ok)
@@ -197,6 +223,19 @@ pub fn try_claim(jobs_dir: &Path, inprogress_dir: &Path) -> Option<String> {
     files.sort();
 
     for path in files {
+        if let Some(want) = target {
+            // Peek before claiming. An unreadable or unparseable candidate
+            // is skipped, not claimed — a targeted worker must never strand
+            // another target's job in inprogress/.
+            let claimable = std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+                .and_then(|job| job.get("target").and_then(Value::as_str).map(str::to_string))
+                .is_some_and(|t| t == want);
+            if !claimable {
+                continue;
+            }
+        }
         let Some(name) = path.file_name() else { continue };
         let dest = inprogress_dir.join(name);
         if std::fs::rename(&path, &dest).is_err() {
@@ -212,23 +251,60 @@ pub fn try_claim(jobs_dir: &Path, inprogress_dir: &Path) -> Option<String> {
     None
 }
 
-/// The `stackhour bridge claim` hidden verb. Returns the process exit code.
+/// The heartbeat file a claimer for `target` writes: the shared legacy
+/// `worker-heartbeat` for a no-filter claim, `worker-heartbeat-<target>` for
+/// a targeted one — so each lane's liveness is its own worker's, not the
+/// last worker of any kind to poll.
+pub fn heartbeat_path_for(paths: &crate::BridgePaths, target: Option<&str>) -> PathBuf {
+    match target {
+        Some(name) => paths.runtime_dir.join(format!("worker-heartbeat-{name}")),
+        None => paths.heartbeat_path.clone(),
+    }
+}
+
+/// Whether the worker lane for `target` is online.
+///
+/// Checks `worker-heartbeat-<target>` when that file exists, else falls back
+/// to the legacy shared `worker-heartbeat` file. The fallback is what keeps
+/// the LIVE Node Mac worker — which polls the original claim.mjs and only
+/// ever beats the shared file — reading as online for its lane.
+///
+/// Mixed-mode caveat: while any legacy no-filter worker is polling, EVERY
+/// lane whose targeted heartbeat file does not exist reads as online off the
+/// shared beat — the shared file cannot say which worker wrote it. The first
+/// targeted claim for a lane creates its per-target file, and from then on
+/// that lane's liveness is its own.
+pub fn worker_alive_for(paths: &crate::BridgePaths, target: &str) -> bool {
+    let own = heartbeat_path_for(paths, Some(target));
+    if own.exists() {
+        return worker_alive(&own);
+    }
+    worker_alive(&paths.heartbeat_path)
+}
+
+/// The `stackhour bridge claim [target]` hidden verb. Returns the process
+/// exit code.
 ///
 /// Blocks up to [`CLAIM_DEADLINE`], beating the heartbeat once per second.
 /// Prints the claimed job's raw JSON (no trailing newline) on success and
 /// nothing at all on timeout. BOTH outcomes exit 0 — the worker distinguishes
 /// them by whether stdout was empty, exactly as it does against the JS.
-pub fn run_claim(runtime_dir: &Path) -> i32 {
+///
+/// With no `target` this is byte-for-byte the legacy claim the live Node Mac
+/// worker invokes: any job, shared heartbeat. With a `target` it claims only
+/// that target's jobs and beats `worker-heartbeat-<target>`.
+pub fn run_claim(runtime_dir: &Path, target: Option<&str>) -> i32 {
     let paths = crate::BridgePaths::from_runtime_dir(runtime_dir);
     let _ = std::fs::create_dir_all(&paths.jobs_dir);
     let _ = std::fs::create_dir_all(&paths.inprogress_dir);
+    let heartbeat = heartbeat_path_for(&paths, target);
 
     // Computed BEFORE the loop and checked AFTER the claim attempt, so a
     // claim always beats at least once and always makes at least one attempt.
     let deadline = now_ms() + CLAIM_DEADLINE.as_millis() as i64;
     loop {
-        beat(&paths.heartbeat_path);
-        if let Some(job) = try_claim(&paths.jobs_dir, &paths.inprogress_dir) {
+        beat(&heartbeat);
+        if let Some(job) = try_claim_target(&paths.jobs_dir, &paths.inprogress_dir, target) {
             use std::io::Write as _;
             let mut out = std::io::stdout();
             let _ = out.write_all(job.as_bytes());
@@ -368,6 +444,7 @@ mod tests {
                 "engine": "codex",
                 "media": null,
                 "sessionId": null,
+                "target": "mac",
                 "ts": 1_700_000_000_000i64,
             }),
         )
@@ -377,10 +454,12 @@ mod tests {
         let body = std::fs::read_to_string(jobs.join(format!("{id}.json"))).unwrap();
         // Compact, no indent — machine traffic.
         assert!(!body.contains('\n'));
+        // The legacy dispatchMac order with `target` spliced in before `ts`;
+        // the Node worker ignores the unknown field.
         assert_eq!(
             body,
             format!(
-                r#"{{"id":"{id}","prompt":"hello","engine":"codex","media":null,"sessionId":null,"ts":1700000000000}}"#
+                r#"{{"id":"{id}","prompt":"hello","engine":"codex","media":null,"sessionId":null,"target":"mac","ts":1700000000000}}"#
             ),
             "key order is part of the on-disk contract with the Node worker"
         );
@@ -530,7 +609,7 @@ mod tests {
         let p = crate::BridgePaths::from_runtime_dir(tmp.path());
         write_job(&p.jobs_dir, &json!({ "prompt": "hi" })).unwrap();
         let started = now_ms();
-        assert_eq!(run_claim(tmp.path()), 0);
+        assert_eq!(run_claim(tmp.path(), None), 0);
         assert!(
             now_ms() - started < 1000,
             "a waiting job must be claimed without a poll sleep"
@@ -538,6 +617,87 @@ mod tests {
         assert!(worker_alive(&p.heartbeat_path));
         assert_eq!(std::fs::read_dir(&p.jobs_dir).unwrap().count(), 0);
         assert_eq!(std::fs::read_dir(&p.inprogress_dir).unwrap().count(), 1);
+    }
+
+    // ---- targeted claims ----
+
+    /// (b) The filter surfaces only matching jobs; no filter is the legacy
+    /// claim-anything mode; and a target-less (pre-roster) job matches NO
+    /// filter.
+    #[test]
+    fn a_targeted_claim_only_surfaces_jobs_stamped_with_that_target() {
+        let tmp = rt();
+        let p = crate::BridgePaths::from_runtime_dir(tmp.path());
+        let mac = write_job(&p.jobs_dir, &json!({ "prompt": "a", "target": "mac" })).unwrap();
+        let pi = write_job(&p.jobs_dir, &json!({ "prompt": "b", "target": "pi" })).unwrap();
+        let bare = write_job(&p.jobs_dir, &json!({ "prompt": "c" })).unwrap();
+
+        // A filter for a target with no jobs claims nothing and moves nothing.
+        assert_eq!(
+            try_claim_target(&p.jobs_dir, &p.inprogress_dir, Some("attic")),
+            None
+        );
+        assert_eq!(std::fs::read_dir(&p.jobs_dir).unwrap().count(), 3);
+
+        let claimed = try_claim_target(&p.jobs_dir, &p.inprogress_dir, Some("pi")).expect("pi's job");
+        let job: Value = serde_json::from_str(&claimed).unwrap();
+        assert_eq!(job["id"], pi.as_str());
+        assert_eq!(job["target"], "pi");
+        // Only pi's job moved.
+        assert!(p.jobs_dir.join(format!("{mac}.json")).exists());
+        assert!(p.jobs_dir.join(format!("{bare}.json")).exists());
+        assert_eq!(try_claim_target(&p.jobs_dir, &p.inprogress_dir, Some("pi")), None);
+
+        // The target-less job is invisible to EVERY filter…
+        assert!(try_claim_target(&p.jobs_dir, &p.inprogress_dir, Some("mac")).is_some());
+        assert_eq!(
+            try_claim_target(&p.jobs_dir, &p.inprogress_dir, Some("mac")),
+            None
+        );
+        assert!(p.jobs_dir.join(format!("{bare}.json")).exists());
+        // …and only the legacy no-filter claim takes it.
+        let claimed = try_claim(&p.jobs_dir, &p.inprogress_dir).expect("legacy claim");
+        assert!(claimed.contains(&bare));
+    }
+
+    /// (c) A targeted claim beats `worker-heartbeat-<target>`, and
+    /// `worker_alive_for` prefers that file, falling back to the legacy
+    /// shared heartbeat only while the per-target file does not exist.
+    #[test]
+    fn a_targeted_claim_beats_its_own_heartbeat_and_liveness_falls_back_to_the_legacy_file() {
+        let tmp = rt();
+        let p = crate::BridgePaths::from_runtime_dir(tmp.path());
+
+        // No file at all: offline.
+        assert!(!worker_alive_for(&p, "pi"));
+
+        // Only the legacy shared heartbeat (a live Node no-arg worker): every
+        // lane reads online off it — the documented mixed-mode fallback.
+        beat(&p.heartbeat_path);
+        assert!(worker_alive_for(&p, "pi"));
+        assert!(worker_alive_for(&p, "mac"));
+
+        // A targeted claim creates the per-target file… (a pi job is waiting,
+        // so run_claim returns on its first poll rather than blocking 25s)
+        write_job(&p.jobs_dir, &json!({ "prompt": "x", "target": "pi" })).unwrap();
+        assert_eq!(run_claim(tmp.path(), Some("pi")), 0);
+        let own = heartbeat_path_for(&p, Some("pi"));
+        assert!(own.exists(), "targeted claim must beat worker-heartbeat-pi");
+        assert!(!std::fs::read_to_string(&own).unwrap().is_empty());
+        assert!(worker_alive_for(&p, "pi"));
+
+        // …and from then on that lane's liveness is its OWN file, even when
+        // the shared one is fresh.
+        std::fs::write(&own, (now_ms() - 120_000).to_string()).unwrap();
+        beat(&p.heartbeat_path);
+        assert!(!worker_alive_for(&p, "pi"), "a stale own file must not fall back");
+        assert!(
+            worker_alive_for(&p, "mac"),
+            "lanes without their own file still fall back"
+        );
+
+        // The legacy shared file is untouched by the targeted claim path.
+        assert_eq!(heartbeat_path_for(&p, None), p.heartbeat_path);
     }
 
     // ---- return ----

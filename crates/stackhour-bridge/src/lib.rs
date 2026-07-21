@@ -13,7 +13,6 @@ pub mod installer;
 pub mod jobs;
 pub mod keyboard;
 pub mod local_lane;
-pub mod macqueue;
 pub mod media;
 pub mod migrate;
 pub mod registry_ctx;
@@ -24,6 +23,7 @@ pub mod state;
 pub mod telegram;
 pub mod tgsend;
 pub mod worker;
+pub mod worker_lane;
 
 /// Bridge runtime-directory layout. Resolution honours
 /// `STACKHOUR_BRIDGE_HOME` (parity with the JS runtime-dir resolution).
@@ -38,8 +38,9 @@ pub struct BridgePaths {
     pub results_dir: PathBuf,
     pub media_dir: PathBuf,
     /// `<runtime_dir>/worker-heartbeat` — a bare decimal ms epoch, no
-    /// trailing newline. Written by every `claim` poll, read by
-    /// [`jobs::worker_alive`].
+    /// trailing newline. Written by every NO-ARG `claim` poll (a targeted
+    /// `claim <target>` writes `worker-heartbeat-<target>` beside it), read
+    /// by [`jobs::worker_alive`] / [`jobs::worker_alive_for`].
     pub heartbeat_path: PathBuf,
     /// `<runtime_dir>/state.json`.
     pub state_path: PathBuf,

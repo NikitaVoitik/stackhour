@@ -1,5 +1,5 @@
-//! Mac-lane parity tests: the Telegram traffic `dispatchMac`, `pollResults`
-//! and `cancelQueuedMac` actually emit.
+//! Worker-lane parity tests (the legacy `mac` lane): the Telegram traffic
+//! `dispatchMac`, `pollResults` and `cancelQueuedMac` actually emit.
 //!
 //! SAFETY: every one of these runs against the local mock in
 //! `common/mock_bot_api.rs`. The owner's Node coordinator holds the only
@@ -7,7 +7,7 @@
 //! token would steal his messages, so no test here may ever be pointed at
 //! `api.telegram.org`.
 //!
-//! The unit tests in `src/macqueue.rs` cover the lane's decisions (which
+//! The unit tests in `src/worker_lane.rs` cover the lane's decisions (which
 //! session key, which engine label, which error string). These cover the
 //! wire: exact method sequence, exact request bodies, exact status text.
 
@@ -17,8 +17,8 @@ mod mock;
 use mock::{MockApi, Reply};
 use serde_json::{json, Value};
 use stackhour_bridge::local_lane::{LaneContext, LocalTarget};
-use stackhour_bridge::macqueue::{MacContext, MacLane};
 use stackhour_bridge::telegram::{Tg, TgConfig};
+use stackhour_bridge::worker_lane::{WorkerContext, WorkerLane};
 use stackhour_bridge::{jobs, BridgePaths};
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -79,15 +79,19 @@ impl LaneContext for Ctx {
     }
 }
 
-impl MacContext for Ctx {
-    fn mac_label(&self) -> String {
-        "🖥️ Mac".to_string()
+impl WorkerContext for Ctx {
+    fn worker_label(&self, target: &str) -> String {
+        if target == "mac" {
+            "🖥️ Mac".to_string()
+        } else {
+            target.to_string()
+        }
     }
 }
 
 struct Harness {
     api: MockApi,
-    lane: MacLane,
+    lane: WorkerLane,
     ctx: Arc<Ctx>,
     dir: tempfile::TempDir,
     paths: BridgePaths,
@@ -102,10 +106,11 @@ fn harness() -> Harness {
     let mut cfg = TgConfig::new("test-token", CHAT).with_api_root(api.base.clone());
     cfg.backoff_base_ms = 1; // the ladder's SHAPE is tested in transport_telegram.rs
     let ctx = Ctx::new();
-    let lane = MacLane::new(
+    let lane = WorkerLane::new(
         Arc::new(Tg::with_config(cfg)),
-        Arc::clone(&ctx) as Arc<dyn MacContext>,
+        Arc::clone(&ctx) as Arc<dyn WorkerContext>,
         paths.clone(),
+        "mac",
     );
     Harness {
         api,

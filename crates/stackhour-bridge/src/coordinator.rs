@@ -19,14 +19,14 @@
 
 use crate::config::{CoordinatorCfg, TargetCfg};
 use crate::local_lane::{LaneContext, LocalJob, LocalLane, LocalTarget};
-use crate::macqueue::{MacContext, MacLane};
 use crate::registry_ctx::RegistryCtx;
 use crate::state::BridgeState;
 use crate::telegram::Tg;
+use crate::worker_lane::{WorkerContext, WorkerLane};
 use crate::{log_line, BridgePaths};
 use indexmap::IndexMap;
 use serde_json::Value;
-use stackhour_core::registry::{CommandKind, EngineDef, Registry};
+use stackhour_core::registry::{CommandKind, EngineDef, Registry, TargetSpec};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
@@ -37,7 +37,7 @@ use std::time::Duration;
 // of those was built for real, and better, by the lane areas: the queue and
 // the busy flag live behind ONE lock in `LocalLane` (splitting them
 // reintroduces a TOCTOU the single-threaded JS cannot have), and the pending
-// map lives in `MacLane` beside the results poller that drains it. Keeping a
+// map lives in each `WorkerLane` beside the results poller that drains it. Keeping a
 // second copy here would mean two answers to "is the bridge busy?". It is
 // deleted rather than deprecated; `Runtime` below is the whole coordinator.
 
@@ -195,26 +195,52 @@ impl LaneContext for CoordCtx {
     }
 }
 
-impl MacContext for CoordCtx {
-    fn mac_label(&self) -> String {
+impl WorkerContext for CoordCtx {
+    fn worker_label(&self, target: &str) -> String {
         self.cfg
             .targets
-            .get("mac")
+            .get(target)
             .map(|t| t.label.clone())
-            .unwrap_or_else(|| "mac".to_string())
+            .unwrap_or_else(|| target.to_string())
     }
+}
+
+/// The target roster the registry is loaded with, derived from the
+/// coordinator config: WORKER (non-local) targets first in config file
+/// order, then local targets in config file order.
+///
+/// The order is the shipped switch-command order (`builtin_commands_for`
+/// splices the roster into the legacy /mac-before-/gcp slot), and
+/// workers-first is what reproduces the Node coordinator's `setMyCommands`
+/// order for a legacy gcp+mac config — mac (the worker) preceded gcp (the
+/// local box) even though the config file listed gcp first.
+pub fn target_specs(cfg: &CoordinatorCfg) -> Vec<TargetSpec> {
+    let spec =
+        |(name, t): (&String, &TargetCfg)| TargetSpec::new(name.as_str(), t.label.as_str(), t.kind.as_str());
+    cfg.targets
+        .iter()
+        .filter(|(_, t)| t.kind != "local")
+        .map(spec)
+        .chain(cfg.targets.iter().filter(|(_, t)| t.kind == "local").map(spec))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
 // The daemon
 // ---------------------------------------------------------------------------
 
-/// The wired-up runtime: transport, both lanes, the shared context.
+/// The wired-up runtime: transport, the local lane, one worker lane per
+/// non-local target, the shared context.
 pub struct Runtime {
     pub tg: Arc<Tg>,
     pub ctx: Arc<CoordCtx>,
+    /// The local lane always exists; with zero local targets it simply never
+    /// receives a directly-routed job (the unknown-target fallback may still
+    /// pass through it, where its own default-target resolution applies).
     pub local: LocalLane,
-    pub mac: MacLane,
+    /// One lane per config target with `kind != "local"`, in config file
+    /// order. Was a single hardcoded `mac: MacLane`.
+    pub workers: IndexMap<String, WorkerLane>,
     pub registry: Mutex<RegistryCtx>,
 }
 
@@ -232,9 +258,26 @@ impl Runtime {
         );
         let ctx = Arc::new(CoordCtx::new(cfg, paths.clone(), registry.snapshot(), state));
         let tg = Arc::new(tg);
+        let workers: IndexMap<String, WorkerLane> = ctx
+            .cfg()
+            .targets
+            .iter()
+            .filter(|(_, t)| t.kind != "local")
+            .map(|(name, _)| {
+                (
+                    name.clone(),
+                    WorkerLane::new(
+                        tg.clone(),
+                        ctx.clone() as Arc<dyn WorkerContext>,
+                        paths.clone(),
+                        name.clone(),
+                    ),
+                )
+            })
+            .collect();
         Runtime {
             local: LocalLane::new(tg.clone(), ctx.clone() as Arc<dyn LaneContext>),
-            mac: MacLane::new(tg.clone(), ctx.clone() as Arc<dyn MacContext>, paths),
+            workers,
             registry: Mutex::new(registry),
             tg,
             ctx,
@@ -245,12 +288,23 @@ impl Runtime {
         self.ctx.log(line);
     }
 
+    /// The single `{{worker}}` online/offline flag the status templates
+    /// render. CONTRACT DECISION: with several worker lanes it reads
+    /// "online" only when EVERY lane's heartbeat is fresh (conservative — a
+    /// down worker is worth noticing), and "offline" when there are no
+    /// worker lanes at all (nothing is beating, same as the Node bridge with
+    /// no heartbeat file). With the legacy single-mac config this is exactly
+    /// the old `self.mac.worker_alive()`.
+    fn workers_alive(&self) -> bool {
+        !self.workers.is_empty() && self.workers.values().all(WorkerLane::worker_alive)
+    }
+
     /// Build the planning environment from live state.
     fn env<'a>(&self, reg: &'a Registry, labels: &'a IndexMap<String, String>) -> crate::commands::CommandEnv<'a> {
         crate::commands::CommandEnv {
             reg,
             target_labels: labels,
-            worker_alive: self.mac.worker_alive(),
+            worker_alive: self.workers_alive(),
             busy: self.local.is_busy(),
             ship: self.ship_cfg(reg),
         }
@@ -318,6 +372,13 @@ impl Runtime {
     /// `routePrompt` — react, then hand to whichever lane owns the active
     /// target. The engine and agent are captured HERE, so a switch that
     /// arrives while the job waits does not retarget it.
+    ///
+    /// Routing, generalized from the JS's two-way local/mac split:
+    /// * a `type == "local"` target → the local lane;
+    /// * a target with its own worker lane → that lane;
+    /// * anything else (a `ship` target absent from config, a stale
+    ///   state.json) → the DEFAULT target's lane, mirroring the local
+    ///   lane's own unknown-target fallback. Never a panic.
     fn route_prompt(&self, text: &str, message_id: Option<i64>, media: Option<Value>) {
         if let Some(id) = message_id {
             self.tg.react_eyes(id);
@@ -343,16 +404,35 @@ impl Runtime {
                 target,
                 agent,
             });
+        } else if let Some(lane) = self.workers.get(&target) {
+            lane.dispatch(text, &engine, agent.as_deref(), media);
+        } else if let Some(lane) = self.workers.get(&self.ctx.default_target()) {
+            // No lane for this target and it is not local: the default
+            // target's worker lane takes it (leader-only fallback).
+            lane.dispatch(text, &engine, agent.as_deref(), media);
         } else {
-            self.mac.dispatch(text, &engine, agent.as_deref(), media);
+            // The default target is local (or itself misconfigured): the
+            // local lane's own fallback resolves — or logs — it, exactly as
+            // it does for an unknown target today.
+            self.local.enqueue(LocalJob {
+                prompt: text.to_string(),
+                engine,
+                target,
+                agent,
+            });
         }
     }
 
-    /// `/stop`: kill the local child AND sweep the queued mac jobs, then
-    /// report what actually happened.
+    /// `/stop`: kill the local child AND sweep every worker lane's queued
+    /// jobs, then report what actually happened.
     fn stop(&self) {
         let stopped_local = self.local.stop_current();
-        let cancelled = self.mac.cancel_queued();
+        let mut cancelled = crate::worker_lane::CancelOutcome::default();
+        for lane in self.workers.values() {
+            let out = lane.cancel_queued();
+            cancelled.cancelled += out.cancelled;
+            cancelled.running += out.running;
+        }
         let reg = self.ctx.registry();
         let labels = self.ctx.target_labels();
         let env = self.env(&reg, &labels);
@@ -601,9 +681,25 @@ impl Runtime {
         self.apply_all(actions);
     }
 
-    /// One sweep of the mac worker's results directory.
+    /// One sweep of the shared results directory, across every worker lane.
+    ///
+    /// Each lane takes the results matched to its own pending ids; the FIRST
+    /// lane additionally sweeps orphan results (no pending entry anywhere —
+    /// coordinator restart), so an orphan is delivered exactly once and a
+    /// sibling lane's matched result is never mislabelled. With the legacy
+    /// single-mac config this is exactly the old `self.mac.poll_results()`.
     pub fn poll_results(&self) -> usize {
-        self.mac.poll_results()
+        let mut lanes = self.workers.values();
+        let Some(first) = lanes.next() else {
+            return 0; // leader-only with zero workers dispatches nothing
+        };
+        let foreign: std::collections::HashSet<String> =
+            lanes.clone().flat_map(WorkerLane::pending_ids).collect();
+        let mut delivered = first.poll_with_orphans(&foreign);
+        for lane in lanes {
+            delivered += lane.poll_matched();
+        }
+        delivered
     }
 }
 
@@ -621,8 +717,14 @@ pub fn run_coordinator(runtime_dir: &Path) -> ! {
         }
     };
 
+    // The registry is loaded with the CONFIG's target roster: the generated
+    // switch commands, target validation and /help lines all follow the
+    // deployment's actual targets. Workers-first ordering (see
+    // [`target_specs`]) reproduces the legacy /mac-before-/gcp surface for a
+    // legacy config. Hot reloads replay the same roster — `RegistryCtx::tick`
+    // rebuilds via `Registry::rebuild`.
     let storage = stackhour_core::paths::resolve_storage_paths_from_process_env();
-    let registry = RegistryCtx::new(&storage);
+    let registry = RegistryCtx::new_with_targets(&storage, &target_specs(&cfg), &cfg.default_target);
     for err in registry.new_errors() {
         log_line(&log_path, &format!("registry: {err}"));
     }
@@ -721,6 +823,40 @@ fn serve(rt: Arc<Runtime>) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The roster ordering rule: workers first (config order), then locals
+    /// (config order). For the legacy config — gcp declared first but LOCAL,
+    /// mac second but a worker — this yields mac-before-gcp, which is what
+    /// keeps the generated switch commands (and therefore the registration
+    /// payload below) in the Node coordinator's `setMyCommands` order.
+    #[test]
+    fn target_specs_orders_workers_first_then_locals_in_config_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(
+            &path,
+            serde_json::json!({
+                "token": "t", "chatId": 1, "defaultTarget": "gcp",
+                "targets": {
+                    "gcp": { "type": "local", "label": "GCP" },
+                    "pi": { "label": "Pi" },
+                    "attic": { "type": "local", "label": "Attic" },
+                    "mac": { "label": "Mac" },
+                },
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let cfg = crate::config::load_coordinator_cfg(&path).unwrap();
+        let specs = target_specs(&cfg);
+        assert_eq!(
+            specs.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            vec!["pi", "mac", "gcp", "attic"],
+            "workers in config order, then locals in config order"
+        );
+        assert!(specs[2].is_local() && specs[3].is_local());
+        assert_eq!(specs[0].label, "Pi");
+    }
 
     /// The daemon's registration body must be the command ARRAY. If this ever
     /// becomes an object again, the bot registers nothing and says nothing.

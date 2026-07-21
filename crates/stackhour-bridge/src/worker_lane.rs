@@ -1,15 +1,20 @@
-//! The coordinator's MAC lane: `dispatchMac` / `pollResults` /
-//! `cancelQueuedMac` / `workerAlive`.
+//! The coordinator's WORKER lanes: `dispatchMac` / `pollResults` /
+//! `cancelQueuedMac` / `workerAlive`, generalized from the single hardcoded
+//! `mac` lane to one [`WorkerLane`] per non-local target.
 //!
 //! This is coordinator.mjs lines 304-335, lifted into a type the daemon can
-//! own. The disk half of the protocol — the job/inprogress/results dance and
-//! the heartbeat file — lives in [`crate::jobs`]; this module is the
+//! own — one instance per pull-worker target. Each lane is constructed for a
+//! target NAME and stamps that name into every job it dispatches (the
+//! `target` field a targeted `bridge claim <name>` filters on); sessions,
+//! pending entries and delivered results are all keyed by the lane's target.
+//! The disk half of the protocol — the job/inprogress/results dance and the
+//! heartbeat files — lives in [`crate::jobs`]; this module is the
 //! Telegram-facing half: it writes a job, posts a status message, and later
 //! turns a result file back into a delivered answer.
 //!
-//! Unlike the local lane there is no live progress: the Mac worker runs
-//! claude WITHOUT `--include-partial-messages`, so the status message is
-//! posted once at dispatch and never edited again until it is deleted by
+//! Unlike the local lane there is no live progress: the worker runs claude
+//! WITHOUT `--include-partial-messages`, so the status message is posted
+//! once at dispatch and never edited again until it is deleted by
 //! `deliverFinal` (or replaced by `🛑 Cancelled.`). There is no typing
 //! indicator and no 800ms throttle on this lane.
 //!
@@ -20,10 +25,12 @@
 //!   `working…` message is never deleted and keeps a live Stop button
 //!   forever, and the duration footer degrades to the literal `done`.
 //!   Preserved — persisting it would change what the owner sees.
-//! * **The session is filed under `mac` explicitly.** `pollResults` calls
-//!   `setSession('mac', engine, …)` with a hardcoded target, NOT the active
-//!   one. If the user switches to `/gcp` while a Mac job is in flight, a
-//!   port that wrote to the active target would corrupt both sessions.
+//! * **The session is filed under the LANE's target explicitly.** The JS
+//!   `pollResults` called `setSession('mac', engine, …)` with a hardcoded
+//!   target, NOT the active one; here it is the lane's own target, same
+//!   principle. If the user switches to `/gcp` while a worker job is in
+//!   flight, a port that wrote to the active target would corrupt both
+//!   sessions.
 //! * **The worker's echo wins.** The engine used to render a result is
 //!   `res.engine || info?.engine || 'claude'`. After a restart, a payload
 //!   that omits `engine` is labelled Claude even if it ran under Codex — and
@@ -37,6 +44,12 @@
 //!   `🛑 Cancelled.` edits arrive oldest-first. `pending` is an
 //!   [`IndexMap`] for exactly that reason, and cancellation collects the ids
 //!   before mutating, which JS gets away with and Rust does not.
+//! * **Orphan results belong to ONE lane.** The results/ directory is shared
+//!   by every lane; a result is normally matched to a lane by its pending
+//!   id. A result with NO pending entry anywhere (coordinator restart) has
+//!   no target of record — [`WorkerLane::poll_results`] takes those too,
+//!   and the runtime designates exactly one lane (its first) as the orphan
+//!   sweeper while the rest poll with [`WorkerLane::poll_matched`].
 //!
 //! ## One declared divergence
 //!
@@ -76,24 +89,19 @@ const DURATION_UNKNOWN: &str = "done";
 /// pending entry names one. Matches `res.engine || info?.engine || 'claude'`.
 const FALLBACK_ENGINE: &str = "claude";
 
-/// What the mac lane needs on top of [`LaneContext`].
+/// What a worker lane needs on top of [`LaneContext`].
 ///
-/// `LaneContext::target` only resolves LOCAL targets, and `mac` is by
-/// definition not one, so the label comes through its own accessor.
-pub trait MacContext: LaneContext {
-    /// `targets.mac.label`, falling back to the bare target key.
-    fn mac_label(&self) -> String;
-
-    /// The target key the mac lane dispatches under. Its own method so a
-    /// second remote worker is a config change rather than a code change.
-    fn mac_target(&self) -> String {
-        "mac".to_string()
-    }
+/// `LaneContext::target` only resolves LOCAL targets, and a worker lane's
+/// target is by definition not one, so the label comes through its own
+/// accessor. (This trait was `MacContext` when the only lane was `mac`.)
+pub trait WorkerContext: LaneContext {
+    /// `targets[<target>].label`, falling back to the bare target key.
+    fn worker_label(&self, target: &str) -> String;
 }
 
-/// A job dispatched to the mac worker, awaiting its result file.
+/// A job dispatched to a worker, awaiting its result file.
 #[derive(Debug, Clone)]
-pub struct MacPending {
+pub struct WorkerPending {
     pub job_id: String,
     /// The engine captured at dispatch, used only if the worker's payload
     /// does not echo one back.
@@ -106,7 +114,7 @@ pub struct MacPending {
     pub dispatched_ms: i64,
 }
 
-/// The result of a `/stop` sweep over the queued Mac jobs.
+/// The result of a `/stop` sweep over one lane's queued jobs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CancelOutcome {
     /// Jobs whose file was still in `jobs/` and was removed.
@@ -115,29 +123,46 @@ pub struct CancelOutcome {
     pub running: usize,
 }
 
-/// The mac lane. Clone-cheap; every clone shares one pending map.
+/// One worker lane, bound to a target name. Clone-cheap; every clone shares
+/// one pending map.
 #[derive(Clone)]
-pub struct MacLane {
+pub struct WorkerLane {
     tg: Arc<Tg>,
-    ctx: Arc<dyn MacContext>,
+    ctx: Arc<dyn WorkerContext>,
     paths: BridgePaths,
-    pending: Arc<Mutex<IndexMap<String, MacPending>>>,
+    /// The roster target this lane dispatches under: stamped into every job,
+    /// used as the session key and the heartbeat lane.
+    target: String,
+    pending: Arc<Mutex<IndexMap<String, WorkerPending>>>,
 }
 
-impl MacLane {
-    pub fn new(tg: Arc<Tg>, ctx: Arc<dyn MacContext>, paths: BridgePaths) -> MacLane {
-        MacLane {
+impl WorkerLane {
+    pub fn new(
+        tg: Arc<Tg>,
+        ctx: Arc<dyn WorkerContext>,
+        paths: BridgePaths,
+        target: impl Into<String>,
+    ) -> WorkerLane {
+        WorkerLane {
             tg,
             ctx,
             paths,
+            target: target.into(),
             pending: Arc::new(Mutex::new(IndexMap::new())),
         }
     }
 
-    /// Whether the Mac worker's heartbeat is fresh. Read LIVE at every render
-    /// site (`/where`, the startup banner, dispatch) — never cached.
+    /// The target name this lane dispatches under.
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    /// Whether this lane's worker heartbeat is fresh. Read LIVE at every
+    /// render site (`/where`, the startup banner, dispatch) — never cached.
+    /// Per-lane: `worker-heartbeat-<target>` when it exists, else the legacy
+    /// shared file (see [`jobs::worker_alive_for`]).
     pub fn worker_alive(&self) -> bool {
-        jobs::worker_alive(&self.paths.heartbeat_path)
+        jobs::worker_alive_for(&self.paths, &self.target)
     }
 
     /// How many dispatched jobs are still awaiting a result.
@@ -152,13 +177,18 @@ impl MacLane {
             .unwrap_or_else(|| engine.to_string())
     }
 
+    /// This lane's target label, from the config via the context.
+    fn label(&self) -> String {
+        self.ctx.worker_label(&self.target)
+    }
+
     /// `dispatchMac(prompt, engine, media)` — write the job, post the status
-    /// message, remember it.
+    /// message, remember it. The job is stamped with this lane's target.
     ///
     /// Order is the reference's and it matters: the job file is written
     /// FIRST, and the heartbeat is only read afterwards. A worker that claims
-    /// the file in that window still gets the `queued (Mac offline…)`
-    /// wording. Harmless, but observable, so it is preserved.
+    /// the file in that window still gets the `queued (… offline…)` wording.
+    /// Harmless, but observable, so it is preserved.
     ///
     /// Returns the job id, or `None` if the job file could not be written (in
     /// which case nothing was posted and nothing is pending).
@@ -170,17 +200,19 @@ impl MacLane {
         media: Option<Value>,
     ) -> Option<String> {
         let t0 = self.ctx.now_ms();
-        let target = self.ctx.mac_target();
-        let session = self.ctx.session(&target, engine, agent);
+        let session = self.ctx.session(&self.target, engine, agent);
 
         // Key order is the on-disk contract with the Node worker; `id` is
         // prepended by write_job. `media` and `sessionId` are explicit nulls,
-        // not omitted keys.
+        // not omitted keys. `target` sits before `ts` — the one roster-era
+        // addition, which the Node worker ignores and a targeted
+        // `bridge claim <target>` filters on.
         let job = json!({
             "prompt": prompt,
             "engine": engine,
             "media": media.unwrap_or(Value::Null),
             "sessionId": session,
+            "target": self.target,
             "ts": t0,
         });
         let id = match jobs::write_job(&self.paths.jobs_dir, &job) {
@@ -192,7 +224,7 @@ impl MacLane {
         };
 
         let engine_label = self.engine_label(engine);
-        let target_label = self.ctx.mac_label();
+        let target_label = self.label();
         let activity = if self.worker_alive() {
             self.ctx.prompt(tpl::STATUS_WORKING, &[])
         } else {
@@ -220,7 +252,7 @@ impl MacLane {
 
         self.pending.lock().expect("pending").insert(
             id.clone(),
-            MacPending {
+            WorkerPending {
                 job_id: id.clone(),
                 engine: engine.to_string(),
                 agent: agent.map(str::to_string),
@@ -231,11 +263,44 @@ impl MacLane {
         Some(id)
     }
 
+    /// The job ids this lane is still awaiting. The runtime uses this to
+    /// tell the orphan-sweeping lane which results belong to its siblings.
+    pub fn pending_ids(&self) -> Vec<String> {
+        self.pending.lock().expect("pending").keys().cloned().collect()
+    }
+
     /// `pollResults()` — one sweep of `results/`, called once a second.
+    ///
+    /// Takes results matched to this lane's pending map AND orphan results
+    /// (no pending entry — coordinator restart). With a single lane this is
+    /// exactly the reference behaviour; with several, the runtime calls
+    /// [`poll_with_orphans`](Self::poll_with_orphans) on ONE designated lane
+    /// and [`poll_matched`](Self::poll_matched) on the rest, so orphans are
+    /// delivered exactly once.
     ///
     /// Returns how many results were delivered, which is what the timer
     /// thread's tests assert on.
     pub fn poll_results(&self) -> usize {
+        self.poll(Some(&std::collections::HashSet::new()))
+    }
+
+    /// [`poll_results`](Self::poll_results) restricted to results whose id
+    /// is in THIS lane's pending map. Orphans (and other lanes' results) are
+    /// left untouched.
+    pub fn poll_matched(&self) -> usize {
+        self.poll(None)
+    }
+
+    /// [`poll_results`](Self::poll_results) that also skips `foreign` ids —
+    /// results pending on a SIBLING lane, which must be delivered by that
+    /// lane (under its target's label and session key), never by this one.
+    pub fn poll_with_orphans(&self, foreign: &std::collections::HashSet<String>) -> usize {
+        self.poll(Some(foreign))
+    }
+
+    /// `orphans`: `None` = matched-only; `Some(foreign)` = matched + every
+    /// unmatched result NOT pending on a sibling lane (the foreign set).
+    fn poll(&self, orphans: Option<&std::collections::HashSet<String>>) -> usize {
         let Ok(entries) = std::fs::read_dir(&self.paths.results_dir) else {
             return 0; // the directory is gone; the next tick will find it
         };
@@ -250,6 +315,20 @@ impl MacLane {
 
         let mut delivered = 0;
         for path in files {
+            let id = path
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            // Skip what is not this poll's to consume (or quarantine): a
+            // matched-only poll takes nothing beyond its own pending ids,
+            // and an orphan sweep leaves sibling lanes' results alone.
+            if !self.pending.lock().expect("pending").contains_key(&id) {
+                match orphans {
+                    None => continue,
+                    Some(foreign) if foreign.contains(&id) => continue,
+                    Some(_) => {}
+                }
+            }
             let parsed = std::fs::read_to_string(&path)
                 .ok()
                 .and_then(|text| serde_json::from_str::<Value>(&text).ok());
@@ -261,10 +340,6 @@ impl MacLane {
             // a delete-then-crash.
             let _ = std::fs::remove_file(&path);
 
-            let id = path
-                .file_stem()
-                .map(|s| s.to_string_lossy().into_owned())
-                .unwrap_or_default();
             let info = self.pending.lock().expect("pending").shift_remove(&id);
             self.deliver(&res, info.as_ref());
             delivered += 1;
@@ -290,20 +365,19 @@ impl MacLane {
     }
 
     /// Turn one result payload into a delivered Telegram message.
-    fn deliver(&self, res: &Value, info: Option<&MacPending>) {
+    fn deliver(&self, res: &Value, info: Option<&WorkerPending>) {
         // The WORKER's echo wins over the coordinator's recollection, and
         // both lose to a hardcoded fallback.
         let engine = str_field(res, "engine")
             .or_else(|| info.map(|i| i.engine.clone()))
             .unwrap_or_else(|| FALLBACK_ENGINE.to_string());
         let engine_label = self.engine_label(&engine);
-        let target = self.ctx.mac_target();
 
-        // Explicitly the mac target, never the active one: switching to /gcp
-        // mid-flight must not file this session under gcp.
+        // Explicitly the LANE's target, never the active one: switching
+        // targets mid-flight must not file this session elsewhere.
         if let Some(session) = str_field(res, "sessionId") {
             self.ctx.set_session(
-                &target,
+                &self.target,
                 &engine,
                 info.and_then(|i| i.agent.as_deref()),
                 Some(session),
@@ -320,7 +394,7 @@ impl MacLane {
             &[
                 ("text", &body),
                 ("engine", &engine_label),
-                ("target", &self.ctx.mac_label()),
+                ("target", &self.label()),
                 ("duration", &duration),
             ],
         );
@@ -407,8 +481,8 @@ mod tests {
     /// One recorded `set_session` call: (target, engine, agent, id).
     type SessionWrite = (String, String, Option<String>, Option<String>);
 
-    /// A [`MacContext`] backed by the real registry defaults, so the template
-    /// bodies under test are the shipped ones.
+    /// A [`WorkerContext`] backed by the real registry defaults, so the
+    /// template bodies under test are the shipped ones.
     pub(crate) struct FakeCtx {
         pub reg: Registry,
         pub now: AtomicI64,
@@ -436,7 +510,7 @@ mod tests {
             self.reg.engines.get(name).cloned()
         }
         fn target(&self, _name: &str, _engine: &str) -> Option<crate::local_lane::LocalTarget> {
-            None // `mac` is never a local target
+            None // a worker target is never a local one
         }
         fn prompt(&self, name: &str, vars: &[(&str, &str)]) -> String {
             self.reg.prompts.render(name, vars)
@@ -473,9 +547,13 @@ mod tests {
         }
     }
 
-    impl MacContext for FakeCtx {
-        fn mac_label(&self) -> String {
-            self.label.clone()
+    impl WorkerContext for FakeCtx {
+        fn worker_label(&self, target: &str) -> String {
+            if target == "mac" {
+                self.label.clone()
+            } else {
+                target.to_string()
+            }
         }
     }
 
@@ -486,7 +564,7 @@ mod tests {
         }
     }
 
-    fn lane_with(ctx: Arc<FakeCtx>, dir: &std::path::Path) -> MacLane {
+    fn lane_for(ctx: Arc<FakeCtx>, dir: &std::path::Path, target: &str) -> WorkerLane {
         let paths = BridgePaths::from_runtime_dir(dir);
         paths.ensure_dirs().unwrap();
         // A Tg pointed at an unroutable port: these tests exercise the lane's
@@ -496,7 +574,11 @@ mod tests {
             crate::telegram::TgConfig::new("test-token", 1).with_api_root("http://127.0.0.1:1/".to_string());
         cfg.backoff_base_ms = 0;
         cfg.attempts = 1;
-        MacLane::new(Arc::new(Tg::with_config(cfg)), ctx, paths)
+        WorkerLane::new(Arc::new(Tg::with_config(cfg)), ctx, paths, target)
+    }
+
+    fn lane_with(ctx: Arc<FakeCtx>, dir: &std::path::Path) -> WorkerLane {
+        lane_for(ctx, dir, "mac")
     }
 
     // ---- the result-text ladder ----
@@ -560,12 +642,79 @@ mod tests {
         assert_eq!(job["engine"], "codex");
         assert_eq!(job["media"], Value::Null);
         assert_eq!(job["sessionId"], "prev-session");
+        assert_eq!(job["target"], "mac", "the job is stamped with the lane's target");
         assert_eq!(job["ts"], 1_000_000);
     }
 
-    /// The media object is serialised VERBATIM, GCP-absolute path and all.
-    /// The worker scps the bytes and rebuilds the prompt with a local path;
-    /// the coordinator transfers nothing.
+    /// Two lanes over the same runtime dir: each stamps its own target, reads
+    /// its own session key, and a targeted claim only surfaces its own jobs.
+    #[test]
+    fn two_lanes_stamp_their_own_target_and_targeted_claims_stay_separate() {
+        let ctx = Arc::new(FakeCtx::new());
+        let tmp = tempfile::tempdir().unwrap();
+        let mac = lane_for(Arc::clone(&ctx), tmp.path(), "mac");
+        let pi = lane_for(Arc::clone(&ctx), tmp.path(), "pi");
+
+        let mac_id = mac.dispatch("for the mac", "claude", None, None).unwrap();
+        let pi_id = pi.dispatch("for the pi", "codex", None, None).unwrap();
+
+        let paths = BridgePaths::from_runtime_dir(tmp.path());
+        let claimed =
+            jobs::try_claim_target(&paths.jobs_dir, &paths.inprogress_dir, Some("pi")).expect("pi's job");
+        let job: Value = serde_json::from_str(&claimed).unwrap();
+        assert_eq!(job["id"], pi_id.as_str());
+        assert_eq!(job["target"], "pi");
+        assert!(
+            paths.jobs_dir.join(format!("{mac_id}.json")).exists(),
+            "the mac job must not be visible to a pi claim"
+        );
+        assert_eq!(
+            jobs::try_claim_target(&paths.jobs_dir, &paths.inprogress_dir, Some("pi")),
+            None
+        );
+
+        // Results are filed under each lane's own target.
+        write_result(tmp.path(), &pi_id, json!({ "text": "done", "sessionId": "s-pi" }));
+        assert_eq!(pi.poll_matched(), 1);
+        assert_eq!(
+            ctx.sessions.lock().unwrap().last().unwrap().0,
+            "pi",
+            "the session files under the LANE's target"
+        );
+    }
+
+    /// A matched-only poll leaves other lanes' results and orphans alone;
+    /// the designated orphan sweeper takes them.
+    #[test]
+    fn poll_matched_leaves_foreign_results_for_the_orphan_sweeper() {
+        let ctx = Arc::new(FakeCtx::new());
+        let tmp = tempfile::tempdir().unwrap();
+        let mac = lane_for(Arc::clone(&ctx), tmp.path(), "mac");
+        let pi = lane_for(Arc::clone(&ctx), tmp.path(), "pi");
+
+        // An orphan (no pending anywhere) and a result pending on `mac`.
+        write_result(
+            tmp.path(),
+            "3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+            json!({ "text": "orphan" }),
+        );
+        let mac_id = mac.dispatch("mine", "claude", None, None).unwrap();
+        write_result(tmp.path(), &mac_id, json!({ "text": "mac's" }));
+
+        assert_eq!(pi.poll_matched(), 0, "pi owns neither result");
+        assert_eq!(
+            std::fs::read_dir(tmp.path().join("results")).unwrap().count(),
+            2,
+            "poll_matched must not consume foreign results"
+        );
+        assert_eq!(mac.poll_matched(), 1, "mac takes its own, not the orphan");
+        assert_eq!(mac.poll_results(), 1, "the full poll sweeps the orphan");
+        assert_eq!(std::fs::read_dir(tmp.path().join("results")).unwrap().count(), 0);
+    }
+
+    /// The media object is serialised VERBATIM, coordinator-absolute path and
+    /// all. The worker scps the bytes and rebuilds the prompt with a local
+    /// path; the coordinator transfers nothing.
     #[test]
     fn dispatch_carries_the_media_object_through_unchanged() {
         let ctx = Arc::new(FakeCtx::new());
@@ -609,7 +758,7 @@ mod tests {
     }
 
     #[test]
-    fn a_result_persists_its_session_under_the_mac_target_explicitly() {
+    fn a_result_persists_its_session_under_the_lane_target_explicitly() {
         let ctx = Arc::new(FakeCtx::new());
         let tmp = tempfile::tempdir().unwrap();
         let lane = lane_with(Arc::clone(&ctx), tmp.path());
@@ -630,7 +779,7 @@ mod tests {
                 None,
                 Some("s-next".to_string())
             )],
-            "the session must be filed under 'mac', never the active target"
+            "the session must be filed under the lane's target, never the active one"
         );
         assert_eq!(lane.pending_len(), 0, "the pending entry is consumed");
         assert!(!tmp.path().join("results").join(format!("{id}.json")).exists());
@@ -809,5 +958,29 @@ mod tests {
         assert!(!lane.worker_alive());
         jobs::beat(&tmp.path().join("worker-heartbeat"));
         assert!(lane.worker_alive(), "no caching — the banner reads it per render");
+    }
+
+    /// Per-lane liveness: a lane's own heartbeat file wins over the legacy
+    /// shared one, and a lane without its own file falls back to it.
+    #[test]
+    fn each_lane_reads_its_own_heartbeat_with_the_legacy_file_as_fallback() {
+        let ctx = Arc::new(FakeCtx::new());
+        let tmp = tempfile::tempdir().unwrap();
+        let mac = lane_for(Arc::clone(&ctx), tmp.path(), "mac");
+        let pi = lane_for(Arc::clone(&ctx), tmp.path(), "pi");
+
+        jobs::beat(&tmp.path().join("worker-heartbeat-pi"));
+        assert!(pi.worker_alive());
+        assert!(!mac.worker_alive(), "pi's heartbeat says nothing about mac");
+
+        // The legacy shared file flips lanes WITHOUT their own file online.
+        jobs::beat(&tmp.path().join("worker-heartbeat"));
+        assert!(mac.worker_alive(), "the legacy fallback covers the Node worker");
+        std::fs::write(
+            tmp.path().join("worker-heartbeat-pi"),
+            (jobs::now_ms() - 120_000).to_string(),
+        )
+        .unwrap();
+        assert!(!pi.worker_alive(), "a lane with its own stale file is offline");
     }
 }
