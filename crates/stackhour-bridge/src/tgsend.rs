@@ -60,6 +60,21 @@ pub struct TgSendArgs {
 /// Argument parsing, matching the reference's single forward pass. `--from`
 /// consumes the next argument; a trailing `--from` with nothing after it
 /// yields `None`, exactly as `args[++i]` gives `undefined`.
+/// Printed by `-h`/`--help`; mirrors the usage comment atop tg-send.mjs.
+const TG_SEND_USAGE: &str = "\
+tg-send — send a message to the owner's Telegram chat.
+
+Usage:
+  stackhour bridge tg-send \"message text\"        message as argument
+  echo \"message\" | stackhour bridge tg-send      message from stdin
+  stackhour bridge tg-send --html \"<b>hi</b>\"    send with HTML parse mode
+  stackhour bridge tg-send --from \"GCP\" \"done\"   prefix with a source label
+
+Reads token + chatId from $CLAUDE_REMOTE_CONFIG, else
+$STACKHOUR_BRIDGE_HOME/config.json, else ~/.claude-remote/config.json.
+Exit code 0 on success, 1 when any part failed, 2 for config/usage problems.
+Prints nothing on success unless --verbose.";
+
 pub fn parse_args(args: &[String]) -> TgSendArgs {
     let mut out = TgSendArgs::default();
     let mut i = 0;
@@ -311,6 +326,14 @@ fn is_parse_error(description: &str) -> bool {
 
 /// Run tg-send against the real process environment; returns the exit code.
 pub fn run_tg_send(args: &[String]) -> i32 {
+    // Guard first, before any config read or network touch: without it,
+    // `--help` falls into the message words and gets SENT to the live chat
+    // (silently, exit 0) — which happened in practice. tg-send.mjs originally
+    // had the same trap and now carries the identical guard.
+    if args.iter().any(|a| a == "-h" || a == "--help") {
+        println!("{TG_SEND_USAGE}");
+        return 0;
+    }
     let parsed = parse_args(args);
     let stdin = if parsed.rest.is_empty() && !stdin_is_tty() {
         let mut buf = String::new();
@@ -357,6 +380,16 @@ mod tests {
         assert!(p.verbose);
         assert_eq!(p.from.as_deref(), Some("Mac"));
         assert_eq!(p.rest, vec!["hello", "world"]);
+    }
+
+    /// `--help` must never be sent as a message (the unguarded original did
+    /// exactly that; tg-send.mjs and this port now both carry the guard). It
+    /// sits before any config read or network touch, so this returns 0
+    /// without side effects even on a machine with a live config.
+    #[test]
+    fn help_flag_prints_usage_instead_of_sending_it_as_a_message() {
+        assert_eq!(run_tg_send(&args(&["--help"])), 0);
+        assert_eq!(run_tg_send(&args(&["-h", "unrelated", "words"])), 0);
     }
 
     #[test]

@@ -15,6 +15,25 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
+
+// A bare `tg-send --help` must never reach Telegram: without this guard the
+// flag falls through to `rest` and gets delivered as a live message. Handle
+// help before reading config or touching the network.
+if (args.includes('-h') || args.includes('--help')) {
+  console.log(`tg-send — send a message to the owner's Telegram chat.
+
+Usage:
+  node tg-send.mjs "message text"          message as argument
+  echo "message" | node tg-send.mjs        message from stdin
+  node tg-send.mjs --html "<b>hi</b>"      send with HTML parse mode
+  node tg-send.mjs --from "GCP" "done"     prefix with a source label
+
+Reads token + chatId from the adjacent config.json (or $CLAUDE_REMOTE_CONFIG).
+Exit code 0 on success, 1 when any part failed, 2 for config/usage problems.
+Prints nothing on success unless --verbose.`);
+  process.exit(0);
+}
+
 let html = false, verbose = false, from = null;
 const rest = [];
 for (let i = 0; i < args.length; i++) {
