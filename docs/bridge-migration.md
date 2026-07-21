@@ -6,8 +6,11 @@ How to move the live Telegram bridge from `~/.claude-remote/coordinator.mjs`
 **Nobody has performed this cutover yet.** Every command below was rehearsed
 against copies and a local mock Bot API; none of it has run against the real
 bot token. Read §5 before you decide to do it — the migration does not, on its
-own, produce a bootable bridge, and three of the supporting verbs
-(`bridge install`, `bridge doctor`, `bridge status`) are unimplemented.
+own, produce a bootable bridge. The supporting verbs (`bridge install`,
+`bridge doctor`, `bridge status`, `bridge restart`) are implemented in the
+Rust binary; note that `bridge install` writes a **user** unit, while this
+runbook keeps the hand-written **system** unit (§2.1) to mirror the legacy
+`claude-coordinator.service` setup.
 
 > ## The one rule that cannot be broken
 >
@@ -44,8 +47,8 @@ homes:
 
 | Destination | What lands there |
 |---|---|
-| `<config-dir>` (default `~/.config/stackhour`) | `config.json` (merged: adds `bridge.defaultEngine/defaultTarget/defaultAgent`), `secrets.json` (0600), `.gitignore`, `engines/{claude,codex}.toml`, `agents/orwell/{agent.toml,soul.md}`, `prompts/{help,ship}.md`, `commands/*.toml` |
-| `<runtime-dir>` | `config.json` (0600): `targets{}` + `maxMediaBytes`, **no secrets** |
+| `<config-dir>` (default `~/.config/stackhour`) | `config.json` (merged: adds `bridge.defaultEngine/defaultTarget/defaultAgent`), `engines/{claude,codex}.toml`, `agents/orwell/{agent.toml,soul.md}`, `prompts/{help,ship}.md`, `commands/*.toml` — **no secrets anywhere in this tree** |
+| `<runtime-dir>` | `config.json` (0600): `token`/`chatId`/`elevenLabsApiKey` + `ship{}` + `targets{}` + `maxMediaBytes` — everything `load_coordinator_cfg` reads, so the migrated runtime dir boots as-is |
 
 It never writes back to the legacy file. `--dry-run` performs zero filesystem
 writes — no mkdir, no temp file — and masks every secret, so it is safe to
@@ -66,20 +69,21 @@ $BIN bridge migrate \
 `--from` has no default on purpose: auto-discovering the live config invites
 an accidental run.
 
-**Note the `--runtime-dir /tmp/...`.** See §1.4 — you almost certainly do *not*
-want the migrated runtime `config.json`, because the Rust coordinator reads the
-Node's existing `~/.claude-remote/config.json` unchanged.
+**Note the `--runtime-dir /tmp/...`.** See §1.4 — the migrated runtime config
+boots on its own, but reusing `~/.claude-remote` as the runtime dir keeps the
+live state and the Mac worker untouched, in which case the scratch runtime
+config is thrown away.
 
 ### 1.3 Verify the output before trusting it
 
 Read the plan for these lines specifically. Against the committed fixture (same
-shape as the real config) the plan is 15 files, 0 conflicts, and these warnings:
+shape as the real config) the plan is 13 files, 0 conflicts, and these warnings:
 
 ```
 warn  engines/*.toml are FROZEN copies of the built-ins ...
 warn  /help /menu /stop are RESERVED and /where /new are kind="builtin" ...
 warn  target 'gcp' had no codexBin and relied on coordinator.mjs:244's hardcoded fallback; materialised as ~/.local/bin/codex
-warn  target 'blort' has no home in the new layout ... /ship cannot switch to it
+warn  target 'blort' is outside the registry's switch surface ... only /ship reaches it, via the runtime 'ship' key
 warn  'maxMediaBytes' absent in source; writing the legacy default 536870912 explicitly
 ```
 
@@ -87,10 +91,12 @@ Checks, in order:
 
 1. **Every legacy key reached a destination.** Any `legacy key '<k>' reached no
    destination` line is a setting you are about to lose. Stop and fix it.
-2. **All three targets are listed** (`3 targets` on the runtime config.json
-   line). `blort` is the easiest to drop and is the `/ship` destination.
-3. **Secrets are masked but sized.** `bridge.telegramToken 1111…AAAA (51 chars)`
-   — the char count is how you confirm the right token without printing it.
+2. **All three targets are listed** (`3 targets + secrets` on the runtime
+   config.json line). `blort` is the easiest to drop and is the `/ship`
+   destination — `ship  target=blort engine=claude` must appear in that file's
+   detail lines.
+3. **Secrets are masked but sized.** `token 1111…AAAA (51 chars)` — the char
+   count is how you confirm the right token without printing it.
 4. Now write it (drop `--dry-run`), then re-read the written tree:
 
 ```sh
@@ -98,28 +104,24 @@ $BIN bridge migrate --from ... --to ... --runtime-dir ... --verify
 ```
 
 `--verify` re-reads both sides and reports drift; exit 0 = clean, exit 3 =
-discrepancies. **Run it before you hand-edit anything** — once you add the
-token to the runtime `config.json` (§1.4) `--verify` will legitimately report
-that file as differing forever.
+discrepancies. **Run it before you hand-edit anything** — any later hand-edit
+to a migrated file makes `--verify` legitimately report it as differing
+forever.
 
 Exit codes: `0` ok · `1` bad usage / unreadable source / failed write ·
 `2` destinations exist, nothing written (use `--force` to back up + overwrite)
 · `3` `--verify` found drift.
 
-### 1.4 The gap: the migrated runtime config does not boot
+### 1.4 Choosing the runtime dir
 
-The migrated `<runtime-dir>/config.json` contains `targets` and
-`maxMediaBytes` and deliberately no secrets. But `load_coordinator_cfg` reads
-`token`, `chatId` and `elevenLabsApiKey` from **that** file, and **nothing in
-the codebase reads `secrets.json` or `STACKHOUR_TELEGRAM_TOKEN`.** Booting
-against a freshly migrated runtime dir therefore fails, verified:
+The migrated `<runtime-dir>/config.json` carries `token`, `chatId`,
+`elevenLabsApiKey`, the `ship` destination, `targets` and `maxMediaBytes` —
+exactly the keys `load_coordinator_cfg` reads — so a freshly migrated runtime
+dir boots on its own. (An earlier revision of the migration parked the secrets
+in a `secrets.json` nothing read, and a migrated runtime dir failed the boot
+gate; that gap is closed.)
 
-```
-[…] coordinator config error: config.json must define token, an integer chatId, and gcp/mac targets.
-exit=1
-```
-
-There are two ways out. **Take the first.**
+Two workable layouts. **The first is still simpler for the live box.**
 
 **(a) Recommended — keep `~/.claude-remote` as the runtime dir and reuse its
 config.json as-is.** The Rust coordinator parses the Node's config file
@@ -129,7 +131,9 @@ verbatim: `token`, `chatId`, `defaultTarget`, all three `targets`, and
 `media/` and `worker-heartbeat` in place, and — critically — keeps the Mac
 worker working, because the worker SSHes to `<remoteDir>/claim.mjs` and
 `<remoteDir>/return.mjs`, which are the Node scripts already sitting in
-`~/.claude-remote`. Nothing on the Mac needs to change.
+`~/.claude-remote`. Nothing on the Mac needs to change. Note the Node config
+has no `ship` key, so `/ship` on this layout parks on `defaultTarget` unless
+you add `"ship": { "target": "blort", "engine": "claude" }` to it.
 
 So: use the migration only for the **config dir** (registry: agents, prompts,
 commands, engines, bridge defaults), throw the scratch runtime config away, and
@@ -140,11 +144,11 @@ ElevenLabs key replaced with fakes, `apiRoot` pointed at a local mock), the
 release binary booted, registered all ten commands, read the real `state.json`,
 and sent `🤖 Claude + Codex bridge online. Active: Claude on ☁️ GCP.`
 
-**(b) Not recommended — a separate runtime dir.** Then you must hand-add
-`token`, `chatId` and `elevenLabsApiKey` into that `config.json` (mode 0600),
-copy `state.json` across, and re-point the Mac worker's `remoteDir` at the new
-directory with `claim.mjs`/`return.mjs` present there. More moving parts, no
-benefit.
+**(b) A separate migrated runtime dir.** Boots as-is with the `ship`
+destination already set, but you must still copy `state.json` across and
+re-point the Mac worker's `remoteDir` at the new directory with
+`claim.mjs`/`return.mjs` present there — those two steps are why (a) stays
+the recommendation for the live box.
 
 ---
 
@@ -152,9 +156,12 @@ benefit.
 
 ### 2.1 Write the Rust unit (once, before the cutover)
 
-`stackhour bridge install` is a `todo!()` — it exits 1 with "`bridge` is not
-implemented in the Rust port yet". Write the unit by hand. Model it on the
-existing one so nothing else changes:
+`stackhour bridge install coordinator` exists and works, but it installs a
+**user** service (`~/.config/systemd/user/stackhour-bridge.service`) whose
+`ExecStart` is the binary it copies into the runtime dir. The legacy
+`claude-coordinator.service` is a **system** unit with `User=nikita`, so this
+runbook writes the replacement by hand to keep the two units side by side in
+the same domain. Model it on the existing one so nothing else changes:
 
 ```ini
 # /etc/systemd/system/stackhour-bridge.service
@@ -311,9 +318,8 @@ both pass on this tree.
 
 | Difference | Detail |
 |---|---|
-| **`/ship` loses its destination** | `coordinator.mjs:363` hardcodes `state.active = 'blort'`. The Rust `ship_cfg` seeds the ship target from `defaultTarget` and only overrides it from a `ship.target` runtime key the migration never writes — so after cutover `/ship` parks on `gcp`, not `blort`. The `blort` target itself survives in `targets`. Pinned by a test in `bridge_migrate_fixture.rs`; the migrator warns about it. **Workaround:** add `"ship": { "target": "blort", "engine": "claude" }` to the runtime `config.json`. |
-| **Secrets live in the runtime config, not `secrets.json`** | The migration writes `secrets.json`, but nothing reads it (§1.4). It is a dead file today. |
-| **`bridge install` / `doctor` / `status` / `restart` are unimplemented** | All exit 1 with "not implemented in the Rust port yet". The unit file is hand-written (§2.1). The success message printed by `bridge migrate` tells you to run `stackhour bridge doctor` — **that instruction is wrong**; the command does not exist yet. |
+| **`/ship`'s destination is a config key, not a hardcode** | `coordinator.mjs:363` hardcodes `state.active = 'blort'`; the Rust `ship_cfg` reads the runtime `ship` key (falling back to `defaultTarget`). The migration writes `"ship": { "target": "blort", "engine": "claude" }`, so a migrated runtime dir behaves like the live Node. On layout (a) of §1.4 — reusing the Node's own config.json — add that key by hand. Pinned by `the_ship_destination_is_carried_into_the_runtime_config`. |
+| **`bridge install` installs the binary, not the `.mjs` files** | `install` / `doctor` / `status` / `restart` are implemented (`installer.rs` / `doctor.rs`; the `stackhour bridge doctor` instruction printed by `bridge migrate` now works). The runtime install copies the *running* stackhour binary into the runtime dir plus node-runnable `claim.mjs`/`return.mjs`/`tg-send.mjs` shims that exec it, instead of Node's five `.mjs` files — so a Node Mac worker keeps calling `node claim.mjs` unchanged. The doctor checks `stackhour` where the Node checked `coordinator.mjs`/`worker.mjs`, keeps the `Node.js >=22` line as a PATH probe (the shims still need node), and additionally surfaces registry validation errors as ✗ lines. `bridge install coordinator` writes a **user** unit whose `ExecStart` is `<runtime-dir>/stackhour bridge coordinator` — never node — while §2.1's cutover unit stays a hand-written **system** unit. |
 | **A missing `defaultTarget` falls back to `gcp`** | Deliberate. `coordinator.mjs` does `s.active ||= CONFIG.defaultTarget` with no validation, so an absent key leaves `active` undefined and every later `targets[active]` lookup silently misses. That is a bug in the Node, not a contract. The installer's strict validator still rejects the key. |
 | **Targets outside `gcp`/`mac` are second-class** | The registry pins targets to `gcp|mac`. `blort` survives in `targets` and still runs, but nothing in the command surface switches to it. |
 | **`engines/*.toml` are frozen at migration time** | Migrating with engines (the default) freezes the built-in argv construction to disk; later upstream argv fixes will not reach them. Use `--no-engines` to keep tracking the built-ins. |

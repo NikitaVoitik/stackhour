@@ -8,8 +8,6 @@
 //! ```text
 //! <config-dir>/                     registry root (StoragePaths::config_dir)
 //!   config.json          0644   MERGED: adds only the "bridge" object
-//!   secrets.json         0600   token, chat id, ElevenLabs key
-//!   .gitignore           0644   MERGED: adds the secrets.json line
 //!   engines/claude.toml  0644   frozen copy of the built-in engine
 //!   engines/codex.toml   0644
 //!   agents/orwell/…      0644   the ORWELL_RULES system prompt
@@ -17,12 +15,18 @@
 //!   prompts/ship.md      0644   the /ship prompt body
 //!   commands/*.toml      0644   one per migratable legacy verb
 //! <runtime-dir>/
-//!   config.json          0600   targets{} + maxMediaBytes. NO SECRETS.
+//!   config.json          0600   token/chatId/elevenLabsApiKey + ship{} +
+//!                               targets{} + maxMediaBytes — everything
+//!                               `load_coordinator_cfg` actually reads, so a
+//!                               freshly migrated runtime dir boots.
 //! ```
 //!
-//! Secrets land in exactly one file, mode 0600, and are masked in every line
-//! this module prints. `--dry-run` performs zero filesystem writes — no
-//! mkdir, no temp file — so reading the plan is always safe.
+//! Secrets land in exactly one file — the runtime `config.json`, mode 0600,
+//! the file the coordinator reads them from — and are masked in every line
+//! this module prints. (An earlier revision wrote a separate `secrets.json`;
+//! nothing ever read it, so it is gone.) `--dry-run` performs zero
+//! filesystem writes — no mkdir, no temp file — so reading the plan is
+//! always safe.
 //!
 //! ## Deviations from the migration brief, and why
 //!
@@ -244,19 +248,23 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
     let cfg = &opts.to;
     let rt = &opts.runtime_dir;
 
-    // ---- secrets.json --------------------------------------------------
-    let mut secrets = Map::new();
-    let mut secret_detail: Vec<String> = Vec::new();
+    // ---- runtime secrets -------------------------------------------------
+    // `load_coordinator_cfg` reads `token`, `chatId` and `elevenLabsApiKey`
+    // from the RUNTIME config.json — the same keys, in the same file, as the
+    // Node coordinator. They are folded into that file (written 0600 below)
+    // rather than a separate secrets.json no loader ever consulted.
+    let mut rt_secrets = Map::new();
+    let mut rt_detail: Vec<String> = Vec::new();
     if !legacy.token.is_empty() {
-        secrets.insert("telegramToken".into(), json!(legacy.token));
-        secret_detail.push(format!("bridge.telegramToken           {}", mask(&legacy.token)));
+        rt_secrets.insert("token".into(), json!(legacy.token));
+        rt_detail.push(format!("token                          {}", mask(&legacy.token)));
         consumed.push("token");
     } else {
-        warnings.push("'token' is missing or empty in the source; the bridge will not authenticate until you set STACKHOUR_TELEGRAM_TOKEN or edit secrets.json".into());
+        warnings.push("'token' is missing or empty in the source; the bridge will not authenticate until you add 'token' to the runtime config.json".into());
     }
     if !legacy.chat_id.is_null() {
-        secrets.insert("chatId".into(), legacy.chat_id.clone());
-        secret_detail.push(format!("bridge.chatId                  {}", legacy.chat_id));
+        rt_secrets.insert("chatId".into(), legacy.chat_id.clone());
+        rt_detail.push(format!("chatId                         {}", legacy.chat_id));
         consumed.push("chatId");
     } else {
         warnings
@@ -271,23 +279,12 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
             consumed.push("elevenLabsApiKey");
         }
         Some(key) => {
-            secrets.insert("elevenLabsApiKey".into(), json!(key));
-            secret_detail.push(format!("bridge.elevenLabsApiKey        {}", mask(key)));
+            rt_secrets.insert("elevenLabsApiKey".into(), json!(key));
+            rt_detail.push(format!("elevenLabsApiKey               {}", mask(key)));
             consumed.push("elevenLabsApiKey");
         }
         None => {}
     }
-    let secrets_doc = json!({ "bridge": Value::Object(secrets.clone()) });
-    files.push(PlannedFile {
-        path: cfg.join("secrets.json"),
-        label: "secrets.json".into(),
-        mode: 0o600,
-        contents: pretty_json(&secrets_doc),
-        disposition: Disposition::Create,
-        summary: format!("{} key{}", secrets.len(), plural(secrets.len())),
-        detail: secret_detail,
-        merged_existing: false,
-    });
 
     // ---- config.json (MERGED: the tracker owns this file) --------------
     let (existing_cfg, cfg_existed) = read_json_object(&cfg.join("config.json"));
@@ -337,28 +334,6 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
         warnings.push(format!("config.json: {c} (existing value is replaced)"));
     }
 
-    // ---- .gitignore (MERGED) -------------------------------------------
-    let gitignore = cfg.join(".gitignore");
-    let existing_ignore = std::fs::read_to_string(&gitignore).unwrap_or_default();
-    if !existing_ignore.lines().any(|l| l.trim() == "secrets.json") {
-        let mut body = existing_ignore.clone();
-        if !body.is_empty() && !body.ends_with('\n') {
-            body.push('\n');
-        }
-        body.push_str(
-            "# written by `stackhour bridge migrate` — this file holds a live bot token\nsecrets.json\n",
-        );
-        files.push(PlannedFile {
-            path: gitignore,
-            label: ".gitignore".into(),
-            mode: 0o644,
-            contents: body.into_bytes(),
-            disposition: Disposition::Merge,
-            summary: "+ secrets.json".into(),
-            detail: Vec::new(),
-            merged_existing: !existing_ignore.is_empty(),
-        });
-    }
 
     // ---- engines/ -------------------------------------------------------
     if opts.engines {
@@ -446,7 +421,7 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
             .into(),
     );
 
-    // ---- runtime config.json (targets + media cap, no secrets) ----------
+    // ---- runtime config.json (secrets + ship + targets + media cap) ------
     let codex_bin = resolve_codex_bin(&opts.home);
     let mut rt_targets = Map::new();
     for (name, entry) in &legacy.targets {
@@ -460,7 +435,7 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
         }
         if !KNOWN_TARGETS.contains(&name.as_str()) {
             warnings.push(format!(
-                "target '{name}' has no home in the new layout (the registry pins targets to {}); /ship cannot switch to it and its state.active value has no equivalent",
+                "target '{name}' is outside the registry's switch surface (targets are pinned to {}); only /ship reaches it, via the runtime 'ship' key",
                 KNOWN_TARGETS.join("|")
             ));
         }
@@ -477,15 +452,25 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
     } else {
         consumed.push("maxMediaBytes");
     }
-    let rt_doc = json!({ "maxMediaBytes": max_media, "targets": Value::Object(rt_targets) });
+    // PARITY coordinator.mjs:361-366: `/ship` hardcodes `state.active =
+    // 'blort'; state.engine = 'claude'`. The Rust `ship_cfg` seeds the ship
+    // target from `defaultTarget` unless this runtime key exists, so the
+    // migration materialises the live destination explicitly — without it,
+    // `/ship` would park on gcp after cutover.
+    let mut rt_obj = rt_secrets;
+    rt_obj.insert("ship".into(), json!({ "target": "blort", "engine": "claude" }));
+    rt_detail.push("ship                           target=blort engine=claude".into());
+    rt_obj.insert("maxMediaBytes".into(), json!(max_media));
+    rt_obj.insert("targets".into(), Value::Object(rt_targets));
+    let rt_doc = Value::Object(rt_obj);
     files.push(PlannedFile {
         path: rt.join("config.json"),
         label: format!("{}", rt.join("config.json").display()),
         mode: 0o600,
         contents: pretty_json(&rt_doc),
         disposition: Disposition::Create,
-        summary: format!("{} target{}", legacy.targets.len(), plural(legacy.targets.len())),
-        detail: Vec::new(),
+        summary: format!("{} target{} + secrets", legacy.targets.len(), plural(legacy.targets.len())),
+        detail: rt_detail,
         merged_existing: false,
     });
 
@@ -987,10 +972,6 @@ mod tests {
             .unwrap_or_else(|| panic!("no planned file {label}"))
     }
 
-    fn text_of(plan: &Plan, label: &str) -> String {
-        String::from_utf8(file(plan, label).contents.clone()).unwrap()
-    }
-
     // ---- parsing --------------------------------------------------------
 
     #[test]
@@ -1029,14 +1010,16 @@ mod tests {
         let plan = plan_of(FIXTURE, dir.path());
         let legacy = LegacyConfig::parse(FIXTURE).unwrap();
 
-        let secrets = file(&plan, "secrets.json");
-        assert_eq!(secrets.mode, 0o600);
-        let body = String::from_utf8(secrets.contents.clone()).unwrap();
+        // The runtime config.json — the file the coordinator reads — is the
+        // single secret-bearing file.
+        let runtime = plan.files.last().unwrap();
+        assert_eq!(runtime.mode, 0o600);
+        let body = String::from_utf8(runtime.contents.clone()).unwrap();
         assert!(body.contains(&legacy.token));
         assert!(body.contains("sk_TEST-ELEVENLABS-KEY-NOT-REAL"));
 
         for f in &plan.files {
-            if f.label == "secrets.json" {
+            if f.path == runtime.path {
                 continue;
             }
             let text = String::from_utf8_lossy(&f.contents);
@@ -1053,7 +1036,7 @@ mod tests {
     fn an_empty_elevenlabs_key_is_omitted_rather_than_written_blank() {
         let dir = tempfile::tempdir().unwrap();
         let plan = plan_of(FIXTURE_MAX, dir.path());
-        let body = text_of(&plan, "secrets.json");
+        let body = String::from_utf8(plan.files.last().unwrap().contents.clone()).unwrap();
         assert!(!body.contains("elevenLabsApiKey"));
         assert!(plan
             .warnings
@@ -1080,33 +1063,18 @@ mod tests {
         assert!(!mask("abcdefgh").contains("abcd"));
     }
 
+    /// No file under the (committable) config dir carries a secret, so no
+    /// .gitignore entry is needed — the secrets live in the runtime dir.
     #[test]
-    fn secrets_json_is_gitignored_because_config_dirs_get_committed() {
+    fn the_config_dir_carries_no_secret_and_needs_no_gitignore() {
         let dir = tempfile::tempdir().unwrap();
         let plan = plan_of(FIXTURE, dir.path());
-        assert!(text_of(&plan, ".gitignore").contains("secrets.json"));
-    }
-
-    #[test]
-    fn an_existing_gitignore_is_extended_not_replaced() {
-        let dir = tempfile::tempdir().unwrap();
-        let cfg = dir.path().join("config");
-        std::fs::create_dir_all(&cfg).unwrap();
-        std::fs::write(cfg.join(".gitignore"), "*.log\n").unwrap();
-        let plan = plan_of(FIXTURE, dir.path());
-        let body = text_of(&plan, ".gitignore");
-        assert!(body.starts_with("*.log\n"));
-        assert!(body.contains("secrets.json"));
-    }
-
-    #[test]
-    fn an_already_ignored_secrets_file_is_not_touched_again() {
-        let dir = tempfile::tempdir().unwrap();
-        let cfg = dir.path().join("config");
-        std::fs::create_dir_all(&cfg).unwrap();
-        std::fs::write(cfg.join(".gitignore"), "secrets.json\n").unwrap();
-        let plan = plan_of(FIXTURE, dir.path());
+        let legacy = LegacyConfig::parse(FIXTURE).unwrap();
         assert!(plan.files.iter().all(|f| f.label != ".gitignore"));
+        for f in plan.files.iter().filter(|f| f.path.starts_with(dir.path().join("config"))) {
+            let text = String::from_utf8_lossy(&f.contents);
+            assert!(!text.contains(&legacy.token), "{} leaked the bot token", f.label);
+        }
     }
 
     // ---- config.json is shared with the tracker -------------------------
@@ -1145,9 +1113,10 @@ mod tests {
     // ---- runtime config -------------------------------------------------
 
     #[test]
-    fn the_runtime_config_gets_the_targets_and_no_credentials() {
+    fn the_runtime_config_gets_targets_credentials_and_the_ship_destination() {
         let dir = tempfile::tempdir().unwrap();
         let plan = plan_of(FIXTURE, dir.path());
+        let legacy = LegacyConfig::parse(FIXTURE).unwrap();
         let f = plan.files.last().unwrap();
         assert_eq!(f.mode, 0o600);
         let doc: Value = serde_json::from_slice(&f.contents).unwrap();
@@ -1158,8 +1127,13 @@ mod tests {
             doc["targets"]["blort"]["cwd"],
             json!("/home/testuser/projects/example")
         );
-        assert!(doc.get("token").is_none());
-        assert!(doc.get("chatId").is_none());
+        // The credentials the coordinator loader actually reads (§1.4 of the
+        // migration runbook used to call their absence "the gap").
+        assert_eq!(doc["token"], json!(legacy.token));
+        assert_eq!(doc["chatId"], legacy.chat_id);
+        // PARITY coordinator.mjs:361-366: /ship must keep parking on blort.
+        assert_eq!(doc["ship"]["target"], json!("blort"));
+        assert_eq!(doc["ship"]["engine"], json!("claude"));
     }
 
     #[test]
@@ -1211,7 +1185,7 @@ mod tests {
         assert!(plan
             .warnings
             .iter()
-            .any(|w| w.contains("'blort' has no home in the new layout")));
+            .any(|w| w.contains("'blort' is outside the registry's switch surface")));
     }
 
     // ---- generated registry files load ----------------------------------
@@ -1377,12 +1351,17 @@ mod tests {
         let cfg = dir.path().join("config");
         std::fs::create_dir_all(cfg.join("prompts")).unwrap();
         std::fs::write(cfg.join("prompts/help.md"), "MINE\n").unwrap();
-        std::fs::write(cfg.join("secrets.json"), "{}\n").unwrap();
+        let rt = dir.path().join("runtime");
+        std::fs::create_dir_all(&rt).unwrap();
+        std::fs::write(rt.join("config.json"), "{}\n").unwrap();
 
         let plan = plan_of(FIXTURE, dir.path());
         let conflicts: Vec<String> = plan.conflicts().iter().map(|f| f.label.clone()).collect();
         assert!(conflicts.contains(&"prompts/help.md".to_string()));
-        assert!(conflicts.contains(&"secrets.json".to_string()));
+        assert!(
+            conflicts.iter().any(|l| l.contains("runtime")),
+            "the pre-existing runtime config.json must conflict: {conflicts:?}"
+        );
 
         let msg = render_conflicts(&plan);
         assert!(msg.contains("--force"));
@@ -1456,11 +1435,12 @@ mod tests {
             assert_eq!(mode, f.mode, "{} has mode {mode:04o}", f.label);
         }
 
-        // A pre-existing world-readable secrets.json is repaired, not trusted.
-        let secrets = dir.path().join("config/secrets.json");
-        std::fs::set_permissions(&secrets, std::fs::Permissions::from_mode(0o644)).unwrap();
+        // A world-readable runtime config (it holds the bot token) is
+        // repaired, not trusted.
+        let runtime_cfg = dir.path().join("runtime/config.json");
+        std::fs::set_permissions(&runtime_cfg, std::fs::Permissions::from_mode(0o644)).unwrap();
         apply(&plan, true).expect("re-apply");
-        let mode = std::fs::metadata(&secrets).unwrap().permissions().mode() & 0o777;
+        let mode = std::fs::metadata(&runtime_cfg).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
     }
 

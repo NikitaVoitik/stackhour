@@ -246,46 +246,49 @@ fn media_cap_survives_including_the_invisible_default() {
 }
 
 /// The ElevenLabs key drives voice transcription (coordinator.mjs:137). A
-/// populated key must land in secrets; an EMPTY one must be omitted rather
+/// populated key must land in the runtime config — the file
+/// `load_coordinator_cfg` reads it from; an EMPTY one must be omitted rather
 /// than written as `""`, so the "is transcription configured?" check keeps
 /// reading false.
 #[test]
 fn elevenlabs_key_survives_and_an_empty_one_is_omitted() {
-    let (_d1, cfg, _rt) = migrate_fixture("legacy-config.json");
-    let secrets = read_json(&cfg.join("secrets.json"));
+    let (_d1, _cfg, rt) = migrate_fixture("legacy-config.json");
+    let runtime = read_json(&rt.join("config.json"));
     let legacy = read_json(&fixture("legacy-config.json"));
     assert_eq!(
-        secrets["bridge"]["elevenLabsApiKey"], legacy["elevenLabsApiKey"],
+        runtime["elevenLabsApiKey"], legacy["elevenLabsApiKey"],
         "the ElevenLabs key did not survive"
     );
 
-    let (_d2, cfg_max, _rt_max) = migrate_fixture("legacy-config-maximal.json");
-    let secrets_max = read_json(&cfg_max.join("secrets.json"));
+    let (_d2, _cfg_max, rt_max) = migrate_fixture("legacy-config-maximal.json");
+    let runtime_max = read_json(&rt_max.join("config.json"));
     assert!(
-        secrets_max["bridge"].get("elevenLabsApiKey").is_none(),
+        runtime_max.get("elevenLabsApiKey").is_none(),
         "an empty ElevenLabs key should be omitted, not written as an empty string"
     );
 }
 
-/// Token and chat id reach secrets.json, and the chat id keeps its NUMERIC
-/// type — Telegram's API is forgiving about a stringified id but the local
-/// "is this message from the owner?" comparison is not.
+/// Token and chat id reach the runtime config under the SAME keys the Node
+/// coordinator used, and the chat id keeps its NUMERIC type — Telegram's API
+/// is forgiving about a stringified id but the local "is this message from
+/// the owner?" comparison is not.
 #[test]
 fn token_and_chat_id_survive_with_their_types() {
-    let (_dir, cfg, _rt) = migrate_fixture("legacy-config.json");
+    let (_dir, _cfg, rt) = migrate_fixture("legacy-config.json");
     let legacy = read_json(&fixture("legacy-config.json"));
-    let secrets = read_json(&cfg.join("secrets.json"));
+    let runtime = read_json(&rt.join("config.json"));
 
-    assert_eq!(secrets["bridge"]["telegramToken"], legacy["token"]);
-    assert_eq!(secrets["bridge"]["chatId"], legacy["chatId"]);
+    assert_eq!(runtime["token"], legacy["token"]);
+    assert_eq!(runtime["chatId"], legacy["chatId"]);
     assert!(
-        secrets["bridge"]["chatId"].is_number(),
+        runtime["chatId"].is_number(),
         "chatId must stay a number"
     );
 }
 
 /// The safety property that lets the config dir be committed: secrets live in
-/// exactly one 0600 file, and nothing else in the tree contains them.
+/// exactly one 0600 file — the runtime config the coordinator reads — and
+/// nothing else in either tree contains them.
 #[test]
 fn secrets_are_isolated_in_one_mode_0600_file() {
     let (_dir, cfg, rt) = migrate_fixture("legacy-config.json");
@@ -293,31 +296,21 @@ fn secrets_are_isolated_in_one_mode_0600_file() {
     let token = legacy["token"].as_str().unwrap();
     let eleven = legacy["elevenLabsApiKey"].as_str().unwrap();
 
-    let secrets = cfg.join("secrets.json");
-    assert!(secrets.exists(), "secrets.json was not written");
+    let runtime_cfg = rt.join("config.json");
+    assert!(runtime_cfg.exists(), "runtime config.json was not written");
 
     #[cfg(unix)]
     {
         assert_eq!(
-            mode_of(&secrets),
+            mode_of(&runtime_cfg),
             0o600,
-            "secrets.json must not be group- or world-readable"
+            "the runtime config holds the bot token and must not be group- or world-readable"
         );
-        // The runtime config carries no credentials but does carry the target
-        // layout, so it is 0600 too.
-        assert_eq!(mode_of(&rt.join("config.json")), 0o600);
     }
-
-    // .gitignore must actually exclude it.
-    let ignore = std::fs::read_to_string(cfg.join(".gitignore")).expect("no .gitignore written");
-    assert!(
-        ignore.lines().any(|l| l.trim() == "secrets.json"),
-        ".gitignore does not exclude secrets.json: {ignore}"
-    );
 
     // No secret anywhere else in the migrated tree, committed or runtime.
     for path in walk(&cfg).into_iter().chain(walk(&rt)) {
-        if path == secrets {
+        if path == runtime_cfg {
             continue;
         }
         let Ok(body) = std::fs::read_to_string(&path) else {
@@ -346,7 +339,7 @@ fn committed_config_holds_no_credential_keys() {
 #[test]
 fn a_second_migration_refuses_with_exit_2() {
     let (_dir, cfg, rt) = migrate_fixture("legacy-config.json");
-    let before = std::fs::read_to_string(cfg.join("secrets.json")).unwrap();
+    let before = std::fs::read_to_string(rt.join("config.json")).unwrap();
 
     let out = run(&[
         "bridge",
@@ -361,9 +354,9 @@ fn a_second_migration_refuses_with_exit_2() {
 
     assert_eq!(out.status.code(), Some(2), "expected the conflict exit code");
     assert_eq!(
-        std::fs::read_to_string(cfg.join("secrets.json")).unwrap(),
+        std::fs::read_to_string(rt.join("config.json")).unwrap(),
         before,
-        "a refused migration still modified secrets.json"
+        "a refused migration still modified the runtime config.json"
     );
 }
 
@@ -391,21 +384,17 @@ fn verify_is_clean_right_after_migrating() {
     assert!(stdout(&out).contains("every legacy key reached a destination"));
 }
 
-/// KNOWN PARITY GAP — `/ship` loses its destination in the migration.
+/// `/ship` keeps its destination through the migration.
 ///
-/// coordinator.mjs:363 hardcodes `state.active = 'blort'` for `/ship`. The
-/// Rust equivalent (`CoordCtx::ship_cfg`) instead seeds the ship target from
-/// `default_target` and only overrides it from a `ship.target` key in the
-/// runtime config — a key this migration never writes. So after a cutover the
-/// `blort` target still exists in `targets` but nothing selects it: `/ship`
-/// parks the user on `gcp` (the fixture's defaultTarget) instead.
-///
-/// The migrator DOES warn about this rather than hiding it, and that warning
-/// is asserted here so it cannot silently disappear. This test documents
-/// today's behaviour; when the gap is closed it will fail loudly and should be
-/// rewritten to assert `ship.target == "blort"`.
+/// coordinator.mjs:363 hardcodes `state.active = 'blort'` for `/ship`, while
+/// the Rust `CoordCtx::ship_cfg` seeds the ship target from `default_target`
+/// unless a `ship.target` runtime key overrides it. This used to be a KNOWN
+/// PARITY GAP (the migration never wrote that key, so `/ship` parked on gcp
+/// after cutover); the migration now materialises the live destination. The
+/// blort target must still survive in `targets`, and the migrator must still
+/// disclose that blort is reachable only through `/ship`.
 #[test]
-fn known_gap_ship_target_is_not_carried_into_the_runtime_config() {
+fn the_ship_destination_is_carried_into_the_runtime_config() {
     let dir = TempDir::new().unwrap();
     let cfg = dir.path().join("config");
     let rt = dir.path().join("run");
@@ -426,16 +415,13 @@ fn known_gap_ship_target_is_not_carried_into_the_runtime_config() {
         runtime.get("targets").and_then(|t| t.get("blort")).is_some(),
         "the blort target itself should still survive in the config"
     );
-    assert!(
-        runtime.get("ship").is_none(),
-        "a ship.target key now exists — the gap is CLOSED; rewrite this test \
-         to assert it equals \"blort\""
-    );
+    assert_eq!(runtime["ship"]["target"], "blort");
+    assert_eq!(runtime["ship"]["engine"], "claude");
 
-    // The loss has to stay disclosed on the way out.
+    // blort's second-class status has to stay disclosed on the way out.
     assert!(
-        stdout(&out).contains("/ship cannot switch to it"),
-        "the migration stopped warning that /ship loses its target"
+        stdout(&out).contains("only /ship reaches it"),
+        "the migration stopped disclosing that blort is /ship-only"
     );
 }
 
