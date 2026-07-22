@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-07-22T23:27:47.803Z",
+  "capturedAt": "2026-07-22T23:42:39.876Z",
   "hostname": "instance-20260615-c4dhm4",
   "platform": "linux",
   "release": "6.1.0-50-cloud-amd64",
@@ -8,10 +8,10 @@
   "logicalCpus": 4,
   "totalMemoryBytes": 32607801344,
   "node": "v22.22.3",
-  "rustc": null,
-  "webkitgtk": null,
-  "chromium": null,
-  "fixtureCommit": null,
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "webkitgtk": "2.50.6",
+  "chromium": "Chromium 150.0.7871.124 built on Debian GNU/Linux 12 (bookworm)",
+  "fixtureCommit": "689863ab7947c2093e453e8d870b66b71b4ee768",
   "display": {
     "server": "Xvfb",
     "geometry": "1280x800x24",

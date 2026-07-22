@@ -20,10 +20,10 @@ matrix.
 - Linux x86_64, one otherwise-idle host, Xvfb at 1280x800 and 96 DPI.
 - Window content is 1280x800, DPR 1, with Noto Sans Mono 13 px for source and
   Noto Sans 13 px for chrome.
-- Deterministic fixture: 5,121 TypeScript files. `src/selected.ts` is selected
+- Deterministic fixture: 5,122 TypeScript files. `src/selected.ts` is selected
   at launch and contains 20,000 source lines.
-- Exactly 40 project-tree rows and 42 editor source rows are mounted/painted.
-  Both lists use fixed-height windowing with overscan 4.
+- Exactly 40 project-tree rows and 30 editor source rows are visible. Both
+  lists use fixed-height windowing with overscan 4 (48 and 38 mounted rows).
 - Identical tabs, outline, output panel, and status bar; identical lexical
   token classes (keyword, string, number, comment, type, function).
 - The scroll workload is 480 requestAnimationFrame/tick steps: 160 down, 160

@@ -19,7 +19,7 @@ for (let line = 1; line <= 20_000; line += 1) {
 await writeFile(join(root, "src", "selected.ts"), `${selected.join("\n")}\n`);
 await writeFile(
   join(root, "src", "alternate.ts"),
-  `${selected.map((line, index) => `// alternate ${index + 1}\n${line}`).join("\n")}\n`,
+  `${selected.map((line) => line.replaceAll("row-", "alternate-")).join("\n")}\n`,
 );
 
 for (let directory = 0; directory < 80; directory += 1) {

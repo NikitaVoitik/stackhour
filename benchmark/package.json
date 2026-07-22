@@ -5,11 +5,18 @@
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "fixture": "node scripts/generate-fixture.mjs",
+    "build": "vite build && bash scripts/package-electron.sh",
+    "visual": "bash scripts/visual.sh",
+    "bench": "node scripts/run-electron.mjs",
     "analyze": "node scripts/analyze.mjs",
     "manifest": "node scripts/machine-manifest.mjs"
   },
   "devDependencies": {
+    "electron": "37.2.3",
+    "vite": "7.0.6",
     "typescript": "5.9.3",
     "typescript-language-server": "5.0.0"
-  }
+  },
+  "main": "electron/main.mjs",
+  "pnpm": { "onlyBuiltDependencies": ["electron", "esbuild"] }
 }
