@@ -1,0 +1,15 @@
+{
+  "name": "stackhour-desktop-benchmark",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "fixture": "node scripts/generate-fixture.mjs",
+    "analyze": "node scripts/analyze.mjs",
+    "manifest": "node scripts/machine-manifest.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "typescript-language-server": "5.0.0"
+  }
+}

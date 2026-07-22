@@ -1,0 +1,22 @@
+{
+  "capturedAt": "2026-07-22T23:27:47.803Z",
+  "hostname": "instance-20260615-c4dhm4",
+  "platform": "linux",
+  "release": "6.1.0-50-cloud-amd64",
+  "arch": "x64",
+  "cpu": "INTEL(R) XEON(R) PLATINUM 8581C CPU @ 2.30GHz",
+  "logicalCpus": 4,
+  "totalMemoryBytes": 32607801344,
+  "node": "v22.22.3",
+  "rustc": null,
+  "webkitgtk": null,
+  "chromium": null,
+  "fixtureCommit": null,
+  "display": {
+    "server": "Xvfb",
+    "geometry": "1280x800x24",
+    "dpi": 96
+  },
+  "coldDefinition": "fresh application XDG directory; kernel page cache retained",
+  "warmDefinition": "reused application XDG directory after priming launch"
+}

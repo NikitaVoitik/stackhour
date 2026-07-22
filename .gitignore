@@ -6,5 +6,14 @@ nohup.out
 target/
 Cargo.lock.orig
 
+# Desktop benchmark generated artifacts
+benchmark/node_modules/
+benchmark/.cache/
+benchmark/.fixture/
+benchmark/dist/
+benchmark/artifacts/
+benchmark/results/raw/
+benchmark/screenshots/*.png
+
 # Claude Code session worktrees
 .claude/worktrees/

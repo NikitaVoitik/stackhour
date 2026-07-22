@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "window": { "width": 1280, "height": 800, "deviceScaleFactor": 1 },
+  "font": {
+    "ui": "Noto Sans",
+    "code": "Noto Sans Mono",
+    "sizePx": 13,
+    "lineHeightPx": 20
+  },
+  "fixture": {
+    "directories": 80,
+    "filesPerDirectory": 64,
+    "fileCount": 5121,
+    "selectedFile": "src/selected.ts",
+    "alternateFile": "src/alternate.ts",
+    "selectedSourceLines": 20000
+  },
+  "virtualization": {
+    "treeVisibleRows": 40,
+    "editorVisibleRows": 42,
+    "overscanRows": 4
+  },
+  "scroll": {
+    "stepsPerLeg": 160,
+    "legs": 4,
+    "treeMaxRow": 5080,
+    "editorMaxRow": 19958
+  },
+  "fileSwitches": 30,
+  "minimumRuns": 5,
+  "lsp": {
+    "command": "typescript-language-server",
+    "args": ["--stdio"],
+    "method": "textDocument/documentSymbol"
+  }
+}
