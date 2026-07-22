@@ -64,3 +64,27 @@ through the complete cold/warm matrix.
 - Package size will be measured on the runnable release directory and on the
   distributable archive/bundle separately. Comparing an Electron directory to
   a Tauri `.deb` alone would be misleading.
+
+## 2026-07-22 — Svelte + Electron checkpoint
+
+- The Svelte renderer reuses the accepted Electron main process, recursive
+  Node scanner, LSP client, fixture, styling, row counts, normalized scroll
+  path, and file-switch path. Only DOM ownership/update code changed.
+- The accepted `screenshots/svelte-electron.png` matches the Vanilla layout at
+  1280×800 and contains a populated 40-row tree, 30 source rows, two tabs,
+  outline, output, and status bar.
+- The minified production renderer grew from 5.62 kB (2.20 kB gzip) for
+  Vanilla to 27.91 kB (11.45 kB gzip) for Svelte. The complete runnable
+  Electron directory changed by only 22,288 bytes; the runtime dominates.
+- Five cold and five warm runs completed and validated. At this checkpoint,
+  Svelte's median launch-to-first-frame is within a few milliseconds of
+  Vanilla in both phases. Svelte has somewhat more frames over 16.7 ms in the
+  Xvfb scroll workload, but neither Electron candidate produced a >33.3 ms
+  scroll frame in its median run.
+- Cold LSP round-trip medians differed by roughly 0.47 s even though the LSP
+  backend is identical. That is evidence of host/cache variance, not frontend
+  causality; LSP comparisons should be reported as workload context rather
+  than attributed to Svelte.
+- No overall or pairwise winner is selected. The Electron comparison remains
+  provisional until the Tauri frontend pair confirms whether the same pattern
+  appears under WebKitGTK.

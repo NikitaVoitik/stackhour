@@ -6,5 +6,5 @@ contextBridge.exposeInMainWorld("bench", {
   symbols: (path) => ipcRenderer.invoke("symbols", path),
   telemetry: (event) => ipcRenderer.send("telemetry", event),
   telemetryBatch: (events) => ipcRenderer.send("telemetry-batch", events),
-  config: { candidate: "vanilla-electron", autorun: process.env.BENCH_AUTORUN === "1" }
+  config: { candidate: "svelte-electron", autorun: process.env.BENCH_AUTORUN === "1" }
 });

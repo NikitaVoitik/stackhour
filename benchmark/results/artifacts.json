@@ -4,5 +4,11 @@
     "releaseTarGzipBytes": 114635289,
     "artifact": "StackhourBenchVanillaElectron-linux-x64",
     "measuredAt": "2026-07-22T23:43:00Z"
+  },
+  "svelte-electron": {
+    "releaseDirectoryBytes": 298787934,
+    "releaseTarGzipBytes": 114643925,
+    "artifact": "StackhourBenchSvelteElectron-linux-x64",
+    "measuredAt": "2026-07-22T23:50:00Z"
   }
 }

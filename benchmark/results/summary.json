@@ -1,6 +1,1606 @@
 {
-  "generatedAt": "2026-07-22T23:42:40.223Z",
+  "generatedAt": "2026-07-22T23:49:45.018Z",
   "runs": [
+    {
+      "file": "svelte-electron-cold-1.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 362.6121,
+        "launchToTree": 412.512533,
+        "projectOpenToTree": 48.979209,
+        "fileClickToRead": 2.566073,
+        "fileClickToPresented": 13.917896,
+        "fileSwitchToStable": 25.938237,
+        "lspRoundTrip": 1888.201722,
+        "lspResponseToOutline": 0.752508
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.699999928474426,
+        "p95Ms": 18.100000023841858,
+        "p99Ms": 20.399999976158142,
+        "worstMs": 26.699999928474426,
+        "over16_7": 300,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 9.999999928474427,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-1",
+          "timestampNs": 750366626744239,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3450617,
+              "rssKb": 213140,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450672,
+              "rssKb": 77220,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450681,
+              "rssKb": 102484,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450705,
+              "rssKb": 111588,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-1",
+          "timestampNs": 750368599689615,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3450617,
+              "rssKb": 232588,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450672,
+              "rssKb": 77220,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450681,
+              "rssKb": 129304,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450705,
+              "rssKb": 123156,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450721,
+              "rssKb": 141856,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3450737,
+              "rssKb": 284556,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3450738,
+              "rssKb": 307152,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3450751,
+              "rssKb": 80652,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-1",
+          "timestampNs": 750380273989908,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3450617,
+              "rssKb": 234092,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450672,
+              "rssKb": 77220,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450681,
+              "rssKb": 223868,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450705,
+              "rssKb": 124684,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3450721,
+              "rssKb": 142380,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3450737,
+              "rssKb": 284556,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3450738,
+              "rssKb": 358828,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3450751,
+              "rssKb": 80652,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-cold-2.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 564.676521,
+        "launchToTree": 686.107271,
+        "projectOpenToTree": 120.390458,
+        "fileClickToRead": 5.652128,
+        "fileClickToPresented": 33.209949,
+        "fileSwitchToStable": 42.569376,
+        "lspRoundTrip": 3167.13786,
+        "lspResponseToOutline": 1.479962
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.699999928474426,
+        "p95Ms": 20.600000023841858,
+        "p99Ms": 25,
+        "worstMs": 33.09999990463257,
+        "over16_7": 300,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 16.39999990463257,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-2",
+          "timestampNs": 750381171015678,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3450939,
+              "rssKb": 210672,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451003,
+              "rssKb": 77512,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451011,
+              "rssKb": 101500,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451041,
+              "rssKb": 111392,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-2",
+          "timestampNs": 750384521050809,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3450939,
+              "rssKb": 230108,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451003,
+              "rssKb": 77512,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451011,
+              "rssKb": 130400,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451041,
+              "rssKb": 122724,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451060,
+              "rssKb": 144968,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3451076,
+              "rssKb": 287044,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3451077,
+              "rssKb": 267764,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3451090,
+              "rssKb": 78368,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-2",
+          "timestampNs": 750396188925060,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3450939,
+              "rssKb": 232636,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451003,
+              "rssKb": 77512,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451011,
+              "rssKb": 215912,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451041,
+              "rssKb": 122984,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451060,
+              "rssKb": 145492,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3451076,
+              "rssKb": 287044,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3451077,
+              "rssKb": 362264,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3451090,
+              "rssKb": 78368,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-cold-3.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 361.46168,
+        "launchToTree": 414.132858,
+        "projectOpenToTree": 51.775724,
+        "fileClickToRead": 2.473219,
+        "fileClickToPresented": 14.078333,
+        "fileSwitchToStable": 27.723757,
+        "lspRoundTrip": 2474.631306,
+        "lspResponseToOutline": 1.662684
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.700000047683716,
+        "p95Ms": 18.5,
+        "p99Ms": 22.09999990463257,
+        "worstMs": 24.700000047683716,
+        "over16_7": 326,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 8.000000047683717,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-3",
+          "timestampNs": 750396787687038,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3451360,
+              "rssKb": 209080,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451415,
+              "rssKb": 79340,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451417,
+              "rssKb": 102500,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451447,
+              "rssKb": 111376,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-3",
+          "timestampNs": 750399353746624,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3451360,
+              "rssKb": 236204,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451415,
+              "rssKb": 79340,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451417,
+              "rssKb": 130100,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451447,
+              "rssKb": 122428,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451463,
+              "rssKb": 139372,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3451479,
+              "rssKb": 286104,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3451480,
+              "rssKb": 340428,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3451493,
+              "rssKb": 80072,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-3",
+          "timestampNs": 750411005493728,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3451360,
+              "rssKb": 233128,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451415,
+              "rssKb": 79340,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451417,
+              "rssKb": 216916,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451447,
+              "rssKb": 125708,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451463,
+              "rssKb": 139900,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3451479,
+              "rssKb": 286104,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3451480,
+              "rssKb": 358184,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3451493,
+              "rssKb": 80072,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-cold-4.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 467.89385,
+        "launchToTree": 546.913604,
+        "projectOpenToTree": 77.500261,
+        "fileClickToRead": 3.089068,
+        "fileClickToPresented": 16.109437,
+        "fileSwitchToStable": 24.391697,
+        "lspRoundTrip": 2571.970642,
+        "lspResponseToOutline": 1.41067
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.699999928474426,
+        "p95Ms": 17.399999976158142,
+        "p99Ms": 19.200000047683716,
+        "worstMs": 21.299999952316284,
+        "over16_7": 306,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 4.599999952316285,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-4",
+          "timestampNs": 750411797684186,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3451874,
+              "rssKb": 212800,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451958,
+              "rssKb": 80276,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451973,
+              "rssKb": 102140,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451997,
+              "rssKb": 110984,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-4",
+          "timestampNs": 750414481868691,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3451874,
+              "rssKb": 233800,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451958,
+              "rssKb": 80276,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451973,
+              "rssKb": 129216,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451997,
+              "rssKb": 122564,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452013,
+              "rssKb": 139604,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452029,
+              "rssKb": 289288,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452030,
+              "rssKb": 320804,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452043,
+              "rssKb": 81004,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-4",
+          "timestampNs": 750426137522489,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3451874,
+              "rssKb": 235476,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451958,
+              "rssKb": 80276,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451973,
+              "rssKb": 212528,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3451997,
+              "rssKb": 122872,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452013,
+              "rssKb": 86272,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452029,
+              "rssKb": 289288,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452030,
+              "rssKb": 364528,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452043,
+              "rssKb": 81004,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-cold-5.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 329.482452,
+        "launchToTree": 373.244168,
+        "projectOpenToTree": 43.108778,
+        "fileClickToRead": 2.353377,
+        "fileClickToPresented": 19.449822,
+        "fileSwitchToStable": 34.031334,
+        "lspRoundTrip": 1811.062519,
+        "lspResponseToOutline": 0.82643
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.600000023841858,
+        "p95Ms": 17.399999976158142,
+        "p99Ms": 18.40000009536743,
+        "worstMs": 25.100000023841858,
+        "over16_7": 292,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 8.400000023841859,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-5",
+          "timestampNs": 750426689084373,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3452156,
+              "rssKb": 213576,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452211,
+              "rssKb": 79940,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452213,
+              "rssKb": 104784,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452244,
+              "rssKb": 110748,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-5",
+          "timestampNs": 750428588177007,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3452156,
+              "rssKb": 233740,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452211,
+              "rssKb": 79940,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452213,
+              "rssKb": 131976,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452244,
+              "rssKb": 122460,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452260,
+              "rssKb": 140484,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452276,
+              "rssKb": 287740,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452277,
+              "rssKb": 306136,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452290,
+              "rssKb": 79688,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "cold",
+          "runId": "cold-5",
+          "timestampNs": 750440236729808,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3452156,
+              "rssKb": 235536,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452211,
+              "rssKb": 79940,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452213,
+              "rssKb": 219828,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452244,
+              "rssKb": 122460,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452260,
+              "rssKb": 87544,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452276,
+              "rssKb": 287740,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452277,
+              "rssKb": 359476,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452290,
+              "rssKb": 79688,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-warm-1.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 270.28786,
+        "launchToTree": 321.563203,
+        "projectOpenToTree": 50.324779,
+        "fileClickToRead": 1.944837,
+        "fileClickToPresented": 17.037238,
+        "fileSwitchToStable": 32.000664,
+        "lspRoundTrip": 1806.90264,
+        "lspResponseToOutline": 1.139271
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.600000023841858,
+        "p95Ms": 17.300000071525574,
+        "p99Ms": 17.700000047683716,
+        "worstMs": 20.299999952316284,
+        "over16_7": 297,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 3.599999952316285,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-1",
+          "timestampNs": 750440732800241,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3452356,
+              "rssKb": 206744,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452395,
+              "rssKb": 71540,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452406,
+              "rssKb": 102776,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452440,
+              "rssKb": 111576,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-1",
+          "timestampNs": 750442631735328,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3452356,
+              "rssKb": 228256,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452395,
+              "rssKb": 71540,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452406,
+              "rssKb": 130116,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452440,
+              "rssKb": 123144,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452456,
+              "rssKb": 140068,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452472,
+              "rssKb": 290264,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452473,
+              "rssKb": 306004,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452486,
+              "rssKb": 77868,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-1",
+          "timestampNs": 750454286255603,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3452356,
+              "rssKb": 230052,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452395,
+              "rssKb": 71540,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452406,
+              "rssKb": 219632,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452440,
+              "rssKb": 124660,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452456,
+              "rssKb": 88088,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452472,
+              "rssKb": 290264,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452473,
+              "rssKb": 358588,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452486,
+              "rssKb": 77868,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-warm-2.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 211.687276,
+        "launchToTree": 257.274892,
+        "projectOpenToTree": 44.897042,
+        "fileClickToRead": 1.901469,
+        "fileClickToPresented": 22.845946,
+        "fileSwitchToStable": 37.598173,
+        "lspRoundTrip": 1926.146869,
+        "lspResponseToOutline": 1.185871
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.600000023841858,
+        "p95Ms": 17.399999976158142,
+        "p99Ms": 17.699999928474426,
+        "worstMs": 23.100000023841858,
+        "over16_7": 283,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 6.400000023841859,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-2",
+          "timestampNs": 750454715627311,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3452533,
+              "rssKb": 201712,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452574,
+              "rssKb": 72692,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452579,
+              "rssKb": 102660,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452606,
+              "rssKb": 111608,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-2",
+          "timestampNs": 750456734649885,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3452533,
+              "rssKb": 225984,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452574,
+              "rssKb": 72692,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452579,
+              "rssKb": 130108,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452606,
+              "rssKb": 123152,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452622,
+              "rssKb": 144788,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452638,
+              "rssKb": 289568,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452639,
+              "rssKb": 319272,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452652,
+              "rssKb": 82060,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-2",
+          "timestampNs": 750468386114252,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3452533,
+              "rssKb": 227876,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452574,
+              "rssKb": 72692,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452579,
+              "rssKb": 217928,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452606,
+              "rssKb": 123152,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452622,
+              "rssKb": 91276,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452638,
+              "rssKb": 289568,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452639,
+              "rssKb": 364460,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452652,
+              "rssKb": 82060,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-warm-3.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 202.841026,
+        "launchToTree": 249.041033,
+        "projectOpenToTree": 45.467259,
+        "fileClickToRead": 1.952192,
+        "fileClickToPresented": 13.029229,
+        "fileSwitchToStable": 25.895565,
+        "lspRoundTrip": 2013.654493,
+        "lspResponseToOutline": 1.056181
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.600000023841858,
+        "p95Ms": 17.399999976158142,
+        "p99Ms": 17.899999976158142,
+        "worstMs": 20.100000023841858,
+        "over16_7": 285,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 3.4000000238418586,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-3",
+          "timestampNs": 750468809770917,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3452722,
+              "rssKb": 203596,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452761,
+              "rssKb": 69924,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452775,
+              "rssKb": 103568,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452789,
+              "rssKb": 111068,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-3",
+          "timestampNs": 750470904299454,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3452722,
+              "rssKb": 229284,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452761,
+              "rssKb": 69924,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452775,
+              "rssKb": 130620,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452789,
+              "rssKb": 122496,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452807,
+              "rssKb": 142044,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452823,
+              "rssKb": 287792,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452824,
+              "rssKb": 333436,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452837,
+              "rssKb": 81688,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-3",
+          "timestampNs": 750482551892470,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3452722,
+              "rssKb": 230564,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452761,
+              "rssKb": 69924,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452775,
+              "rssKb": 221908,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452789,
+              "rssKb": 122496,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452807,
+              "rssKb": 88532,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452823,
+              "rssKb": 287792,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452824,
+              "rssKb": 357092,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452837,
+              "rssKb": 81688,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-warm-4.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 204.777225,
+        "launchToTree": 251.415116,
+        "projectOpenToTree": 45.801376,
+        "fileClickToRead": 1.954567,
+        "fileClickToPresented": 21.538072,
+        "fileSwitchToStable": 36.174375,
+        "lspRoundTrip": 1812.942756,
+        "lspResponseToOutline": 0.125004
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.699999928474426,
+        "p95Ms": 17.300000071525574,
+        "p99Ms": 17.5,
+        "worstMs": 24.300000071525574,
+        "over16_7": 317,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 7.600000071525574,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-4",
+          "timestampNs": 750482981741014,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3452884,
+              "rssKb": 207912,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452923,
+              "rssKb": 70132,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452925,
+              "rssKb": 100756,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452953,
+              "rssKb": 110976,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-4",
+          "timestampNs": 750484884560507,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3452884,
+              "rssKb": 228564,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452923,
+              "rssKb": 70132,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452925,
+              "rssKb": 128684,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452953,
+              "rssKb": 119516,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452969,
+              "rssKb": 139924,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452985,
+              "rssKb": 288020,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452986,
+              "rssKb": 285432,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452999,
+              "rssKb": 78824,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-4",
+          "timestampNs": 750496534727243,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3452884,
+              "rssKb": 230672,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452923,
+              "rssKb": 70132,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452925,
+              "rssKb": 218000,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452953,
+              "rssKb": 122864,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3452969,
+              "rssKb": 87080,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3452985,
+              "rssKb": 288020,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452986,
+              "rssKb": 361660,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3452999,
+              "rssKb": 78824,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "svelte-electron-warm-5.jsonl",
+      "candidate": "svelte-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 206.895379,
+        "launchToTree": 253.886102,
+        "projectOpenToTree": 46.100517,
+        "fileClickToRead": 2.268247,
+        "fileClickToPresented": 21.322268,
+        "fileSwitchToStable": 36.019551,
+        "lspRoundTrip": 1937.284758,
+        "lspResponseToOutline": 0.826774
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16.600000023841858,
+        "p95Ms": 17.300000071525574,
+        "p99Ms": 17.699999928474426,
+        "worstMs": 23.90000009536743,
+        "over16_7": 296,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 7.200000095367432,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-5",
+          "timestampNs": 750496964538302,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3453065,
+              "rssKb": 206000,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453104,
+              "rssKb": 72032,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453106,
+              "rssKb": 102664,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453133,
+              "rssKb": 110652,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-5",
+          "timestampNs": 750498994353616,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3453065,
+              "rssKb": 227760,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453104,
+              "rssKb": 72032,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453106,
+              "rssKb": 130088,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453133,
+              "rssKb": 122380,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453149,
+              "rssKb": 140072,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3453165,
+              "rssKb": 284504,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3453166,
+              "rssKb": 312180,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3453179,
+              "rssKb": 82356,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "svelte-electron",
+          "phase": "warm",
+          "runId": "warm-5",
+          "timestampNs": 750510650526144,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3453065,
+              "rssKb": 229816,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453104,
+              "rssKb": 72032,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453106,
+              "rssKb": 219816,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453133,
+              "rssKb": 122380,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3453149,
+              "rssKb": 87148,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3453165,
+              "rssKb": 284504,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3453166,
+              "rssKb": 360336,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3453179,
+              "rssKb": 82356,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
     {
       "file": "vanilla-electron-cold-1.jsonl",
       "candidate": "vanilla-electron",
