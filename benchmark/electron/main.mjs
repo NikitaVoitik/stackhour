@@ -7,7 +7,7 @@ import { scan, readSource, documentSymbols, languagePids, stopLanguageServer } f
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = process.env.BENCH_FIXTURE || join(here, "..", ".fixture");
 const logPath = process.env.BENCH_LOG;
-const candidate = "svelte-electron"; const phase = process.env.BENCH_PHASE || "visual"; const runId = process.env.BENCH_RUN_ID || "manual";
+const candidate = "react-electron"; const phase = process.env.BENCH_PHASE || "visual"; const runId = process.env.BENCH_RUN_ID || "manual";
 const emit = (event) => { const row = { schemaVersion: 1, candidate, phase, runId, timestampNs: Number(process.hrtime.bigint()), ...event }; if (logPath) appendFileSync(logPath, `${JSON.stringify(row)}\n`); else console.log(JSON.stringify(row)); };
 emit({ event: "process_start" });
 

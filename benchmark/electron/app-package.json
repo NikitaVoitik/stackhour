@@ -1,5 +1,5 @@
 {
-  "name": "stackhour-bench-svelte-electron",
+  "name": "stackhour-bench-react-electron",
   "version": "1.0.0",
   "type": "module",
   "main": "electron/main.mjs"
