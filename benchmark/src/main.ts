@@ -15,4 +15,4 @@ window.bench = {
   config
 };
 
-await import("./mount-svelte");
+await import("./mount-react");

@@ -77,7 +77,7 @@ fn telemetry_batch(rows: Vec<Value>, state: State<'_, BenchState>) { for row in 
 
 fn main() {
     let state = BenchState {
-        candidate: "svelte-tauri", phase: std::env::var("BENCH_PHASE").unwrap_or_else(|_| "visual".into()),
+        candidate: "react-tauri", phase: std::env::var("BENCH_PHASE").unwrap_or_else(|_| "visual".into()),
         run_id: std::env::var("BENCH_RUN_ID").unwrap_or_else(|_| "manual".into()), started: Instant::now(),
         fixture: std::env::var_os("BENCH_FIXTURE").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("../.fixture")),
         lsp_command: std::env::var_os("BENCH_LSP").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("typescript-language-server")),

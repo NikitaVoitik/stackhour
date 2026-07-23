@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "StackhourBenchSvelteTauri",
+  "productName": "StackhourBenchReactTauri",
   "version": "0.1.0",
-  "identifier": "com.stackhour.bench.svelte-tauri",
+  "identifier": "com.stackhour.bench.react-tauri",
   "build": { "frontendDist": "../dist" },
   "app": {
     "windows": [{ "title": "Stackhour UI Benchmark", "width": 1280, "height": 800, "resizable": false, "decorations": false, "backgroundColor": "#17191f" }],
