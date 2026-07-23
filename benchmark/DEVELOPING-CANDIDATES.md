@@ -17,10 +17,15 @@ and telemetry — only the stack underneath changes.
 
 | Branch | Frontend | Shell | Template to copy | Notes |
 |---|---|---|---|---|
-| `benchmark/react-electron` | React 19 | Electron | `benchmark/svelte-electron` | React is the missing mainstream frontend |
+| `benchmark/react-electron` | React 19 | Electron | `benchmark/svelte-electron` | missing mainstream frontend |
 | `benchmark/react-tauri` | React 19 | Tauri 2 | `benchmark/svelte-tauri` | React on the lighter shell |
 | `benchmark/solid-tauri` | SolidJS | Tauri 2 | `benchmark/svelte-tauri` | fine-grained reactivity vs Svelte |
-| `benchmark/egui` | native `egui`/`eframe` | native (Rust) | `benchmark/gpui` | 2nd native point next to GPUI |
+| `benchmark/vue-tauri` | Vue 3 | Tauri 2 | `benchmark/svelte-tauri` | rounds out the mainstream frontends |
+| `benchmark/egui` | native `egui`/`eframe` | native (Rust) | `benchmark/gpui` | immediate-mode native next to GPUI |
+| `benchmark/iced` | native `iced` | native (Rust) | `benchmark/gpui` | Elm-style retained native GUI |
+| `benchmark/qt-qml` | Qt Quick / QML | native (C++/Qt 6) | `benchmark/gpui` | the desktop incumbent; GPU scene graph |
+| `benchmark/dioxus-desktop` | Dioxus (Rust) | system webview (wry) | `benchmark/svelte-tauri` | React-like Rust over a webview |
+| `benchmark/wails` | web frontend | Go + system webview | `benchmark/svelte-tauri` | Go analogue to Tauri |
 
 Already on GitHub (do not rebuild): `benchmark/vanilla-electron`,
 `benchmark/svelte-electron`, `benchmark/vanilla-tauri`, `benchmark/svelte-tauri`,
@@ -28,8 +33,9 @@ Already on GitHub (do not rebuild): `benchmark/vanilla-electron`,
 `benchmark/vanilla-electron-appproto` and `benchmark/svelte-electron-appproto`
 (see "Two Electron loading approaches" below).
 
-Optional stretch candidates if you want to go wider: `vue-tauri`, `qt-qml`
-(native C++/Qt), `iced` (native Rust), `dioxus-desktop`, `wails` (Go).
+That is a wide cohort spanning three axes: web frontends (React/Solid/Vue on the
+existing 2×2), pure-native (egui, iced, Qt), and webview-over-non-JS-backend
+(Dioxus/Rust, Wails/Go). Build in any order; benchmark serially.
 
 ---
 
@@ -114,6 +120,58 @@ is to branch from the nearest sibling that already implements your shell.
 Same as React+Tauri but use `solid-js` + `vite-plugin-solid`; reimplement the UI
 with Solid's fine-grained signals. Log prefix `solid-tauri`.
 
+### Vue 3 + Tauri (`vue-tauri`, from `svelte-tauri`)
+Same as React+Tauri but use `vue` + `@vitejs/plugin-vue`; reimplement the UI as a
+single `src/App.vue` mounted from `src/main.ts`. Log prefix `vue-tauri`.
+
+### iced native (`iced`, from `gpui`)
+1. `git switch -c benchmark/iced origin/benchmark/gpui`
+2. Add `benchmark/iced/` (Cargo bin crate) using `iced` with the Elm-style
+   `Message`/`update`/`view` model; depend on `crates/benchmark-core` exactly as
+   `gpui/` does. Reproduce the layout and the telemetry order; drive the scroll
+   workload from iced's frame/subscription tick.
+3. `scripts/run-iced.mjs` (copy `run-gpui.mjs`), `visual-iced.sh`. `build`:
+   `cargo build --manifest-path iced/Cargo.toml --release`. Headless: same
+   compositor/Xvfb path as gpui.
+
+### Qt Quick / QML native (`qt-qml`, from `gpui`)
+1. `git switch -c benchmark/qt-qml origin/benchmark/gpui`
+2. Add `benchmark/qt/` — a **Qt 6** app (CMake) with the UI in **QML** (a
+   `ListView` with fixed `delegate` height gives you the same windowing for free;
+   match 40 tree / 42 editor visible rows, overscan 4). C++ `main.cpp` drives the
+   workload and emits telemetry.
+3. Reuse the shared scanner/LSP/memory logic from `crates/benchmark-core`: build
+   it as a static lib with a small C ABI (`#[no_mangle] extern "C"`) and call it
+   from C++, **or** port the equivalent logic in C++ but keep the JSON-RPC bodies
+   and scan results byte-identical. Prefer the FFI route so the core stays shared.
+4. `scripts/run-qt.mjs` (copy `run-gpui.mjs`, point at the Qt release binary),
+   `visual-qt.sh`. `build`: `cmake --build build --config Release` (wire it into
+   `package.json`'s `build`). Telemetry to the same JSONL contract.
+5. Headless: Qt Quick needs a GL/Vulkan context — run under the same nested
+   software compositor / Xvfb path, or set `QT_QUICK_BACKEND=software` if the
+   scene graph can't get a GPU context (note which, since software changes the
+   graphics path — as it did for GPUI).
+
+### Dioxus desktop (`dioxus-desktop`, from `svelte-tauri`)
+1. `git switch -c benchmark/dioxus-desktop origin/benchmark/gpui` (or from a Tauri
+   sibling for the webview deps).
+2. Add `benchmark/dioxus/` (Cargo bin crate) using `dioxus` + `dioxus-desktop`
+   (renders through `wry`/system webview). Reproduce the UI in RSX; reuse
+   `crates/benchmark-core`. It is a Rust frontend over a webview — closer to Tauri
+   than to gpui, so record it in that group.
+3. `scripts/run-dioxus.mjs`, `visual-dioxus.sh`. `build`:
+   `cargo build --manifest-path dioxus/Cargo.toml --release`. Needs
+   `webkit2gtk-4.1` on Linux like Tauri.
+
+### Wails (`wails`, from `svelte-tauri`)
+1. `git switch -c benchmark/wails origin/benchmark/svelte-tauri`
+2. Replace the Tauri shell with a **Wails v2** Go app (`wails.json`, `main.go`,
+   `app.go`); keep a web frontend in `frontend/` (reuse the vanilla or svelte UI
+   built by vite). Go binds the scanner/LSP/memory walk (port from
+   `benchmark-core` or shell out) and emits the same telemetry.
+3. `scripts/run-wails.mjs`, `visual-wails.sh`. `build`: `wails build`. Linux needs
+   `webkit2gtk-4.1`; requires the Go toolchain + `wails` CLI.
+
 ### egui native (`egui`, from `gpui`)
 1. `git switch -c benchmark/egui origin/benchmark/gpui`
 2. Add `benchmark/egui/` (Cargo bin crate) using `eframe`/`egui`; depend on
@@ -154,9 +212,14 @@ Both need `--disable-gpu` and a shown, non-throttled window
   must be present for packaging.
 - **Tauri 2:** Rust stable + `webkit2gtk-4.1` (Linux) / WebKit (macOS),
   `@tauri-apps/cli`.
-- **Native (egui/gpui):** Rust stable, Vulkan/GL. On a real GPU host you get
-  hardware Vulkan; on a headless CI host use the nested software Wayland
+- **Native Rust (egui/gpui/iced):** Rust stable, Vulkan/GL. On a real GPU host you
+  get hardware Vulkan; on a headless CI host use the nested software Wayland
   compositor script or Xvfb + llvmpipe.
+- **Qt (`qt-qml`):** Qt 6 (`qtbase`, `qtdeclarative`) + CMake + a C++ compiler.
+  Needs a GL/Vulkan context; fall back to `QT_QUICK_BACKEND=software` on a
+  GPU-less host (record it — software changes the graphics path).
+- **Dioxus / Wails (webview):** `webkit2gtk-4.1` on Linux like Tauri; Wails also
+  needs the Go toolchain + `wails` CLI, Dioxus needs Rust + the `dioxus` CLI.
 - The AWS `nightgame-dev` box is already provisioned with all of the above. On a
   Mac, install the equivalents (Xcode CLT, `rustup`, `pnpm`, and WebKit is
   system-provided for Tauri).
