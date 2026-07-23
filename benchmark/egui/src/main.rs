@@ -787,6 +787,7 @@ fn main() -> eframe::Result {
     let lsp = env_path("BENCH_LSP", "typescript-language-server");
     let autorun = std::env::var("BENCH_AUTORUN").as_deref() == Ok("1");
     let options = eframe::NativeOptions {
+        renderer: eframe::Renderer::Glow,
         viewport: ViewportBuilder::default()
             .with_inner_size([1280.0, 800.0])
             .with_min_inner_size([1280.0, 800.0])
