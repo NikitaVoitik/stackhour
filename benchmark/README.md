@@ -11,9 +11,8 @@ branched from `rust-rewrite`:
 | `benchmark/svelte-tauri` | Svelte | Tauri 2 |
 | `benchmark/gpui` | native Rust | GPUI |
 
-No branch is a designated winner. `benchmark/results` is populated only after
-all five release builds pass the visual contract and complete the same run
-matrix.
+The final cross-candidate interpretation is in [`RESULTS.md`](RESULTS.md).
+Each candidate branch retains its own raw run evidence and accepted screenshot.
 
 ## Controlled contract
 
@@ -26,7 +25,7 @@ matrix.
   lists use fixed-height windowing with overscan 4 (48 and 38 mounted rows).
 - Identical tabs, outline, output panel, and status bar; identical lexical
   token classes (keyword, string, number, comment, type, function).
-- The scroll workload is 480 requestAnimationFrame/tick steps: 160 down, 160
+- The scroll workload is 640 requestAnimationFrame/tick steps: 160 down, 160
   up, repeated once, with the same normalized easing and scroll range.
 - The switch workload alternates `src/selected.ts` and
   `src/alternate.ts` 30 times. Stable frame means two presented frames after
