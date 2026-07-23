@@ -12,6 +12,7 @@ benchmark/.cache/
 benchmark/.fixture/
 benchmark/dist/
 benchmark/artifacts/
+benchmark/qt/build/
 
 # Claude Code session worktrees
 .claude/worktrees/

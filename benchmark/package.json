@@ -5,9 +5,9 @@
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "fixture": "node scripts/generate-fixture.mjs",
-    "build": "cargo build --manifest-path gpui/Cargo.toml --release",
-    "visual": "bash scripts/visual-gpui.sh",
-    "bench": "node scripts/run-gpui.mjs",
+    "build": "cmake -S qt -B qt/build -DCMAKE_BUILD_TYPE=Release && cmake --build qt/build --config Release",
+    "visual": "bash scripts/visual-qt.sh",
+    "bench": "node scripts/run-qt.mjs",
     "analyze": "node scripts/analyze.mjs",
     "manifest": "node scripts/machine-manifest.mjs"
   },
