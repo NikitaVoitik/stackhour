@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
+import { gpuEnvironment, verifyGpu } from "./gpu-harness.mjs";
 
 const base = join(dirname(fileURLToPath(import.meta.url)), "..");
 const command = (name, args = []) => {
@@ -23,7 +24,13 @@ const manifest = {
   webkitgtk: command("pkg-config", ["--modversion", "webkit2gtk-4.1"]),
   chromium: command("chromium", ["--version"]),
   fixtureCommit: command("git", ["rev-parse", "benchmark/common"]),
-  display: { server: "Xvfb", geometry: "1280x800x24", dpi: 96 },
+  display: {
+    server: "GPU-backed Xorg",
+    name: gpuEnvironment().DISPLAY,
+    geometry: "1280x800x24",
+    dpi: 96
+  },
+  gpu: verifyGpu(gpuEnvironment()),
   coldDefinition: "fresh application XDG directory; kernel page cache retained",
   warmDefinition: "reused application XDG directory after priming launch"
 };
