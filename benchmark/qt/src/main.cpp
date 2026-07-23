@@ -4,10 +4,12 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include <QSGRendererInterface>
 
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("StackhourBenchQtQml"));
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
     Backend backend;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("backend"), &backend);
