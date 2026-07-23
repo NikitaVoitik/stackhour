@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import solid from "vite-plugin-solid";
 
 export default defineConfig({
   base: "./",
-  plugins: [svelte()],
+  plugins: [solid()],
   build: { target: "es2022" }
 });
