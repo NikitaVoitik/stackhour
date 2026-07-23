@@ -11,6 +11,37 @@ const candidate = "react-electron"; const phase = process.env.BENCH_PHASE || "vi
 const emit = (event) => { const row = { schemaVersion: 1, candidate, phase, runId, timestampNs: Number(process.hrtime.bigint()), ...event }; if (logPath) appendFileSync(logPath, `${JSON.stringify(row)}\n`); else console.log(JSON.stringify(row)); };
 emit({ event: "process_start" });
 
+const gpuInfoReady = new Promise((resolve, reject) => {
+  const timeout = setTimeout(() => reject(new Error("Electron GPU information timed out")), 10000);
+  app.once("gpu-info-update", () => {
+    clearTimeout(timeout);
+    resolve();
+  });
+});
+
+async function verifyElectronGpu() {
+  await gpuInfoReady;
+  const features = app.getGPUFeatureStatus();
+  const info = await app.getGPUInfo("basic");
+  const accelerated = app.isHardwareAccelerationEnabled();
+  const compositing = features.gpu_compositing || "unknown";
+  const webgl = features.webgl || "unknown";
+  const enabled = (value) => /^enabled(?:_|$)/.test(value);
+  emit({
+    event: "gpu_renderer",
+    accelerated,
+    compositing,
+    webgl,
+    devices: info.gpuDevice || [],
+  });
+  if (!accelerated || !enabled(compositing) || !enabled(webgl)) {
+    throw new Error(
+      `Electron hardware rendering unavailable: accelerated=${accelerated}, ` +
+      `gpu_compositing=${compositing}, webgl=${webgl}`,
+    );
+  }
+}
+
 function memorySample(label) {
   const rows = [];
   for (const pid of new Set([process.pid, ...app.getAppMetrics().map((metric) => metric.pid), ...languagePids()])) {
@@ -22,7 +53,14 @@ function memorySample(label) {
   }
   emit({ event: "memory_sample", label, processes: rows });
 }
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await verifyElectronGpu();
+  } catch (error) {
+    emit({ event: "benchmark_error", message: error.message });
+    app.exit(2);
+    return;
+  }
   const window = new BrowserWindow({ width: 1280, height: 800, useContentSize: true, resizable: false, show: false, backgroundColor: "#17191f", webPreferences: { preload: join(here, "preload.cjs"), contextIsolation: true, sandbox: true } });
   window.removeMenu(); window.once("ready-to-show", () => window.show());
   ipcMain.handle("scan", async () => { const files = await scan(fixture); emit({ event: "project_scan_complete", count: files.length }); return files; });
