@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
   base: "./",
-  plugins: [svelte()],
+  plugins: [vue()],
   build: { target: "es2022" }
 });
