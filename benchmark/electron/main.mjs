@@ -23,10 +23,10 @@ async function verifyElectronGpu() {
   await gpuInfoReady;
   const features = app.getGPUFeatureStatus();
   const info = await app.getGPUInfo("basic");
-  const accelerated = app.isHardwareAccelerationEnabled();
   const compositing = features.gpu_compositing || "unknown";
   const webgl = features.webgl || "unknown";
   const enabled = (value) => /^enabled(?:_|$)/.test(value);
+  const accelerated = enabled(compositing) && enabled(webgl);
   emit({
     event: "gpu_renderer",
     accelerated,
