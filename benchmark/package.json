@@ -7,7 +7,7 @@
     "fixture": "node scripts/generate-fixture.mjs",
     "build": "go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 build -clean -nopackage",
     "visual": "bash scripts/visual-wails.sh",
-    "bench": "xvfb-run -a -s '-screen 0 1280x800x24 -dpi 96' dbus-run-session -- node scripts/run-wails.mjs",
+    "bench": "dbus-run-session -- node scripts/run-wails.mjs",
     "analyze": "node scripts/analyze.mjs",
     "manifest": "node scripts/machine-manifest.mjs"
   },
