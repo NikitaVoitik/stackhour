@@ -17,7 +17,8 @@ matrix.
 
 ## Controlled contract
 
-- Linux x86_64, one otherwise-idle host, Xvfb at 1280x800 and 96 DPI.
+- Linux x86_64, one otherwise-idle NVIDIA host, with a hardware-accelerated
+  Xorg display at 1280x800 and 96 DPI.
 - Window content is 1280x800, DPR 1, with Noto Sans Mono 13 px for source and
   Noto Sans 13 px for chrome.
 - Deterministic fixture: 5,122 TypeScript files. `src/selected.ts` is selected
@@ -35,6 +36,11 @@ matrix.
   RPC sequence: initialize, initialized, didOpen, documentSymbol. Runtime/UI
   RSS is sampled separately from the language-server and tsserver process
   trees.
+- `scripts/gpu-preflight.mjs` rejects indirect or software rendering
+  (`llvmpipe`, `softpipe`, SwiftShader, or similar) before a trial. Every
+  candidate run is sampled with `nvidia-smi pmon`; a run fails unless one of
+  the candidate's processes acquires an NVIDIA GPU context. Raw GPU evidence is
+  written under `results/gpu`.
 - Rust candidates share `benchmark-core`. Electron uses the equivalent Node
   scanner and byte-for-byte JSON-RPC request bodies.
 
@@ -59,6 +65,8 @@ Generate the ignored fixture once with `pnpm fixture`. Each candidate branch
 defines `pnpm build`, `pnpm visual`, and `pnpm bench`. The benchmark command
 runs at least five cold and five warm release-build trials and writes raw JSONL
 under `results/raw`. The common report command consumes the collected files.
+Set `BENCH_DISPLAY` (or `DISPLAY`) to the dedicated 1280x800 Xorg display before
+running `pnpm manifest`, `pnpm visual`, or `pnpm bench`.
 
 Cold trials drop only application-owned caches and use a fresh XDG directory;
 they do not claim to be kernel page-cache cold unless run with elevated cache
