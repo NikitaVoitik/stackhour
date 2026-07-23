@@ -112,3 +112,33 @@ through the complete cold/warm matrix.
   but no winner is selected because the required GPUI native baseline is not
   yet complete. Cross-branch result integration and idle/process-count tables
   also remain before final interpretation.
+
+## 2026-07-23 — GPUI native checkpoint
+
+- GPUI 0.2.2 is pinned as the native Rust baseline. It uses the same
+  `benchmark-core` scanner, LSP protocol client, process walk, fixture, initial
+  selection, geometry, virtualization window, 640-step scroll path, and 30
+  alternating file switches as the Tauri candidates.
+- Direct GPUI/X11 under Xvfb creates the correct 1280×800 window, but Vulkan
+  presentation is not observable in the X root and no presented-frame
+  callbacks arrive. GPUI's Wayland backend requires a `wl_seat`, which the
+  Weston headless backend does not publish. The reproducible solution is GPUI
+  on software Vulkan inside Weston/X11 with a software compositor, hosted by
+  Xvfb. The isolated compositor's debug protocol is enabled only for the
+  visual-gate screenshot.
+- The accepted `screenshots/gpui.png` matches the shared UI contract: 40 tree
+  rows, 30 source lines, initially selected file, two tabs, lexical syntax
+  highlighting, LSP outline, output panel, status bar, 1280×800 window, and
+  Noto font family.
+- Five cold and five warm trials validate. GPUI has by far the lowest first
+  frame and idle/loaded UI-runtime RSS in this run set. Its large-file
+  presentation and scroll values are by far the slowest in the nested
+  software-compositor path. Those presentation values are real for the saved
+  harness but are not transferable to a physical accelerated desktop.
+- The native binary is 16,210,848 bytes (6,695,671-byte gzip), excluding
+  system graphics libraries. It is larger than the stripped Tauri binaries
+  but far smaller than Electron's bundled release directory.
+- All five required candidates are now built, visually checked, and measured.
+  Comparative interpretation can now be written, but it must separate robust
+  startup/memory/package findings from the non-equivalent headless GPUI
+  presentation path.

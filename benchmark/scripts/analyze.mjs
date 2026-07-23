@@ -28,6 +28,7 @@ for (const file of files) {
     timingsMs: {
       launchToFirstFrame: delta(events, "process_start", "first_frame"),
       launchToTree: delta(events, "process_start", "project_tree_visible"),
+      launchToUsable: delta(events, "process_start", "stable_frame"),
       projectOpenToTree: delta(events, "project_open_requested", "tree_presented"),
       fileClickToRead: delta(events, "file_click", "disk_read_complete"),
       fileClickToPresented: delta(events, "file_click", "text_presented"),
