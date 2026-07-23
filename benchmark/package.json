@@ -5,18 +5,18 @@
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "fixture": "node scripts/generate-fixture.mjs",
-    "build": "vite build && bash scripts/package-electron.sh",
-    "visual": "bash scripts/visual.sh",
-    "bench": "node scripts/run-electron.mjs",
+    "build": "vite build && tauri build --no-bundle",
+    "visual": "bash scripts/visual-tauri.sh",
+    "bench": "xvfb-run -a -s '-screen 0 1280x800x24 -dpi 96' dbus-run-session -- node scripts/run-tauri.mjs",
     "analyze": "node scripts/analyze.mjs",
     "manifest": "node scripts/machine-manifest.mjs"
   },
   "devDependencies": {
-    "electron": "37.2.3",
+    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/cli": "2.11.4",
     "vite": "7.0.6",
     "typescript": "5.9.3",
     "typescript-language-server": "5.0.0"
   },
-  "main": "electron/main.mjs",
-  "pnpm": { "onlyBuiltDependencies": ["electron", "esbuild"] }
+  "pnpm": { "onlyBuiltDependencies": ["esbuild"] }
 }

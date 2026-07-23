@@ -64,3 +64,30 @@ through the complete cold/warm matrix.
 - Package size will be measured on the runnable release directory and on the
   distributable archive/bundle separately. Comparing an Electron directory to
   a Tauri `.deb` alone would be misleading.
+
+## 2026-07-23 — Vanilla TypeScript + Tauri checkpoint
+
+- The frameworkless DOM renderer and CSS remain the Vanilla Electron versions.
+  The bridge moved from Electron IPC to Tauri invoke commands. Tauri and GPUI
+  share the new `benchmark-core` Rust scanner, LSP framing/client, process-tree
+  walk, and memory classification.
+- The first Tauri screenshot was a blank 10×10 GTK initialization window.
+  WebKitGTK blocks before creating its webview on this headless host when no
+  session D-Bus is available. One isolated Xvfb containing one isolated D-Bus
+  session fixes startup and allows the portal to be primed once before trials.
+- `WEBKIT_DISABLE_COMPOSITING_MODE=1` is required under Xvfb on this host. It
+  is Tauri's documented last-resort Linux graphics workaround. Electron also
+  falls back from its GPU process under Xvfb, but the mechanisms are not
+  identical; smoothness conclusions apply to this headless software-rendered
+  environment unless repeated on a physical accelerated desktop.
+- The accepted `screenshots/vanilla-tauri.png` matches the controlled content
+  and geometry. Chromium and WebKitGTK rasterize the same fonts slightly
+  differently, which is a runtime characteristic rather than a CSS change.
+- Five cold and five warm trials validate. The 8,092,840-byte release binary
+  is dramatically smaller than the Electron directory, but it dynamically
+  uses the host's WebKitGTK 2.50.6. Both the binary and gzip size are retained;
+  the report will not imply that system-webview bytes cease to exist.
+- The provisional numbers show shorter startup, scan, and stable-frame timing
+  than Vanilla Electron on this host, fewer scroll frames over 16.7 ms, and
+  roughly 90 MiB less loaded UI/runtime RSS. No winner is selected: the
+  Svelte/Tauri repeat and native GPUI baseline are still required.

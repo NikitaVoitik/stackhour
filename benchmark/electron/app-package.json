@@ -1,6 +1,0 @@
-{
-  "name": "stackhour-bench-vanilla-electron",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "electron/main.mjs"
-}

@@ -4,5 +4,12 @@
     "releaseTarGzipBytes": 114635289,
     "artifact": "StackhourBenchVanillaElectron-linux-x64",
     "measuredAt": "2026-07-22T23:43:00Z"
+  },
+  "vanilla-tauri": {
+    "releaseBinaryBytes": 8092840,
+    "releaseTarGzipBytes": 2194585,
+    "artifact": "stackhour-bench-vanilla-tauri",
+    "measuredAt": "2026-07-23T00:04:00Z",
+    "systemRuntimeExcluded": "WebKitGTK 2.50.6"
   }
 }

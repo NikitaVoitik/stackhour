@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "StackhourBenchVanillaTauri",
+  "version": "0.1.0",
+  "identifier": "com.stackhour.bench.vanilla-tauri",
+  "build": { "frontendDist": "../dist" },
+  "app": {
+    "windows": [{ "title": "Stackhour UI Benchmark", "width": 1280, "height": 800, "resizable": false, "decorations": false, "backgroundColor": "#17191f" }],
+    "security": { "csp": null }
+  },
+  "bundle": { "active": false }
+}

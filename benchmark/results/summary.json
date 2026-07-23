@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-22T23:42:40.223Z",
+  "generatedAt": "2026-07-23T00:03:40.802Z",
   "runs": [
     {
       "file": "vanilla-electron-cold-1.jsonl",
@@ -1598,6 +1598,1456 @@
               "group": "ui-runtime"
             }
           ]
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-cold-1.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 186.615331,
+        "launchToTree": 214.917677,
+        "projectOpenToTree": 26.417164,
+        "fileClickToRead": 0.659126,
+        "fileClickToPresented": 13.77402,
+        "fileSwitchToStable": 23.150336,
+        "lspRoundTrip": 1766.887326,
+        "lspResponseToOutline": 6.917075
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 17.00000000000091,
+        "worstMs": 24,
+        "over16_7": 52,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 7.300000000000001,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465253,
+              "rssKb": 162096
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465262,
+              "rssKb": 67436
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465266,
+              "rssKb": 190716
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 190997205
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465253,
+              "rssKb": 188412
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465262,
+              "rssKb": 67380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465266,
+              "rssKb": 203496
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465309,
+              "rssKb": 141852
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465325,
+              "rssKb": 278652
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465326,
+              "rssKb": 286332
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465339,
+              "rssKb": 78536
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 2031364867
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465253,
+              "rssKb": 162232
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465262,
+              "rssKb": 67444
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465266,
+              "rssKb": 327508
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465309,
+              "rssKb": 88596
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465325,
+              "rssKb": 278652
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465326,
+              "rssKb": 362216
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465339,
+              "rssKb": 78536
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 12812604046
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-cold-2.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 190.130186,
+        "launchToTree": 218.560873,
+        "projectOpenToTree": 26.800332,
+        "fileClickToRead": 0.6103,
+        "fileClickToPresented": 14.16377,
+        "fileSwitchToStable": 23.439123,
+        "lspRoundTrip": 1725.681748,
+        "lspResponseToOutline": 11.311496
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 18,
+        "worstMs": 22,
+        "over16_7": 54,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 5.300000000000001,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465408,
+              "rssKb": 166096
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465417,
+              "rssKb": 67364
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465421,
+              "rssKb": 193196
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 194852487
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465408,
+              "rssKb": 192780
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465417,
+              "rssKb": 67308
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465421,
+              "rssKb": 211252
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465464,
+              "rssKb": 141608
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465480,
+              "rssKb": 286732
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465481,
+              "rssKb": 283196
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465494,
+              "rssKb": 77904
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 1998630003
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465408,
+              "rssKb": 166988
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465417,
+              "rssKb": 67372
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465421,
+              "rssKb": 336784
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465464,
+              "rssKb": 88668
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465480,
+              "rssKb": 286732
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465481,
+              "rssKb": 362644
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465494,
+              "rssKb": 77904
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 12766568068
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-cold-3.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 679.214057,
+        "launchToTree": 706.258262,
+        "projectOpenToTree": 25.423423,
+        "fileClickToRead": 0.614958,
+        "fileClickToPresented": 13.407323,
+        "fileSwitchToStable": 22.209193,
+        "lspRoundTrip": 1840.144054,
+        "lspResponseToOutline": 7.698685
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 17.00000000000182,
+        "worstMs": 23,
+        "over16_7": 48,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 6.300000000000001,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465538,
+              "rssKb": 160076
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465547,
+              "rssKb": 69288
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465551,
+              "rssKb": 188708
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 683752768
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465538,
+              "rssKb": 160792
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465547,
+              "rssKb": 69224
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465551,
+              "rssKb": 204920
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465594,
+              "rssKb": 141824
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465610,
+              "rssKb": 288004
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465611,
+              "rssKb": 333456
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465624,
+              "rssKb": 80784
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 2595462029
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465538,
+              "rssKb": 163180
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465547,
+              "rssKb": 69288
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465551,
+              "rssKb": 347040
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465594,
+              "rssKb": 88872
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465610,
+              "rssKb": 288004
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465611,
+              "rssKb": 360004
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465624,
+              "rssKb": 80784
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 13396727506
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-cold-4.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 681.586297,
+        "launchToTree": 710.056298,
+        "projectOpenToTree": 25.1774,
+        "fileClickToRead": 0.644064,
+        "fileClickToPresented": 14.312867,
+        "fileSwitchToStable": 23.61625,
+        "lspRoundTrip": 1677.183566,
+        "lspResponseToOutline": 33.497579
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 20,
+        "worstMs": 27.999999999999773,
+        "over16_7": 54,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 11.299999999999772,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465684,
+              "rssKb": 162004
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465693,
+              "rssKb": 67404
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465697,
+              "rssKb": 190332
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 688227672
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465684,
+              "rssKb": 190284
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465693,
+              "rssKb": 67356
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465697,
+              "rssKb": 208808
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465740,
+              "rssKb": 139248
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465756,
+              "rssKb": 278468
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465757,
+              "rssKb": 282608
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465770,
+              "rssKb": 81652
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 2463909528
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465684,
+              "rssKb": 165240
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465693,
+              "rssKb": 69392
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465697,
+              "rssKb": 336044
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465740,
+              "rssKb": 85636
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465756,
+              "rssKb": 278468
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465757,
+              "rssKb": 359532
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465770,
+              "rssKb": 81652
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 13216474717
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-cold-5.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 190.76739,
+        "launchToTree": 218.27248,
+        "projectOpenToTree": 25.926942,
+        "fileClickToRead": 0.871661,
+        "fileClickToPresented": 14.822883,
+        "fileSwitchToStable": 23.407878,
+        "lspRoundTrip": 1835.614792,
+        "lspResponseToOutline": 6.244922
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 17.00000000000182,
+        "worstMs": 22,
+        "over16_7": 48,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 5.300000000000001,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465810,
+              "rssKb": 162120
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465819,
+              "rssKb": 69464
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465823,
+              "rssKb": 192968
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 195177894
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465810,
+              "rssKb": 188764
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465819,
+              "rssKb": 69408
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465823,
+              "rssKb": 209020
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465866,
+              "rssKb": 140080
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465882,
+              "rssKb": 278204
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465883,
+              "rssKb": 314488
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465896,
+              "rssKb": 79840
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 2100873666
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465810,
+              "rssKb": 166980
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465819,
+              "rssKb": 69472
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465823,
+              "rssKb": 333148
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3465866,
+              "rssKb": 86512
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465882,
+              "rssKb": 278204
+            },
+            {
+              "group": "tsserver",
+              "pid": 3465883,
+              "rssKb": 357268
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465896,
+              "rssKb": 79840
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 12861287812
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-warm-1.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 185.483683,
+        "launchToTree": 213.622655,
+        "projectOpenToTree": 25.95709,
+        "fileClickToRead": 0.690604,
+        "fileClickToPresented": 14.18069,
+        "fileSwitchToStable": 23.916201,
+        "lspRoundTrip": 1888.709907,
+        "lspResponseToOutline": 6.41937
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 17.000000000000455,
+        "worstMs": 21.99999999999818,
+        "over16_7": 51,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 5.299999999998182,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465942,
+              "rssKb": 164020
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465956,
+              "rssKb": 67328
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465960,
+              "rssKb": 190660
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 189850417
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465942,
+              "rssKb": 190648
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465956,
+              "rssKb": 67272
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465960,
+              "rssKb": 206836
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466003,
+              "rssKb": 141904
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466019,
+              "rssKb": 275292
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466020,
+              "rssKb": 334804
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466033,
+              "rssKb": 82328
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 2156351634
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3465942,
+              "rssKb": 168800
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465956,
+              "rssKb": 67336
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3465960,
+              "rssKb": 331616
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466003,
+              "rssKb": 88804
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466019,
+              "rssKb": 275292
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466020,
+              "rssKb": 359112
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466033,
+              "rssKb": 82328
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 12916232033
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-warm-2.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 181.415019,
+        "launchToTree": 210.06197,
+        "projectOpenToTree": 26.184109,
+        "fileClickToRead": 0.661251,
+        "fileClickToPresented": 13.945572,
+        "fileSwitchToStable": 23.447417,
+        "lspRoundTrip": 1777.455044,
+        "lspResponseToOutline": 3.020256
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 17.00000000000182,
+        "worstMs": 22,
+        "over16_7": 50,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 5.300000000000001,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466091,
+              "rssKb": 159792
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466100,
+              "rssKb": 67344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466104,
+              "rssKb": 190668
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 185877807
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466091,
+              "rssKb": 157960
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466100,
+              "rssKb": 67288
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466104,
+              "rssKb": 202920
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466147,
+              "rssKb": 141532
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466163,
+              "rssKb": 287576
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466164,
+              "rssKb": 302504
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466177,
+              "rssKb": 81408
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 2032088504
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466091,
+              "rssKb": 164800
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466100,
+              "rssKb": 67352
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466104,
+              "rssKb": 323208
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466147,
+              "rssKb": 87912
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466163,
+              "rssKb": 287576
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466164,
+              "rssKb": 361120
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466177,
+              "rssKb": 81408
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 12795691987
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-warm-3.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 181.292335,
+        "launchToTree": 208.770002,
+        "projectOpenToTree": 25.768075,
+        "fileClickToRead": 0.918996,
+        "fileClickToPresented": 15.038277,
+        "fileSwitchToStable": 24.325265,
+        "lspRoundTrip": 1792.342753,
+        "lspResponseToOutline": 12.622643
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 17.00000000000182,
+        "worstMs": 24,
+        "over16_7": 55,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 7.300000000000001,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466213,
+              "rssKb": 164088
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466222,
+              "rssKb": 69412
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466226,
+              "rssKb": 191212
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 185792581
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466213,
+              "rssKb": 191040
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466222,
+              "rssKb": 69344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466226,
+              "rssKb": 205432
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466269,
+              "rssKb": 142380
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466285,
+              "rssKb": 285628
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466286,
+              "rssKb": 301660
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466299,
+              "rssKb": 80492
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 2055302230
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466213,
+              "rssKb": 165340
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466222,
+              "rssKb": 69408
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466226,
+              "rssKb": 335752
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466269,
+              "rssKb": 88848
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466285,
+              "rssKb": 285628
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466286,
+              "rssKb": 357980
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466299,
+              "rssKb": 80492
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 12816274562
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-warm-4.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 182.266226,
+        "launchToTree": 210.871911,
+        "projectOpenToTree": 26.229464,
+        "fileClickToRead": 0.579093,
+        "fileClickToPresented": 14.095035,
+        "fileSwitchToStable": 23.900967,
+        "lspRoundTrip": 1894.577202,
+        "lspResponseToOutline": 6.170635
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 17.00000000000182,
+        "worstMs": 25,
+        "over16_7": 50,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 8.3,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466353,
+              "rssKb": 162012
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466362,
+              "rssKb": 69576
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466366,
+              "rssKb": 188596
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 186657795
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466353,
+              "rssKb": 160656
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466362,
+              "rssKb": 69520
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466366,
+              "rssKb": 207604
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466409,
+              "rssKb": 148028
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466425,
+              "rssKb": 284476
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466426,
+              "rssKb": 314128
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466439,
+              "rssKb": 77684
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 2156207262
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466353,
+              "rssKb": 162276
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466362,
+              "rssKb": 69584
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466366,
+              "rssKb": 329300
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466409,
+              "rssKb": 94548
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466425,
+              "rssKb": 284476
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466426,
+              "rssKb": 363784
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466439,
+              "rssKb": 77684
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 12920330219
+        }
+      ]
+    },
+    {
+      "file": "vanilla-tauri-warm-5.jsonl",
+      "candidate": "vanilla-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 179.860875,
+        "launchToTree": 210.941011,
+        "projectOpenToTree": 27.577501,
+        "fileClickToRead": 0.678699,
+        "fileClickToPresented": 13.786431,
+        "fileSwitchToStable": 23.3673,
+        "lspRoundTrip": 1866.004865,
+        "lspResponseToOutline": 7.17077
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 17.00000000000182,
+        "worstMs": 21,
+        "over16_7": 50,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 4.300000000000001,
+      "memory": [
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466524,
+              "rssKb": 162076
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466538,
+              "rssKb": 69368
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466542,
+              "rssKb": 192924
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 186395617
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466524,
+              "rssKb": 188360
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466538,
+              "rssKb": 69316
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466542,
+              "rssKb": 207844
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466585,
+              "rssKb": 143352
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466601,
+              "rssKb": 280292
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466602,
+              "rssKb": 314748
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466615,
+              "rssKb": 81804
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 2126530686
+        },
+        {
+          "candidate": "vanilla-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3466524,
+              "rssKb": 166944
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466538,
+              "rssKb": 69380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466542,
+              "rssKb": 345992
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3466585,
+              "rssKb": 143876
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466601,
+              "rssKb": 280292
+            },
+            {
+              "group": "tsserver",
+              "pid": 3466602,
+              "rssKb": 360080
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3466615,
+              "rssKb": 81804
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 12898177717
         }
       ]
     }
