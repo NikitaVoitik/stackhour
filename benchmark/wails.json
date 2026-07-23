@@ -1,0 +1,14 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "stackhour-bench-wails",
+  "outputfilename": "stackhour-bench-wails",
+  "frontend:dir": ".",
+  "wailsjsdir": "build/wailsjs",
+  "frontend:install": "pnpm install",
+  "frontend:build": "pnpm exec vite build",
+  "frontend:dev:watcher": "pnpm exec vite --host 127.0.0.1",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Stackhour benchmark"
+  }
+}
