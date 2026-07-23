@@ -15,4 +15,4 @@ window.bench = {
   config
 };
 
-await import("./renderer");
+await import("./mount-svelte");

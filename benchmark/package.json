@@ -12,8 +12,10 @@
     "manifest": "node scripts/machine-manifest.mjs"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "6.0.0",
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/cli": "2.11.4",
+    "svelte": "5.35.6",
     "vite": "7.0.6",
     "typescript": "5.9.3",
     "typescript-language-server": "5.0.0"

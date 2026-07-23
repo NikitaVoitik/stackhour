@@ -11,5 +11,12 @@
     "artifact": "stackhour-bench-vanilla-tauri",
     "measuredAt": "2026-07-23T00:04:00Z",
     "systemRuntimeExcluded": "WebKitGTK 2.50.6"
+  },
+  "svelte-tauri": {
+    "releaseBinaryBytes": 8101928,
+    "releaseTarGzipBytes": 2202205,
+    "artifact": "stackhour-bench-svelte-tauri",
+    "measuredAt": "2026-07-23T00:12:00Z",
+    "systemRuntimeExcluded": "WebKitGTK 2.50.6"
   }
 }

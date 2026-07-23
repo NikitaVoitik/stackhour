@@ -91,3 +91,24 @@ through the complete cold/warm matrix.
   than Vanilla Electron on this host, fewer scroll frames over 16.7 ms, and
   roughly 90 MiB less loaded UI/runtime RSS. No winner is selected: the
   Svelte/Tauri repeat and native GPUI baseline are still required.
+
+## 2026-07-23 — Svelte + Tauri checkpoint
+
+- The shared Rust backend, Tauri configuration, D-Bus/Xvfb envelope, CSS,
+  fixture, and workload match Vanilla Tauri. Only the renderer ownership and
+  update path changed to the same Svelte component design used in the Electron
+  pair.
+- The accepted `screenshots/svelte-tauri.png` matches Vanilla Tauri's content,
+  geometry, font rasterization, and 40-tree/30-editor row contract.
+- Five cold and five warm trials validate. Startup and loaded UI/runtime RSS
+  are effectively tied with Vanilla Tauri at the precision of this five-run
+  host sample. Svelte's stable-frame median is around 4 ms slower, while both
+  remain below 33.3 ms for every scroll frame in their median runs.
+- Adding Svelte increases the stripped Tauri binary by 9,088 bytes and its
+  gzip by 7,620 bytes. As with Electron, the framework payload is small beside
+  the desktop runtime, although Tauri's runtime is system-provided rather than
+  bundled.
+- The direct 2×2 candidates are now built, visually checked, and benchmarked,
+  but no winner is selected because the required GPUI native baseline is not
+  yet complete. Cross-branch result integration and idle/process-count tables
+  also remain before final interpretation.

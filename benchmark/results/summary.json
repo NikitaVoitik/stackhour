@@ -1,6 +1,1456 @@
 {
-  "generatedAt": "2026-07-23T00:03:40.802Z",
+  "generatedAt": "2026-07-23T00:11:28.276Z",
   "runs": [
+    {
+      "file": "svelte-tauri-cold-1.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 187.902951,
+        "launchToTree": 218.487652,
+        "projectOpenToTree": 29.082011,
+        "fileClickToRead": 0.625312,
+        "fileClickToPresented": 14.151319,
+        "fileSwitchToStable": 20.769482,
+        "lspRoundTrip": 1834.605715,
+        "lspResponseToOutline": 3.652984
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 20,
+        "worstMs": 22.000000000000455,
+        "over16_7": 61,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 5.3000000000004555,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469325,
+              "rssKb": 162024
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469334,
+              "rssKb": 67332
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469338,
+              "rssKb": 193996
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 192264791
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469325,
+              "rssKb": 188352
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469334,
+              "rssKb": 67276
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469338,
+              "rssKb": 209868
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469381,
+              "rssKb": 139804
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469397,
+              "rssKb": 289088
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469398,
+              "rssKb": 290228
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469411,
+              "rssKb": 79976
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 2094950420
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469325,
+              "rssKb": 167164
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469334,
+              "rssKb": 67340
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469338,
+              "rssKb": 307656
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469381,
+              "rssKb": 86208
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469397,
+              "rssKb": 289088
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469398,
+              "rssKb": 361332
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469411,
+              "rssKb": 79976
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 12904855217
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-cold-2.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 183.789647,
+        "launchToTree": 215.099006,
+        "projectOpenToTree": 29.172016,
+        "fileClickToRead": 0.82926,
+        "fileClickToPresented": 14.183933,
+        "fileSwitchToStable": 21.716364,
+        "lspRoundTrip": 1761.774351,
+        "lspResponseToOutline": 11.247737
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 19.00000000000091,
+        "worstMs": 28,
+        "over16_7": 59,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 11.3,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469458,
+              "rssKb": 159980
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469467,
+              "rssKb": 67452
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469471,
+              "rssKb": 193980
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 188445424
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469458,
+              "rssKb": 157936
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469467,
+              "rssKb": 67396
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469471,
+              "rssKb": 211972
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469514,
+              "rssKb": 141416
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469530,
+              "rssKb": 282468
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469531,
+              "rssKb": 291144
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469551,
+              "rssKb": 79164
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 2026061844
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469458,
+              "rssKb": 165064
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469467,
+              "rssKb": 67460
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469471,
+              "rssKb": 348460
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469514,
+              "rssKb": 88588
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469530,
+              "rssKb": 282468
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469531,
+              "rssKb": 359848
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469551,
+              "rssKb": 79164
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 12805007910
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-cold-3.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 188.033077,
+        "launchToTree": 218.630728,
+        "projectOpenToTree": 29.400483,
+        "fileClickToRead": 0.665914,
+        "fileClickToPresented": 14.956021,
+        "fileSwitchToStable": 29.154137,
+        "lspRoundTrip": 1767.210522,
+        "lspResponseToOutline": 11.716034
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 19.99999999999909,
+        "worstMs": 25,
+        "over16_7": 60,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 8.3,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469596,
+              "rssKb": 164004
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469605,
+              "rssKb": 67356
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469609,
+              "rssKb": 191952
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 192578647
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469596,
+              "rssKb": 165092
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469605,
+              "rssKb": 67300
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469609,
+              "rssKb": 209160
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469652,
+              "rssKb": 139512
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469668,
+              "rssKb": 288220
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469669,
+              "rssKb": 297360
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469682,
+              "rssKb": 78608
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 2044499240
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469596,
+              "rssKb": 169332
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469605,
+              "rssKb": 67364
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469609,
+              "rssKb": 315132
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469652,
+              "rssKb": 140036
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469668,
+              "rssKb": 288220
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469669,
+              "rssKb": 360608
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469682,
+              "rssKb": 78608
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 12814177434
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-cold-4.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 184.595758,
+        "launchToTree": 221.899597,
+        "projectOpenToTree": 36.444867,
+        "fileClickToRead": 0.902429,
+        "fileClickToPresented": 18.813715,
+        "fileSwitchToStable": 28.100776,
+        "lspRoundTrip": 1808.576817,
+        "lspResponseToOutline": 6.396102
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 20,
+        "worstMs": 23,
+        "over16_7": 59,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 6.300000000000001,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469725,
+              "rssKb": 162044
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469735,
+              "rssKb": 67436
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469739,
+              "rssKb": 191780
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 188974581
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469725,
+              "rssKb": 188172
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469735,
+              "rssKb": 67380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469739,
+              "rssKb": 210276
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469782,
+              "rssKb": 140184
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469798,
+              "rssKb": 283964
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469799,
+              "rssKb": 296588
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469812,
+              "rssKb": 78004
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 2082670359
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469725,
+              "rssKb": 167144
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469735,
+              "rssKb": 67444
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469739,
+              "rssKb": 350028
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469782,
+              "rssKb": 85880
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469798,
+              "rssKb": 283964
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469799,
+              "rssKb": 360800
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469812,
+              "rssKb": 78004
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 12833154088
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-cold-5.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 187.977173,
+        "launchToTree": 221.196549,
+        "projectOpenToTree": 28.703374,
+        "fileClickToRead": 0.641382,
+        "fileClickToPresented": 14.401807,
+        "fileSwitchToStable": 28.653614,
+        "lspRoundTrip": 1871.815066,
+        "lspResponseToOutline": 9.887738
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 20.999999999999545,
+        "worstMs": 25,
+        "over16_7": 57,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 8.3,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469865,
+              "rssKb": 166168
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469874,
+              "rssKb": 67436
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469878,
+              "rssKb": 188020
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 194687853
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469865,
+              "rssKb": 195708
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469874,
+              "rssKb": 67380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469878,
+              "rssKb": 207720
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469921,
+              "rssKb": 142380
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469937,
+              "rssKb": 288652
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469938,
+              "rssKb": 312856
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469951,
+              "rssKb": 77960
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 2147288362
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469865,
+              "rssKb": 170368
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469874,
+              "rssKb": 67444
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469878,
+              "rssKb": 356448
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3469921,
+              "rssKb": 89008
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469937,
+              "rssKb": 288652
+            },
+            {
+              "group": "tsserver",
+              "pid": 3469938,
+              "rssKb": 361620
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469951,
+              "rssKb": 77960
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 12922411978
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-warm-1.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 186.335432,
+        "launchToTree": 217.783649,
+        "projectOpenToTree": 29.821566,
+        "fileClickToRead": 0.691279,
+        "fileClickToPresented": 14.410469,
+        "fileSwitchToStable": 29.610414,
+        "lspRoundTrip": 1784.74885,
+        "lspResponseToOutline": 6.108899
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 18.99999999999909,
+        "worstMs": 23,
+        "over16_7": 55,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 6.300000000000001,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469985,
+              "rssKb": 164016
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469994,
+              "rssKb": 69328
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469998,
+              "rssKb": 202132
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 190915000
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469985,
+              "rssKb": 162360
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469994,
+              "rssKb": 69272
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469998,
+              "rssKb": 214436
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470041,
+              "rssKb": 142888
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470057,
+              "rssKb": 287412
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470058,
+              "rssKb": 287628
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470071,
+              "rssKb": 79904
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 2054742060
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3469985,
+              "rssKb": 168420
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469994,
+              "rssKb": 69336
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3469998,
+              "rssKb": 324456
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470041,
+              "rssKb": 90308
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470057,
+              "rssKb": 287412
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470058,
+              "rssKb": 358464
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470071,
+              "rssKb": 79904
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 12815465129
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-warm-2.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 187.955222,
+        "launchToTree": 219.721408,
+        "projectOpenToTree": 29.743354,
+        "fileClickToRead": 0.579481,
+        "fileClickToPresented": 13.777142,
+        "fileSwitchToStable": 29.452962,
+        "lspRoundTrip": 1809.618758,
+        "lspResponseToOutline": 7.678925
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 20.000000000000455,
+        "worstMs": 30,
+        "over16_7": 64,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 13.3,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470133,
+              "rssKb": 164056
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470142,
+              "rssKb": 67288
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470146,
+              "rssKb": 195888
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 192338367
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470133,
+              "rssKb": 190876
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470142,
+              "rssKb": 67232
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470146,
+              "rssKb": 213832
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470189,
+              "rssKb": 139952
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470205,
+              "rssKb": 276784
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470206,
+              "rssKb": 320548
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470219,
+              "rssKb": 76644
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 2082247930
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470133,
+              "rssKb": 169092
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470142,
+              "rssKb": 67296
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470146,
+              "rssKb": 349604
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470189,
+              "rssKb": 87204
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470205,
+              "rssKb": 276784
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470206,
+              "rssKb": 361700
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470219,
+              "rssKb": 76644
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 12873872030
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-warm-3.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 187.032587,
+        "launchToTree": 219.51642,
+        "projectOpenToTree": 29.835104,
+        "fileClickToRead": 0.930021,
+        "fileClickToPresented": 14.520726,
+        "fileSwitchToStable": 27.879902,
+        "lspRoundTrip": 1871.067621,
+        "lspResponseToOutline": 7.033099
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 19,
+        "worstMs": 23,
+        "over16_7": 59,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 6.300000000000001,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470274,
+              "rssKb": 164044
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470283,
+              "rssKb": 67432
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470287,
+              "rssKb": 191836
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 193559378
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470274,
+              "rssKb": 190856
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470283,
+              "rssKb": 67376
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470287,
+              "rssKb": 205312
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470336,
+              "rssKb": 143348
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470352,
+              "rssKb": 284752
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470353,
+              "rssKb": 319748
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470366,
+              "rssKb": 78816
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 2144723611
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470274,
+              "rssKb": 169388
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470283,
+              "rssKb": 67440
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470287,
+              "rssKb": 321288
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470336,
+              "rssKb": 90496
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470352,
+              "rssKb": 284752
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470353,
+              "rssKb": 358924
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470366,
+              "rssKb": 78816
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 12904644609
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-warm-4.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 184.662766,
+        "launchToTree": 216.003736,
+        "projectOpenToTree": 29.421544,
+        "fileClickToRead": 0.658202,
+        "fileClickToPresented": 14.027031,
+        "fileSwitchToStable": 20.569981,
+        "lspRoundTrip": 1874.504738,
+        "lspResponseToOutline": 6.072654
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 20,
+        "worstMs": 27.99999999999909,
+        "over16_7": 57,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 11.299999999999091,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470416,
+              "rssKb": 166188
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470425,
+              "rssKb": 69320
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470429,
+              "rssKb": 193752
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 189055642
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470416,
+              "rssKb": 192952
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470425,
+              "rssKb": 69252
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470429,
+              "rssKb": 207948
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470472,
+              "rssKb": 142064
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470488,
+              "rssKb": 288288
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470489,
+              "rssKb": 331348
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470502,
+              "rssKb": 81992
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 2133685210
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470416,
+              "rssKb": 171640
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470425,
+              "rssKb": 69316
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470429,
+              "rssKb": 337148
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470472,
+              "rssKb": 88964
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470488,
+              "rssKb": 288288
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470489,
+              "rssKb": 361208
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470502,
+              "rssKb": 81992
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 12916407605
+        }
+      ]
+    },
+    {
+      "file": "svelte-tauri-warm-5.jsonl",
+      "candidate": "svelte-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 189.237352,
+        "launchToTree": 220.618528,
+        "projectOpenToTree": 30.412316,
+        "fileClickToRead": 0.657889,
+        "fileClickToPresented": 13.672143,
+        "fileSwitchToStable": 20.642365,
+        "lspRoundTrip": 1894.588013,
+        "lspResponseToOutline": 6.976277
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 16,
+        "p95Ms": 17,
+        "p99Ms": 20.00000000000182,
+        "worstMs": 22,
+        "over16_7": 61,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 5.300000000000001,
+      "memory": [
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470541,
+              "rssKb": 161764
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470550,
+              "rssKb": 67404
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470554,
+              "rssKb": 195932
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 193661481
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470541,
+              "rssKb": 188628
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470550,
+              "rssKb": 67348
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470554,
+              "rssKb": 209388
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470597,
+              "rssKb": 142720
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470613,
+              "rssKb": 284908
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470614,
+              "rssKb": 324544
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470627,
+              "rssKb": 79196
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 2161503783
+        },
+        {
+          "candidate": "svelte-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3470541,
+              "rssKb": 166020
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470550,
+              "rssKb": 67412
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470554,
+              "rssKb": 317096
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 3470597,
+              "rssKb": 88696
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470613,
+              "rssKb": 284908
+            },
+            {
+              "group": "tsserver",
+              "pid": 3470614,
+              "rssKb": 358816
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 3470627,
+              "rssKb": 79196
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 12925172685
+        }
+      ]
+    },
     {
       "file": "vanilla-electron-cold-1.jsonl",
       "candidate": "vanilla-electron",
