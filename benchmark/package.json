@@ -5,11 +5,25 @@
   "packageManager": "pnpm@10.12.1",
   "scripts": {
     "fixture": "node scripts/generate-fixture.mjs",
+    "build": "vite build && electron-packager . StackhourBenchVanillaElectron --platform=linux --arch=x64 --out=artifacts --overwrite --prune=true --ignore='^/(src|scripts|results|screenshots|.fixture|.cache)($|/)'",
+    "visual": "bash scripts/visual.sh",
+    "bench": "node scripts/run-electron.mjs",
     "analyze": "node scripts/analyze.mjs",
     "manifest": "node scripts/machine-manifest.mjs"
   },
   "devDependencies": {
+    "@electron/asar": "^4.2.1",
+    "@electron/packager": "18.4.4",
+    "electron": "37.2.3",
     "typescript": "5.9.3",
-    "typescript-language-server": "5.0.0"
+    "typescript-language-server": "5.0.0",
+    "vite": "8.1.5"
+  },
+  "main": "electron/main.mjs",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
   }
 }
