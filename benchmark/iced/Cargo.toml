@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 benchmark-core = { path = "../crates/benchmark-core" }
-iced = { version = "=0.14.0", features = ["canvas", "tokio"] }
+iced = { version = "=0.14.0", default-features = false, features = ["canvas", "tokio", "wgpu", "x11"] }
 regex = "1"
 serde_json = "1"
 
