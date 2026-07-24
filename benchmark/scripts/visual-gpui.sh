@@ -4,49 +4,13 @@ base="$(cd "$(dirname "$0")/.." && pwd)"
 app="$base/gpui/target/release/stackhour-bench-gpui"
 display="${BENCH_DISPLAY:-${DISPLAY:-:0}}"
 mkdir -p "$base/screenshots"
-capture="$(mktemp -d /tmp/stackhour-gpui-capture.XXXXXX)"
-cleanup() {
-  rm -rf "$capture"
-}
-trap cleanup EXIT
 
 BENCH_DISPLAY="$display" DISPLAY="$display" node "$base/scripts/gpu-preflight.mjs"
-DISPLAY="$display" BENCH_DISPLAY="$display" bash -c '
-  set -euo pipefail
-  base="$1"
-  app="$2"
-  capture="$3"
-  runtime="$capture/runtime"
-  mkdir -p "$runtime"
-  chmod 700 "$runtime"
-  XDG_RUNTIME_DIR="$runtime" weston \
-    --backend=x11-backend.so \
-    --width=1280 \
-    --height=800 \
-    --shell=kiosk-shell.so \
-    --socket=wayland-gpui \
-    --debug \
-    --no-config \
-    --log="$capture/weston.log" &
-  weston_pid=$!
-  trap "kill $weston_pid 2>/dev/null || true" EXIT
-  for _ in $(seq 1 100); do
-    [[ -S "$runtime/wayland-gpui" ]] && break
-    sleep 0.05
-  done
-  XDG_RUNTIME_DIR="$runtime" WAYLAND_DISPLAY=wayland-gpui \
-    DISPLAY="$BENCH_DISPLAY" BENCH_DISPLAY="$BENCH_DISPLAY" \
-    BENCH_FIXTURE="$base/.fixture" \
-    BENCH_LSP="$base/node_modules/.bin/typescript-language-server" \
-    "$app" &
-  app_pid=$!
-  sleep 8
-  cd "$capture"
-  XDG_RUNTIME_DIR="$runtime" WAYLAND_DISPLAY=wayland-gpui weston-screenshooter
-  shot="$(find "$capture" -maxdepth 1 -name "wayland-screenshot-*.png" -print -quit)"
-  [[ -n "$shot" ]]
-  mv "$shot" "$base/screenshots/gpui.png"
-  kill "$app_pid" 2>/dev/null || true
-  wait "$app_pid" 2>/dev/null || true
-' _ "$base" "$app" "$capture"
+env -u WAYLAND_DISPLAY -u XDG_SESSION_TYPE \
+DISPLAY="$display" BENCH_DISPLAY="$display" \
+BENCH_FIXTURE="$base/.fixture" \
+BENCH_LSP="$base/node_modules/.bin/typescript-language-server" \
+bash -c \
+  '"$1" & pid=$!; sleep 8; import -window root "$2"; kill "$pid"; wait "$pid" || true' \
+  _ "$app" "$base/screenshots/gpui.png"
 identify "$base/screenshots/gpui.png"
