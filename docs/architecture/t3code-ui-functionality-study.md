@@ -2,7 +2,9 @@
 
 - Status: reference analysis, not an implementation specification
 - Reviewed: 2026-07-24
+- Build decision updated: 2026-07-25
 - T3 Code snapshot: [`ece05087a70e94efcd57441337fa1249559362ba`](https://github.com/pingdotgg/t3code/tree/ece05087a70e94efcd57441337fa1249559362ba)
+- Follow-up: [remote agent control plane and ACP](remote-agent-control-plane-and-acp.md)
 
 ## Scope
 
@@ -69,6 +71,35 @@ pixel-by-pixel visual audit.
    lightweight review much sooner. Native mobile becomes justified only when
    notifications, background work, share extensions, or terminal performance
    prove important enough.
+
+## Build-now decision
+
+This document describes useful product patterns and a likely end state. It is
+not the scope of the first implementation.
+
+The first Stackhour slice should prove one differentiating loop:
+
+```text
+Telegram + minimal web page
+  -> Stackhour hub
+  -> outbound-connected laptop node
+  -> one explicitly configured ACP agent
+  -> streamed response and durable approval
+  -> approval resolved from Telegram or web
+```
+
+Build only the durability required by that loop:
+
+- `Task`, `Run`, `Event`, `Approval`, and stable node identity;
+- one append-only SQLite event table;
+- one hub-assigned sequence;
+- UUID command/event idempotency;
+- reconnect and `after_sequence` catch-up;
+- streamed messages, approval resolution, and interrupt.
+
+Terminals, worktrees, rich diff review, provider registries, native engine
+adapters, a native Stackhour agent, offline execution, and native mobile are
+reference architecture until evidence makes them necessary.
 
 ## T3 Code product surface
 
@@ -392,123 +423,120 @@ The existing filesystem/SSH pull worker is valuable migration material, but a
 responsive multi-client UI needs a long-lived authenticated node protocol with
 heartbeats, multiplexed events, cancellation, and reconnect/replay.
 
-### Core entities
+### Initial core entities
 
 Keep the first domain deliberately small:
 
-- `Node`: stable identity, label, platform, capabilities, connection status,
-  software version, and last seen time.
-- `Project`: logical repository identity plus one or more node-local
-  checkouts.
-- `Checkout`: node, absolute root, repository/branch state, and supported
-  workspace modes.
+- `Node`: stable identity, label, connection status, software version, and a
+  small capability snapshot.
 - `Task`: durable user intent and lifecycle, independent of an engine process.
-- `Run`: one attempt on one node with one engine/agent/model and access policy.
+- `Run`: one attempt on one node with one configured ACP agent and access
+  policy.
 - `Event`: ordered durable task history.
-- `Artifact`: image, log, patch, plan, or other large result referenced by an
-  event.
 - `Approval`: actionable request with scope, expiry, decision, and actor.
-- `TerminalSession`: node-local PTY metadata and resumable output cursor.
+
+For the vertical slice, a run may carry a configured workspace path without
+introducing first-class `Project` and `Checkout` tables. Add those entities
+when one logical repository actually needs multiple node-local checkouts.
+Add `Artifact` and `TerminalSession` when large outputs and interactive PTYs
+enter the product.
 
 Do not call every task a "chat." Telegram may look chat-like, but the domain is
 a remotely executed task with a conversation timeline.
 
-### Minimum event vocabulary
+### Initial event vocabulary
 
 Start with stable product events rather than provider packets:
 
-- `task.created`, `task.updated`, `task.archived`;
-- `run.queued`, `run.started`, `run.interrupted`, `run.completed`,
-  `run.failed`;
+- `task.created`;
+- `run.started`, `run.interrupted`, `run.completed`, `run.failed`;
 - `message.user`, `message.assistant.delta`, `message.assistant.completed`;
-- `activity.started`, `activity.updated`, `activity.completed`;
 - `approval.requested`, `approval.resolved`;
-- `question.requested`, `question.answered`;
-- `plan.proposed`, `plan.accepted`;
-- `changes.updated`, `checkpoint.created`;
-- `terminal.opened`, `terminal.output`, `terminal.exited`;
 - `node.connected`, `node.disconnected`.
 
 Store raw provider payloads separately or behind a versioned diagnostic field.
 UI projections should not depend on them.
 
-### UI MVP
+Add activities, questions, plans, file changes, checkpoints, artifacts, and
+terminal events only with the features that consume them. The richer
+vocabulary elsewhere in this study is a naming reference, not an instruction
+to implement unused event types.
 
-The first React UI should contain:
+### Initial UI slice
 
-1. **Node switcher/status:** laptop and remote server, online state, active
-   work, version, and a clear offline explanation.
-2. **Project/task sidebar:** grouped across nodes, with running/approval/error
-   indicators and fast create/search.
-3. **Task timeline:** user/assistant messages, grouped activity, pending
-   actions, changed-file summaries, and reconnect-safe streaming.
-4. **Composer:** text, images/files, node, checkout/worktree mode, engine/agent,
-   model, Plan/Build, and access policy. Hide uncommon controls behind a
-   compact menu.
-5. **Approval/question cards:** first-class and usable from both PWA and
-   Telegram.
-6. **Diff panel:** changed files and a read-only patch first; inline review and
-   checkpoint restore later.
-7. **Terminal panel:** initially desktop/web only, with output replay and
-   explicit write permission.
-8. **Settings:** nodes, providers/engines, Telegram, access policies, and
-   diagnostics.
+The first React UI should contain only:
+
+1. a task list;
+2. a reconnect-safe message timeline;
+3. a text composer;
+4. laptop-node online/offline state;
+5. approval cards usable from both web and Telegram;
+6. interrupt and a visible final run state.
 
 Telegram should expose the same task/run/approval model with a narrower view,
 not a separate job system. A task created in Telegram must open in the PWA or
 desktop with its full history, and a graphical-client approval must resolve
 the Telegram card too.
 
-### Code boundaries for an agent-written app
+Node selection, project browsing, files, images, model controls, diffs,
+terminals, and settings follow after the loop is reliable.
 
-Prefer explicit, narrow packages and generated boundaries:
+### Initial code boundaries
 
 ```text
 crates/
-  stackhour-domain       IDs, commands, events, policies, projections
-  stackhour-protocol     node/client wire schemas and version negotiation
-  stackhour-hub          auth, durable log, routing, API, subscriptions
-  stackhour-node         local capabilities and outbound connection
-  stackhour-runtime      engine adapters and run supervision
-  stackhour-git          checkout/worktree/checkpoint/diff operations
-  stackhour-terminal     PTY lifecycle and resumable output
-  stackhour-telegram     Telegram projection and commands
+  stackhour-domain
+    task/run/event/approval types and SQLite persistence
 
-apps/
-  web                    React UI and PWA
-  desktop                thin Tauri shell around the shared web UI
+  stackhour-hub
+    client API, Telegram integration, ordered subscriptions, node routing
 
-packages/
-  contracts-ts           generated from versioned Rust schemas
-  client-runtime         connection, cache, commands, and projections
-  ui                     reusable presentational components
+  stackhour-node
+    outbound connection, run supervision, ACP adapter module
 ```
 
-Each UI feature should own its view, state adapter, commands, and focused tests:
-`tasks`, `composer`, `timeline`, `approvals`, `diff`, `terminal`, `nodes`, and
-`settings`. A route may compose features but should not become their state
-machine. This matters more, not less, when agents write much of the code:
-small ownership surfaces reduce accidental coupling and make tests useful as
-executable context.
+Keep protocol types in `stackhour-domain` initially. Keep the ACP adapter as a
+module in `stackhour-node`. Keep Telegram inside the hub while it is one small
+projection. Split a crate only when it has an independent lifecycle, more than
+one consumer, or a dependency boundary worth enforcing.
+
+The React UI can remain one application organized by feature. Generated
+TypeScript contracts and a shared client runtime become justified when the
+Tauri shell or another rich client actually consumes them.
+
+Likely future seams include protocol, runtime, Git, terminal, review, context,
+tools, and model-provider modules. They are not initial crates.
 
 ## Recommended sequence
 
-### Phase 1 — domain and connectivity
+### Phase 1 — prove the remote approval loop
 
-- Introduce stable node/project/checkout/task/run/event IDs.
-- Define versioned Rust commands/events and generated TypeScript contracts.
-- Add the hub's durable ordered task event log and idempotent command IDs.
-- Replace or supplement pull polling with an outbound authenticated node
-  stream, reconnect cursors, capabilities, and heartbeats.
-- Project the existing Telegram bridge through the new task model.
+- Add stable node, task, run, event, and approval IDs.
+- Add one append-only SQLite event table with one hub sequence and UUID
+  idempotency.
+- Add an authenticated outbound laptop-node connection with reconnect,
+  `after_sequence` catch-up, heartbeat, and interrupt.
+- Run one explicitly configured ACP agent from the node.
+- Stream messages into both Telegram and a minimal web task page.
+- Persist an approval before presenting it and resolve the same request from
+  either client.
+
+Exit criteria:
+
+- start a task from Telegram and open its history on the web;
+- disconnect and reconnect a node without duplicate messages;
+- resolve a laptop-originated approval from Telegram;
+- interrupt the run from either client.
 
 ### Phase 2 — shared web/PWA
 
-- Build the responsive shell, node/project/task navigation, timeline, composer,
-  approvals, and connection diagnostics.
+- Build the responsive shell, task navigation, timeline, composer, approvals,
+  and connection diagnostics.
 - Make streaming and reconnection correct before adding specialist panels.
-- Add service-worker installation and offline read access; do not promise
-  offline execution.
+- Add node/project selection and attachments only after the single-node path is
+  reliable.
+- Add service-worker installation later in this phase; do not promise offline
+  execution.
 
 ### Phase 3 — Tauri desktop
 
@@ -525,6 +553,10 @@ executable context.
 - Add source-control provider actions after local Git flows are reliable.
 - Treat browser preview/automation as a separate security-reviewed feature.
 
+Native Codex/Claude adapters are added only after a measured ACP fidelity or
+recovery gap. A native Stackhour agent engine requires its own later RFC and
+must reuse the proven task history, approval, and node boundaries.
+
 ### Phase 5 — native mobile only if evidence supports it
 
 - Measure PWA limitations in daily use.
@@ -535,8 +567,8 @@ executable context.
 ## Risks and open decisions
 
 - **Hub placement:** the existing Linux coordinator is the natural first hub,
-  but backup, upgrade, and recovery behavior must be defined before it becomes
-  the only source of task history.
+  but client authentication, backup, restore testing, upgrades, and recovery
+  must be implemented before it becomes the only source of task history.
 - **Node trust:** decide whether a paired node is fully trusted or receives
   per-project/per-capability grants.
 - **Terminal security:** terminal read access, terminal input, and agent access
