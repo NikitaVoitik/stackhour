@@ -607,7 +607,10 @@ mod tests {
             .expect("lstat")
             .file_type()
             .is_symlink());
-        assert_eq!(fs::canonicalize(&rollback).expect("realpath"), referent);
+        assert_eq!(
+            fs::canonicalize(&rollback).expect("rollback realpath"),
+            fs::canonicalize(&referent).expect("referent realpath")
+        );
         assert_eq!(entities(&referent), vec!["referent".to_string()]);
     }
 
