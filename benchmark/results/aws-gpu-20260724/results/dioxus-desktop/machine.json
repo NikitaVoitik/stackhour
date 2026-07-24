@@ -1,0 +1,32 @@
+{
+  "capturedAt": "2026-07-23T19:16:18.258Z",
+  "hostname": "ip-172-31-21-33",
+  "platform": "linux",
+  "release": "6.8.0-1060-aws",
+  "arch": "x64",
+  "cpu": "Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz",
+  "logicalCpus": 4,
+  "totalMemoryBytes": 16554942464,
+  "node": "v22.17.1",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+  "webkitgtk": "2.50.4",
+  "chromium": null,
+  "fixtureCommit": null,
+  "display": {
+    "server": "GPU-backed Xorg",
+    "name": ":99",
+    "geometry": "1280x800x24",
+    "dpi": 96
+  },
+  "gpu": {
+    "display": ":99",
+    "directRendering": "Yes",
+    "vendor": "NVIDIA Corporation",
+    "renderer": "Tesla T4/PCIe/SSE2",
+    "nvidia": [
+      "0, Tesla T4, GPU-1f8a0be3-efe1-4dc8-bb07-0887c8a6f079, 595.71.05"
+    ]
+  },
+  "coldDefinition": "fresh application XDG directory; kernel page cache retained",
+  "warmDefinition": "reused application XDG directory after priming launch"
+}

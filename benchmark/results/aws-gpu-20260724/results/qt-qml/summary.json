@@ -1,0 +1,765 @@
+{
+  "generatedAt": "2026-07-23T19:46:34.705Z",
+  "runs": [
+    {
+      "file": "qt-qml-cold-1.jsonl",
+      "candidate": "qt-qml",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 384.849512,
+        "launchToTree": 432.235008,
+        "launchToUsable": 457.472806,
+        "projectOpenToTree": 33.403205,
+        "fileClickToRead": 2.539886,
+        "fileClickToPresented": 24.279507,
+        "fileSwitchToStable": 25.045799,
+        "lspRoundTrip": 3306.926781,
+        "lspResponseToOutline": 9.017681
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.687046,
+        "p95Ms": 19.812718,
+        "p99Ms": 23.506733,
+        "worstMs": 26.417994,
+        "over16_7": 113,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 9.717994000000001,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 2918,
+              "rssKb": 185444
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 398845560
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 2918,
+              "rssKb": 274332
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 3787179077
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 2918,
+              "rssKb": 291900
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 13559703682
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-cold-2.jsonl",
+      "candidate": "qt-qml",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 377.295517,
+        "launchToTree": 417.658673,
+        "launchToUsable": 442.606158,
+        "projectOpenToTree": 30.276635,
+        "fileClickToRead": 2.511692,
+        "fileClickToPresented": 24.18582,
+        "fileSwitchToStable": 24.756862,
+        "lspRoundTrip": 3371.357399,
+        "lspResponseToOutline": 7.22515
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.668639,
+        "p95Ms": 19.959047,
+        "p99Ms": 23.207138,
+        "worstMs": 30.165212,
+        "over16_7": 112,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 13.465212000000001,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 2976,
+              "rssKb": 185724
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 387413625
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 2976,
+              "rssKb": 274560
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 3836873821
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 2976,
+              "rssKb": 292032
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 13572495706
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-cold-3.jsonl",
+      "candidate": "qt-qml",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 384.438281,
+        "launchToTree": 425.180089,
+        "launchToUsable": 450.431833,
+        "projectOpenToTree": 29.788532,
+        "fileClickToRead": 2.579589,
+        "fileClickToPresented": 24.041553,
+        "fileSwitchToStable": 24.992732,
+        "lspRoundTrip": 3309.383617,
+        "lspResponseToOutline": 13.194003
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.707095,
+        "p95Ms": 19.902901,
+        "p99Ms": 22.449979,
+        "worstMs": 29.819627,
+        "over16_7": 100,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 13.119627000000001,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3033,
+              "rssKb": 185504
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 395412127
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3033,
+              "rssKb": 274408
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 3791557599
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3033,
+              "rssKb": 292336
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 13537620193
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-cold-4.jsonl",
+      "candidate": "qt-qml",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 376.842243,
+        "launchToTree": 416.935047,
+        "launchToUsable": 442.270016,
+        "projectOpenToTree": 29.969519,
+        "fileClickToRead": 2.491374,
+        "fileClickToPresented": 24.007863,
+        "fileSwitchToStable": 25.177361,
+        "lspRoundTrip": 3385.945127,
+        "lspResponseToOutline": 14.96451
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.921419,
+        "p95Ms": 20.14606,
+        "p99Ms": 22.510942,
+        "worstMs": 26.442421,
+        "over16_7": 105,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 9.742421,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3090,
+              "rssKb": 185228
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 386982910
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3090,
+              "rssKb": 273568
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 3859306103
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3090,
+              "rssKb": 292056
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 13718756788
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-cold-5.jsonl",
+      "candidate": "qt-qml",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 381.828284,
+        "launchToTree": 423.307251,
+        "launchToUsable": 449.023111,
+        "projectOpenToTree": 30.518884,
+        "fileClickToRead": 2.597697,
+        "fileClickToPresented": 24.092127,
+        "fileSwitchToStable": 25.483295,
+        "lspRoundTrip": 3427.846967,
+        "lspResponseToOutline": 8.562381
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 15.119364,
+        "p95Ms": 20.728244,
+        "p99Ms": 22.744366,
+        "worstMs": 28.322158,
+        "over16_7": 112,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 11.622158000000002,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3147,
+              "rssKb": 185360
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 392814342
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3147,
+              "rssKb": 274412
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 3904926084
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3147,
+              "rssKb": 291912
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 13944613240
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-warm-1.jsonl",
+      "candidate": "qt-qml",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 301.192895,
+        "launchToTree": 338.862874,
+        "launchToUsable": 364.571471,
+        "projectOpenToTree": 26.273574,
+        "fileClickToRead": 2.626159,
+        "fileClickToPresented": 24.147912,
+        "fileSwitchToStable": 25.473979,
+        "lspRoundTrip": 3384.043658,
+        "lspResponseToOutline": 9.60962
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.772229,
+        "p95Ms": 19.845591,
+        "p99Ms": 22.753492,
+        "worstMs": 33.763827,
+        "over16_7": 109,
+        "over33_3": 1
+      },
+      "longestMainThreadStallMs": 17.063827,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3206,
+              "rssKb": 125816
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 312618823
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3206,
+              "rssKb": 215648
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 3776504400
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3206,
+              "rssKb": 233604
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 13605022316
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-warm-2.jsonl",
+      "candidate": "qt-qml",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 310.513845,
+        "launchToTree": 346.291022,
+        "launchToUsable": 372.06792,
+        "projectOpenToTree": 25.649652,
+        "fileClickToRead": 2.527949,
+        "fileClickToPresented": 24.581301,
+        "fileSwitchToStable": 25.618383,
+        "lspRoundTrip": 3322.148834,
+        "lspResponseToOutline": 12.552818
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.821823,
+        "p95Ms": 20.460246,
+        "p99Ms": 23.358878,
+        "worstMs": 29.345916,
+        "over16_7": 108,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 12.645916,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3263,
+              "rssKb": 125556
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 320660057
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3263,
+              "rssKb": 215092
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 3724544960
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3263,
+              "rssKb": 233516
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 13583877532
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-warm-3.jsonl",
+      "candidate": "qt-qml",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 300.189913,
+        "launchToTree": 338.327541,
+        "launchToUsable": 363.838164,
+        "projectOpenToTree": 26.051398,
+        "fileClickToRead": 2.523726,
+        "fileClickToPresented": 24.307346,
+        "fileSwitchToStable": 25.337265,
+        "lspRoundTrip": 3388.060498,
+        "lspResponseToOutline": 10.448925
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.775636,
+        "p95Ms": 20.068227,
+        "p99Ms": 22.440803,
+        "worstMs": 33.820779,
+        "over16_7": 107,
+        "over33_3": 1
+      },
+      "longestMainThreadStallMs": 17.120779000000002,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3320,
+              "rssKb": 125720
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 312304737
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3320,
+              "rssKb": 215496
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 3776932987
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3320,
+              "rssKb": 233456
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 13601274293
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-warm-4.jsonl",
+      "candidate": "qt-qml",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 305.782042,
+        "launchToTree": 341.385941,
+        "launchToUsable": 367.650253,
+        "projectOpenToTree": 25.56609,
+        "fileClickToRead": 2.589831,
+        "fileClickToPresented": 24.593233,
+        "fileSwitchToStable": 26.086121,
+        "lspRoundTrip": 3384.825287,
+        "lspResponseToOutline": 17.999214
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.974213,
+        "p95Ms": 20.223777,
+        "p99Ms": 22.592381,
+        "worstMs": 25.532476,
+        "over16_7": 113,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 8.832476,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3377,
+              "rssKb": 125516
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 315845922
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3377,
+              "rssKb": 214532
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 3791012803
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3377,
+              "rssKb": 233672
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 13701950596
+        }
+      ]
+    },
+    {
+      "file": "qt-qml-warm-5.jsonl",
+      "candidate": "qt-qml",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 314.210944,
+        "launchToTree": 350.87288,
+        "launchToUsable": 376.664717,
+        "projectOpenToTree": 26.670097,
+        "fileClickToRead": 2.588324,
+        "fileClickToPresented": 24.496929,
+        "fileSwitchToStable": 25.619734,
+        "lspRoundTrip": 3355.022474,
+        "lspResponseToOutline": 10.891008
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 14.886663,
+        "p95Ms": 20.316089,
+        "p99Ms": 23.063074,
+        "worstMs": 38.616779,
+        "over16_7": 110,
+        "over33_3": 1
+      },
+      "longestMainThreadStallMs": 21.916779000000002,
+      "memory": [
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3434,
+              "rssKb": 125520
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 324220415
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3434,
+              "rssKb": 215184
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 3760306077
+        },
+        {
+          "candidate": "qt-qml",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 3434,
+              "rssKb": 233564
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 13672626102
+        }
+      ]
+    }
+  ]
+}

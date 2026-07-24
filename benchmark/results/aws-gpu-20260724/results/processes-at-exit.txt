@@ -1,0 +1,192 @@
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  1 05:33 ?        00:00:02 /sbin/init
+root           2       0  0 05:33 ?        00:00:00 [kthreadd]
+root           3       2  0 05:33 ?        00:00:00 [pool_workqueue_release]
+root           4       2  0 05:33 ?        00:00:00 [kworker/R-rcu_g]
+root           5       2  0 05:33 ?        00:00:00 [kworker/R-rcu_p]
+root           6       2  0 05:33 ?        00:00:00 [kworker/R-slub_]
+root           7       2  0 05:33 ?        00:00:00 [kworker/R-netns]
+root           8       2  0 05:33 ?        00:00:00 [kworker/0:0-events]
+root           9       2  0 05:33 ?        00:00:00 [kworker/0:0H-events_highpri]
+root          10       2  0 05:33 ?        00:00:00 [kworker/0:1-events]
+root          11       2  0 05:33 ?        00:00:00 [kworker/u8:0-ext4-rsv-conversion]
+root          12       2  0 05:33 ?        00:00:00 [kworker/R-mm_pe]
+root          13       2  0 05:33 ?        00:00:00 [rcu_tasks_rude_kthread]
+root          14       2  0 05:33 ?        00:00:00 [rcu_tasks_trace_kthread]
+root          15       2  0 05:33 ?        00:00:00 [ksoftirqd/0]
+root          16       2  0 05:33 ?        00:00:00 [rcu_sched]
+root          17       2  0 05:33 ?        00:00:00 [migration/0]
+root          18       2  0 05:33 ?        00:00:00 [idle_inject/0]
+root          19       2  0 05:33 ?        00:00:00 [cpuhp/0]
+root          20       2  0 05:33 ?        00:00:00 [cpuhp/1]
+root          21       2  0 05:33 ?        00:00:00 [idle_inject/1]
+root          22       2  0 05:33 ?        00:00:00 [migration/1]
+root          23       2  0 05:33 ?        00:00:00 [ksoftirqd/1]
+root          24       2  0 05:33 ?        00:00:00 [kworker/1:0-events]
+root          25       2  0 05:33 ?        00:00:00 [kworker/1:0H-events_highpri]
+root          26       2  0 05:33 ?        00:00:00 [cpuhp/2]
+root          27       2  0 05:33 ?        00:00:00 [idle_inject/2]
+root          28       2  0 05:33 ?        00:00:00 [migration/2]
+root          29       2  0 05:33 ?        00:00:00 [ksoftirqd/2]
+root          30       2  0 05:33 ?        00:00:00 [kworker/2:0-events]
+root          31       2  0 05:33 ?        00:00:00 [kworker/2:0H-events_highpri]
+root          32       2  0 05:33 ?        00:00:00 [cpuhp/3]
+root          33       2  0 05:33 ?        00:00:00 [idle_inject/3]
+root          34       2  0 05:33 ?        00:00:00 [migration/3]
+root          35       2  0 05:33 ?        00:00:00 [ksoftirqd/3]
+root          36       2  0 05:33 ?        00:00:00 [kworker/3:0-cgroup_free]
+root          37       2  0 05:33 ?        00:00:00 [kworker/3:0H-events_highpri]
+root          38       2  0 05:33 ?        00:00:00 [kdevtmpfs]
+root          39       2  0 05:33 ?        00:00:00 [kworker/R-inet_]
+root          40       2  0 05:33 ?        00:00:00 [kauditd]
+root          41       2  0 05:33 ?        00:00:00 [khungtaskd]
+root          42       2  0 05:33 ?        00:00:00 [oom_reaper]
+root          43       2  0 05:33 ?        00:00:00 [kworker/u8:1-iou_exit]
+root          44       2  0 05:33 ?        00:00:00 [kworker/R-write]
+root          45       2  0 05:33 ?        00:00:00 [kworker/u8:2-iou_exit]
+root          46       2  0 05:33 ?        00:00:00 [kcompactd0]
+root          47       2  0 05:33 ?        00:00:00 [ksmd]
+root          48       2  0 05:33 ?        00:00:00 [khugepaged]
+root          49       2  0 05:33 ?        00:00:00 [kworker/R-kinte]
+root          50       2  0 05:33 ?        00:00:00 [kworker/R-kbloc]
+root          51       2  0 05:33 ?        00:00:00 [kworker/R-blkcg]
+root          52       2  0 05:33 ?        00:00:00 [kworker/3:1-cgroup_offline]
+root          53       2  0 05:33 ?        00:00:00 [irq/9-acpi]
+root          54       2  0 05:33 ?        00:00:00 [kworker/1:1-cgroup_bpf_destroy]
+root          55       2  0 05:33 ?        00:00:00 [kworker/2:1-events]
+root          56       2  0 05:33 ?        00:00:00 [kworker/R-tpm_d]
+root          57       2  0 05:33 ?        00:00:00 [kworker/R-ata_s]
+root          58       2  0 05:33 ?        00:00:00 [kworker/R-md]
+root          59       2  0 05:33 ?        00:00:00 [kworker/R-md_bi]
+root          60       2  0 05:33 ?        00:00:00 [kworker/R-edac-]
+root          61       2  0 05:33 ?        00:00:00 [kworker/R-devfr]
+root          62       2  0 05:33 ?        00:00:00 [watchdogd]
+root          63       2  0 05:33 ?        00:00:00 [kworker/R-quota]
+root          64       2  0 05:33 ?        00:00:00 [kworker/3:1H-kblockd]
+root          65       2  0 05:33 ?        00:00:00 [kswapd0]
+root          66       2  0 05:33 ?        00:00:00 [ecryptfs-kthread]
+root          67       2  0 05:33 ?        00:00:00 [kworker/R-kthro]
+root          68       2  0 05:33 ?        00:00:00 [kworker/R-acpi_]
+root          69       2  0 05:33 ?        00:00:00 [kworker/R-nvme-]
+root          70       2  0 05:33 ?        00:00:00 [kworker/R-nvme-]
+root          71       2  0 05:33 ?        00:00:00 [kworker/R-nvme-]
+root          72       2  0 05:33 ?        00:00:00 [kworker/R-nvme-]
+root          73       2  0 05:33 ?        00:00:00 [kworker/R-ena]
+root          74       2  0 05:33 ?        00:00:00 [kworker/u8:3-iou_exit]
+root          75       2  0 05:33 ?        00:00:00 [kworker/u8:4-events_unbound]
+root          76       2  0 05:33 ?        00:00:00 [kworker/R-mld]
+root          77       2  0 05:33 ?        00:00:00 [kworker/R-ipv6_]
+root          84       2  0 05:33 ?        00:00:00 [kworker/R-kstrp]
+root          85       2  0 05:33 ?        00:00:00 [kworker/2:2-cgroup_free]
+root          87       2  0 05:33 ?        00:00:00 [kworker/u9:0]
+root         100       2  0 05:33 ?        00:00:00 [kworker/R-charg]
+root         101       2  0 05:33 ?        00:00:00 [jbd2/nvme0n1p1-8]
+root         102       2  0 05:33 ?        00:00:00 [kworker/R-ext4-]
+root         103       2  0 05:34 ?        00:00:00 [kworker/0:1H-kblockd]
+root         104       2  0 05:34 ?        00:00:00 [kworker/0:2-cgroup_free]
+root         106       2  0 05:34 ?        00:00:00 [kworker/2:1H-kblockd]
+root         130       2  0 05:34 ?        00:00:00 [kworker/1:1H-kblockd]
+root         145       1  0 05:34 ?        00:00:00 /lib/systemd/systemd-journald
+root         172       2  0 05:34 ?        00:00:00 [kworker/3:2-events]
+root         173       2  0 05:34 ?        00:00:00 [kworker/R-ib-co]
+root         174       2  0 05:34 ?        00:00:00 [kworker/R-ib-co]
+root         175       2  0 05:34 ?        00:00:00 [kworker/R-ib_mc]
+root         176       2  0 05:34 ?        00:00:00 [kworker/R-ib_nl]
+root         177       2  0 05:34 ?        00:00:00 [kworker/3:3-cgroup_free]
+root         188       2  0 05:34 ?        00:00:00 [kworker/1:2-events]
+root         189       2  0 05:34 ?        00:00:00 [kworker/1:3-events]
+root         190       2  0 05:34 ?        00:00:00 [kworker/1:4-events]
+root         195       2  0 05:34 ?        00:00:00 [kworker/R-kalua]
+root         196       2  0 05:34 ?        00:00:00 [kworker/R-kmpat]
+root         197       2  0 05:34 ?        00:00:00 [kworker/R-kmpat]
+root         198       2  0 05:34 ?        00:00:00 [kworker/R-kmpat]
+root         199       1  0 05:34 ?        00:00:00 /sbin/multipathd -d -s
+root         202       1  0 05:34 ?        00:00:00 /lib/systemd/systemd-udevd
+root         209       2  0 05:34 ?        00:00:00 [nv_queue]
+root         210       2  0 05:34 ?        00:00:00 [nv_mem_pool_scrubber_queue]
+root         211       2  0 05:34 ?        00:00:00 [nv_mem_pool_scrubber_queue]
+root         212       2  0 05:34 ?        00:00:00 [nv_mem_pool_scrubber_queue]
+root         213       2  0 05:34 ?        00:00:00 [nv_queue]
+root         214       2  0 05:34 ?        00:00:01 [nv_open_q]
+root         274       2  0 05:34 ?        00:00:00 [kworker/R-crypt]
+root         290       2  0 05:34 ?        00:00:00 [kworker/R-nfit]
+root         314       2  0 05:34 ?        00:00:00 [kworker/u8:5-iou_exit]
+root         315       2  0 05:34 ?        00:00:00 [kworker/u8:6-iou_exit]
+root         318       2  0 05:34 ?        00:00:00 [kworker/u8:7-iou_exit]
+root         319       2  0 05:34 ?        00:00:00 [kworker/u8:8-iou_exit]
+root         324       2  0 05:34 ?        00:00:00 [kworker/u8:9-iou_exit]
+root         325       2  0 05:34 ?        00:00:00 [kworker/u8:10-iou_exit]
+root         326       2  0 05:34 ?        00:00:00 [kworker/u8:11-iou_exit]
+root         375       2  0 05:34 ?        00:00:00 [kworker/0:3]
+root         378       2  0 05:34 ?        00:00:00 [kworker/1:5]
+systemd+     451       1  0 05:34 ?        00:00:00 /lib/systemd/systemd-networkd
+root         452       2  0 05:34 ?        00:00:00 [kworker/2:3-events]
+systemd+     454       1  0 05:34 ?        00:00:00 /lib/systemd/systemd-resolved
+root         488       1  0 05:34 ?        00:00:00 /usr/sbin/acpid
+root         494       1  0 05:34 ?        00:00:00 /usr/sbin/cron -f -P
+message+     496       1  0 05:34 ?        00:00:00 @dbus-daemon --system --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+root         513       1  0 05:34 ?        00:00:00 /usr/sbin/irqbalance --foreground
+root         514       1  0 05:34 ?        00:00:00 /usr/bin/python3 /usr/bin/networkd-dispatcher --run-startup-triggers
+root         517       1  0 05:34 ?        00:00:01 /usr/bin/nv-hostengine -n --service-account nvidia-dcgm
+syslog       520       1  0 05:34 ?        00:00:00 /usr/sbin/rsyslogd -n -iNONE
+root         521       1  0 05:34 ?        00:00:01 /snap/amazon-ssm-agent/13349/amazon-ssm-agent
+root         526       1  0 05:34 ?        00:00:00 /usr/local/bin/soci-snapshotter-grpc --root /var/lib/soci-snapshotter-grpc --address fd://
+root         529       1  0 05:34 ?        00:00:00 /lib/systemd/systemd-logind
+_chrony      546       1  0 05:34 ?        00:00:00 /usr/sbin/chronyd -F 1
+root         563       1  0 05:34 ttyS0    00:00:00 /sbin/agetty -o -p -- \u --keep-baud 115200,57600,38400,9600 ttyS0 vt220
+_chrony      574     546  0 05:34 ?        00:00:00 /usr/sbin/chronyd -F 1
+root         578       1  0 05:34 tty1     00:00:00 /sbin/agetty -o -p -- \u --noclear tty1 linux
+root         627       2  0 05:34 ?        00:00:00 [irq/37-nvidia]
+root         628       2  0 05:34 ?        00:00:00 [irq/38-nvidia]
+root         629       2  0 05:34 ?        00:00:00 [irq/39-nvidia]
+root         630       2  0 05:34 ?        00:00:00 [irq/40-nvidia]
+root         631       2  0 05:34 ?        00:00:00 [irq/41-nvidia]
+root         632       2  0 05:34 ?        00:00:00 [irq/42-nvidia]
+root         633       2  0 05:34 ?        00:00:00 [nvidia]
+root         634       2  0 05:34 ?        00:00:00 [nv_queue]
+root         662       1  0 05:34 ?        00:00:00 /usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal
+root         687       1  0 05:34 ?        00:00:00 /usr/libexec/polkitd --no-debug
+root         758       2  0 05:34 ?        00:00:00 [kworker/R-tls-s]
+root         785       2  0 05:34 ?        00:00:00 [kworker/R-kdmfl]
+root         827       1  0 05:34 ?        00:00:00 /usr/bin/containerd
+root         835       2  0 05:34 ?        00:00:00 [UVM global queue]
+root         836       2  0 05:34 ?        00:00:00 [UVM deferred release queue]
+root         837       2  0 05:34 ?        00:00:00 [UVM Tools Event Queue]
+root         878       1  0 05:34 ?        00:00:00 nvidia-persistenced
+root         887       2  0 05:34 ?        00:00:00 [nvidia-modeset/kthread_q]
+root         888       2  0 05:34 ?        00:00:00 [nvidia-modeset/deferred_close_kthread_q]
+root         901       1  0 05:34 ?        00:00:00 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+root        1274       2  0 05:34 ?        00:00:00 [jbd2/dm-0-8]
+root        1275       2  0 05:34 ?        00:00:00 [kworker/R-ext4-]
+ubuntu      1319       1  0 05:34 ?        00:00:00 /lib/systemd/systemd --user
+ubuntu      1320    1319  0 05:34 ?        00:00:00 (sd-pam)
+ubuntu      1326    1319  0 05:34 ?        00:00:00 /usr/bin/pipewire
+ubuntu      1327    1319  0 05:34 ?        00:00:00 /usr/bin/pipewire-media-session
+rtkit       1345       1  0 05:34 ?        00:00:00 /usr/libexec/rtkit-daemon
+ubuntu      1348    1319  0 05:34 ?        00:00:00 /usr/bin/dbus-daemon --session --address=systemd: --nofork --nopidfile --systemd-activation --syslog-only
+root        1533       1  0 05:34 ?        00:00:00 sshd: ubuntu [priv]
+ubuntu      1581    1533  0 05:34 ?        00:00:00 sshd: ubuntu@notty
+ubuntu      1582    1581  0 05:34 ?        00:00:00 bash /tmp/aws-gpu-remote.sh
+ubuntu      1585    1582  0 05:34 ?        00:00:00 bash /tmp/aws-gpu-remote.sh
+ubuntu      1586    1585  0 05:34 ?        00:00:00 tee -a /home/ubuntu/stackhour-gpu-benchmark/results/remote-run.log
+root        2258       1  0 05:34 ?        00:00:00 /usr/libexec/packagekitd
+root        2488    1582  0 05:34 ?        00:00:00 sudo Xorg :99 -noreset -ac -nolisten tcp -dpi 96 -config /etc/X11/xorg.conf -logfile /var/log/Xorg.99.log
+root        2491    2488  0 05:34 tty2     00:00:00 /usr/lib/xorg/Xorg :99 -noreset -ac -nolisten tcp -dpi 96 -config /etc/X11/xorg.conf -logfile /var/log/Xorg.99.log
+ubuntu      2527       1  0 05:34 ?        00:00:00 matchbox-window-manager -use_titlebar no
+ubuntu      2797    1319  0 05:34 ?        00:00:00 /usr/libexec/xdg-document-portal
+ubuntu      2803    1319  0 05:34 ?        00:00:00 /usr/libexec/xdg-permission-store
+root        2810    2797  0 05:34 ?        00:00:00 fusermount3 -o rw,nosuid,nodev,fsname=portal,auto_unmount,subtype=portal -- /run/user/1000/doc
+root        3184       2  0 05:35 ?        00:00:00 [kworker/u8:12]
+root        3185       2  0 05:35 ?        00:00:00 [kworker/u8:13-iou_exit]
+root        3186       2  0 05:35 ?        00:00:00 [kworker/u8:14]
+root        3720       1  0 05:36 ?        00:00:00 /bin/sh /usr/lib/apt/apt.systemd.daily install
+root        3724    3720  0 05:36 ?        00:00:00 /bin/sh /usr/lib/apt/apt.systemd.daily lock_is_held install
+root        3766    3724 27 05:36 ?        00:00:22 /usr/bin/python3 /usr/bin/unattended-upgrade
+ubuntu      4593    1319  0 05:36 ?        00:00:00 /usr/libexec/xdg-desktop-portal
+root        4788       1  1 05:37 ?        00:00:00 /usr/lib/snapd/snapd
+root        5507       1  0 05:37 ?        00:00:00 sshd: /usr/sbin/sshd -D -o AuthorizedKeysCommand /usr/share/ec2-instance-connect/eic_run_authorized_keys %u %f -o AuthorizedKeysCommandUser ec2-instance-connect [listener] 0 of 10-100 startups
+root        6639    3766 43 05:37 ?        00:00:00 /usr/bin/python3 /usr/bin/unattended-upgrade
+root        6713    6639  0 05:37 ?        00:00:00 /usr/bin/python3 /usr/bin/unattended-upgrade
+root        6722    6713  0 05:37 ?        00:00:00 sh -c test -x /usr/lib/needrestart/apt-pinvoke && /usr/lib/needrestart/apt-pinvoke || true
+root        6723    6722  0 05:37 ?        00:00:00 /usr/bin/perl /usr/sbin/needrestart
+ubuntu      6753    1582  0 05:37 ?        00:00:00 ps -ef

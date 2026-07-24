@@ -1,0 +1,1455 @@
+{
+  "generatedAt": "2026-07-23T18:59:09.635Z",
+  "runs": [
+    {
+      "file": "solid-tauri-cold-1.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 315.71241,
+        "launchToTree": 376.844504,
+        "projectOpenToTree": 54.373271,
+        "fileClickToRead": 4.830862,
+        "fileClickToPresented": 32.971177,
+        "fileSwitchToStable": 46.347714,
+        "lspRoundTrip": 3533.535343,
+        "lspResponseToOutline": 12.879289
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 34.99999999999909,
+        "worstMs": 53,
+        "over16_7": 635,
+        "over33_3": 8
+      },
+      "longestMainThreadStallMs": 36.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9774,
+              "rssKb": 128584
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9787,
+              "rssKb": 48416
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9795,
+              "rssKb": 141656
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 325558222
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9774,
+              "rssKb": 158928
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9787,
+              "rssKb": 48364
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9795,
+              "rssKb": 156148
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 9825,
+              "rssKb": 136820
+            },
+            {
+              "group": "tsserver",
+              "pid": 9841,
+              "rssKb": 283064
+            },
+            {
+              "group": "tsserver",
+              "pid": 9842,
+              "rssKb": 292116
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9855,
+              "rssKb": 78196
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 3995638197
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9774,
+              "rssKb": 138176
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9787,
+              "rssKb": 48620
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9795,
+              "rssKb": 254332
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 9825,
+              "rssKb": 83016
+            },
+            {
+              "group": "tsserver",
+              "pid": 9841,
+              "rssKb": 283064
+            },
+            {
+              "group": "tsserver",
+              "pid": 9842,
+              "rssKb": 357880
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9855,
+              "rssKb": 74760
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 18694946867
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-cold-2.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 307.816011,
+        "launchToTree": 369.335147,
+        "projectOpenToTree": 52.205275,
+        "fileClickToRead": 1.095693,
+        "fileClickToPresented": 31.125135,
+        "fileSwitchToStable": 44.643757,
+        "lspRoundTrip": 3444.849586,
+        "lspResponseToOutline": 15.687545
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 28.00000000000182,
+        "p99Ms": 36,
+        "worstMs": 53,
+        "over16_7": 635,
+        "over33_3": 11
+      },
+      "longestMainThreadStallMs": 36.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9884,
+              "rssKb": 128540
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9897,
+              "rssKb": 48380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9905,
+              "rssKb": 141252
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 317679761
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9884,
+              "rssKb": 158968
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9897,
+              "rssKb": 48332
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9905,
+              "rssKb": 155764
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 9935,
+              "rssKb": 137516
+            },
+            {
+              "group": "tsserver",
+              "pid": 9951,
+              "rssKb": 281796
+            },
+            {
+              "group": "tsserver",
+              "pid": 9952,
+              "rssKb": 280232
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9965,
+              "rssKb": 78044
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 3899219064
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9884,
+              "rssKb": 136684
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9897,
+              "rssKb": 48588
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9905,
+              "rssKb": 251208
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 9935,
+              "rssKb": 83920
+            },
+            {
+              "group": "tsserver",
+              "pid": 9951,
+              "rssKb": 281796
+            },
+            {
+              "group": "tsserver",
+              "pid": 9952,
+              "rssKb": 359388
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 9965,
+              "rssKb": 75584
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 18817766865
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-cold-3.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 319.737971,
+        "launchToTree": 378.415661,
+        "projectOpenToTree": 55.983483,
+        "fileClickToRead": 1.02054,
+        "fileClickToPresented": 25.905899,
+        "fileSwitchToStable": 41.212085,
+        "lspRoundTrip": 3441.350034,
+        "lspResponseToOutline": 14.056156
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 35.99999999999909,
+        "worstMs": 53,
+        "over16_7": 635,
+        "over33_3": 11
+      },
+      "longestMainThreadStallMs": 36.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9993,
+              "rssKb": 128640
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10006,
+              "rssKb": 48392
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10014,
+              "rssKb": 141372
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 326206271
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9993,
+              "rssKb": 159072
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10006,
+              "rssKb": 48360
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10014,
+              "rssKb": 156736
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10044,
+              "rssKb": 138724
+            },
+            {
+              "group": "tsserver",
+              "pid": 10060,
+              "rssKb": 283920
+            },
+            {
+              "group": "tsserver",
+              "pid": 10061,
+              "rssKb": 282532
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10074,
+              "rssKb": 78176
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 3906951572
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 9993,
+              "rssKb": 137484
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10006,
+              "rssKb": 48616
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10014,
+              "rssKb": 250500
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10044,
+              "rssKb": 84548
+            },
+            {
+              "group": "tsserver",
+              "pid": 10060,
+              "rssKb": 283920
+            },
+            {
+              "group": "tsserver",
+              "pid": 10061,
+              "rssKb": 357180
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10074,
+              "rssKb": 74384
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 18795519601
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-cold-4.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 320.519074,
+        "launchToTree": 378.468834,
+        "projectOpenToTree": 54.638868,
+        "fileClickToRead": 1.230155,
+        "fileClickToPresented": 26.921156,
+        "fileSwitchToStable": 40.312937,
+        "lspRoundTrip": 3364.146229,
+        "lspResponseToOutline": 15.392825
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 34.000000000000455,
+        "worstMs": 52,
+        "over16_7": 635,
+        "over33_3": 7
+      },
+      "longestMainThreadStallMs": 35.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10103,
+              "rssKb": 128272
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10116,
+              "rssKb": 48028
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10124,
+              "rssKb": 141344
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 326908241
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10103,
+              "rssKb": 159268
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10116,
+              "rssKb": 47976
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10124,
+              "rssKb": 157536
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10154,
+              "rssKb": 137032
+            },
+            {
+              "group": "tsserver",
+              "pid": 10170,
+              "rssKb": 282824
+            },
+            {
+              "group": "tsserver",
+              "pid": 10171,
+              "rssKb": 276740
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10184,
+              "rssKb": 78148
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 3829819297
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10103,
+              "rssKb": 137452
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10116,
+              "rssKb": 48232
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10124,
+              "rssKb": 255384
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10154,
+              "rssKb": 83100
+            },
+            {
+              "group": "tsserver",
+              "pid": 10170,
+              "rssKb": 282824
+            },
+            {
+              "group": "tsserver",
+              "pid": 10171,
+              "rssKb": 355240
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10184,
+              "rssKb": 74480
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 18768538381
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-cold-5.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 316.291553,
+        "launchToTree": 374.626506,
+        "projectOpenToTree": 54.182391,
+        "fileClickToRead": 1.163308,
+        "fileClickToPresented": 28.57741,
+        "fileSwitchToStable": 43.760064,
+        "lspRoundTrip": 3493.427781,
+        "lspResponseToOutline": 17.727191
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 28.99999999999818,
+        "p99Ms": 38,
+        "worstMs": 52,
+        "over16_7": 635,
+        "over33_3": 13
+      },
+      "longestMainThreadStallMs": 35.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10214,
+              "rssKb": 128324
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10227,
+              "rssKb": 48208
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10235,
+              "rssKb": 141512
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 322725868
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10214,
+              "rssKb": 162344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10227,
+              "rssKb": 48176
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10235,
+              "rssKb": 157584
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10265,
+              "rssKb": 138184
+            },
+            {
+              "group": "tsserver",
+              "pid": 10281,
+              "rssKb": 283076
+            },
+            {
+              "group": "tsserver",
+              "pid": 10282,
+              "rssKb": 284344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10295,
+              "rssKb": 78196
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 3969496393
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10214,
+              "rssKb": 136936
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10227,
+              "rssKb": 48432
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10235,
+              "rssKb": 248320
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10265,
+              "rssKb": 84320
+            },
+            {
+              "group": "tsserver",
+              "pid": 10281,
+              "rssKb": 283076
+            },
+            {
+              "group": "tsserver",
+              "pid": 10282,
+              "rssKb": 357748
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10295,
+              "rssKb": 74608
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 18905004663
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-warm-1.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 316.34879,
+        "launchToTree": 373.863985,
+        "projectOpenToTree": 53.180128,
+        "fileClickToRead": 1.127205,
+        "fileClickToPresented": 29.156658,
+        "fileSwitchToStable": 42.745808,
+        "lspRoundTrip": 3483.616165,
+        "lspResponseToOutline": 16.001251
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 35.00000000000091,
+        "worstMs": 52,
+        "over16_7": 635,
+        "over33_3": 9
+      },
+      "longestMainThreadStallMs": 35.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10324,
+              "rssKb": 128468
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10337,
+              "rssKb": 48144
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10345,
+              "rssKb": 141604
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 322756969
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10324,
+              "rssKb": 162088
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10337,
+              "rssKb": 48092
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10345,
+              "rssKb": 157756
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10375,
+              "rssKb": 142156
+            },
+            {
+              "group": "tsserver",
+              "pid": 10391,
+              "rssKb": 282292
+            },
+            {
+              "group": "tsserver",
+              "pid": 10392,
+              "rssKb": 282128
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10405,
+              "rssKb": 78200
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 3948742762
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10324,
+              "rssKb": 136656
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10337,
+              "rssKb": 48348
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10345,
+              "rssKb": 254352
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10375,
+              "rssKb": 89924
+            },
+            {
+              "group": "tsserver",
+              "pid": 10391,
+              "rssKb": 282292
+            },
+            {
+              "group": "tsserver",
+              "pid": 10392,
+              "rssKb": 357620
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10405,
+              "rssKb": 74520
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 18833708732
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-warm-2.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 306.142244,
+        "launchToTree": 363.495623,
+        "projectOpenToTree": 51.518986,
+        "fileClickToRead": 1.132217,
+        "fileClickToPresented": 29.336803,
+        "fileSwitchToStable": 43.043287,
+        "lspRoundTrip": 3503.836581,
+        "lspResponseToOutline": 10.451833
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 28,
+        "p99Ms": 33.99999999999818,
+        "worstMs": 52,
+        "over16_7": 635,
+        "over33_3": 7
+      },
+      "longestMainThreadStallMs": 35.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10433,
+              "rssKb": 128336
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10446,
+              "rssKb": 48300
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10454,
+              "rssKb": 141612
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 312417393
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10433,
+              "rssKb": 159120
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10446,
+              "rssKb": 48268
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10454,
+              "rssKb": 156872
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10484,
+              "rssKb": 137948
+            },
+            {
+              "group": "tsserver",
+              "pid": 10500,
+              "rssKb": 284528
+            },
+            {
+              "group": "tsserver",
+              "pid": 10501,
+              "rssKb": 287172
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10514,
+              "rssKb": 78228
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 3948513850
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10433,
+              "rssKb": 137656
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10446,
+              "rssKb": 48524
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10454,
+              "rssKb": 247904
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10484,
+              "rssKb": 84308
+            },
+            {
+              "group": "tsserver",
+              "pid": 10500,
+              "rssKb": 284528
+            },
+            {
+              "group": "tsserver",
+              "pid": 10501,
+              "rssKb": 356512
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10514,
+              "rssKb": 75624
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 18601391936
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-warm-3.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 311.540075,
+        "launchToTree": 372.317247,
+        "projectOpenToTree": 52.035053,
+        "fileClickToRead": 1.212931,
+        "fileClickToPresented": 27.483473,
+        "fileSwitchToStable": 42.050305,
+        "lspRoundTrip": 3526.796407,
+        "lspResponseToOutline": 12.768687
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 27,
+        "p99Ms": 34.00000000000091,
+        "worstMs": 52.00000000000182,
+        "over16_7": 635,
+        "over33_3": 8
+      },
+      "longestMainThreadStallMs": 35.300000000001816,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10543,
+              "rssKb": 128608
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10556,
+              "rssKb": 48292
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10564,
+              "rssKb": 141544
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 321223366
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10543,
+              "rssKb": 160256
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10556,
+              "rssKb": 48260
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10564,
+              "rssKb": 157520
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10594,
+              "rssKb": 138460
+            },
+            {
+              "group": "tsserver",
+              "pid": 10610,
+              "rssKb": 283272
+            },
+            {
+              "group": "tsserver",
+              "pid": 10611,
+              "rssKb": 293828
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10624,
+              "rssKb": 78156
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 3983599951
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10543,
+              "rssKb": 138664
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10556,
+              "rssKb": 48516
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10564,
+              "rssKb": 252388
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10594,
+              "rssKb": 84360
+            },
+            {
+              "group": "tsserver",
+              "pid": 10610,
+              "rssKb": 283272
+            },
+            {
+              "group": "tsserver",
+              "pid": 10611,
+              "rssKb": 358388
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10624,
+              "rssKb": 75600
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 18700546822
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-warm-4.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 306.928931,
+        "launchToTree": 367.316395,
+        "projectOpenToTree": 50.979236,
+        "fileClickToRead": 0.998705,
+        "fileClickToPresented": 27.693444,
+        "fileSwitchToStable": 43.107696,
+        "lspRoundTrip": 3386.459035,
+        "lspResponseToOutline": 14.487965
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 28.00000000000091,
+        "p99Ms": 35,
+        "worstMs": 52,
+        "over16_7": 635,
+        "over33_3": 8
+      },
+      "longestMainThreadStallMs": 35.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10652,
+              "rssKb": 128368
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10665,
+              "rssKb": 48224
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10673,
+              "rssKb": 141712
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 316696043
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10652,
+              "rssKb": 130760
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10665,
+              "rssKb": 48192
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10673,
+              "rssKb": 157164
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10703,
+              "rssKb": 139404
+            },
+            {
+              "group": "tsserver",
+              "pid": 10719,
+              "rssKb": 283616
+            },
+            {
+              "group": "tsserver",
+              "pid": 10720,
+              "rssKb": 279464
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10733,
+              "rssKb": 78048
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 3844915115
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10652,
+              "rssKb": 137796
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10665,
+              "rssKb": 48448
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10673,
+              "rssKb": 267168
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10703,
+              "rssKb": 85620
+            },
+            {
+              "group": "tsserver",
+              "pid": 10719,
+              "rssKb": 283616
+            },
+            {
+              "group": "tsserver",
+              "pid": 10720,
+              "rssKb": 360840
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10733,
+              "rssKb": 74632
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 18658125628
+        }
+      ]
+    },
+    {
+      "file": "solid-tauri-warm-5.jsonl",
+      "candidate": "solid-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 307.204118,
+        "launchToTree": 365.118611,
+        "projectOpenToTree": 52.223316,
+        "fileClickToRead": 1.031168,
+        "fileClickToPresented": 29.472825,
+        "fileSwitchToStable": 42.503981,
+        "lspRoundTrip": 3467.309585,
+        "lspResponseToOutline": 13.918151
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 36.999999999999545,
+        "worstMs": 54,
+        "over16_7": 635,
+        "over33_3": 12
+      },
+      "longestMainThreadStallMs": 37.3,
+      "memory": [
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10764,
+              "rssKb": 128424
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10777,
+              "rssKb": 48272
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10785,
+              "rssKb": 141564
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 313437291
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10764,
+              "rssKb": 158772
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10777,
+              "rssKb": 48240
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10785,
+              "rssKb": 157368
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10815,
+              "rssKb": 139164
+            },
+            {
+              "group": "tsserver",
+              "pid": 10831,
+              "rssKb": 283884
+            },
+            {
+              "group": "tsserver",
+              "pid": 10832,
+              "rssKb": 277892
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10845,
+              "rssKb": 78168
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 3936711095
+        },
+        {
+          "candidate": "solid-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 10764,
+              "rssKb": 136524
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10777,
+              "rssKb": 48496
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10785,
+              "rssKb": 260020
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 10815,
+              "rssKb": 85680
+            },
+            {
+              "group": "tsserver",
+              "pid": 10831,
+              "rssKb": 283884
+            },
+            {
+              "group": "tsserver",
+              "pid": 10832,
+              "rssKb": 357088
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 10845,
+              "rssKb": 74736
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 18719717023
+        }
+      ]
+    }
+  ]
+}

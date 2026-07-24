@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "candidate": "react-electron",
+  "phase": "cold",
+  "runId": "cold-2",
+  "capturedAt": "2026-07-23T18:45:12.315Z",
+  "gpu": {
+    "display": ":99",
+    "directRendering": "Yes",
+    "vendor": "NVIDIA Corporation",
+    "renderer": "Tesla T4/PCIe/SSE2",
+    "nvidia": [
+      "0, Tesla T4, GPU-1f8a0be3-efe1-4dc8-bb07-0887c8a6f079, 595.71.05"
+    ]
+  },
+  "trackedPids": [
+    2368,
+    2373,
+    2374,
+    2400,
+    2405,
+    2425,
+    2438,
+    2454,
+    2455,
+    2468
+  ],
+  "gpuProcessSamples": [
+    " 20260723    18:45:02       0       2400     G      0      0      -      -      -      -     17      0    StackhourBenchR",
+    " 20260723    18:45:03       0       2400     G      0      0      -      -      -      -     17      0    StackhourBenchR",
+    " 20260723    18:45:04       0       2400     G      0      0      -      -      -      -     17      0    StackhourBenchR",
+    " 20260723    18:45:05       0       2400     G      0      0      -      -      -      -     17      0    StackhourBenchR",
+    " 20260723    18:45:06       0       2400     G      0      0      -      -      -      -     21      0    StackhourBenchR",
+    " 20260723    18:45:07       0       2400     G      0      0      -      -      -      -     21      0    StackhourBenchR",
+    " 20260723    18:45:08       0       2400     G      1      0      -      -      -      -     21      0    StackhourBenchR",
+    " 20260723    18:45:09       0       2400     G      1      0      -      -      -      -     21      0    StackhourBenchR",
+    " 20260723    18:45:10       0       2400     G      1      0      -      -      -      -     21      0    StackhourBenchR",
+    " 20260723    18:45:11       0       2400     G      1      0      -      -      -      -     21      0    StackhourBenchR"
+  ],
+  "pmon": "#Date        Time         gpu         pid   type     sm    mem    enc    dec    jpg    ofa     fb   ccpm    command \n#YYYYMMDD    HH:MM:SS     Idx           #    C/G      %      %      %      %      %      %     MB     MB    name \n 20260723    18:45:01       0       1762     G      0      0      -      -      -      -     25      0    Xorg           \n 20260723    18:45:02       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:02       0       2400     G      0      0      -      -      -      -     17      0    StackhourBenchR\n 20260723    18:45:03       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:03       0       2400     G      0      0      -      -      -      -     17      0    StackhourBenchR\n 20260723    18:45:04       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:04       0       2400     G      0      0      -      -      -      -     17      0    StackhourBenchR\n 20260723    18:45:05       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:05       0       2400     G      0      0      -      -      -      -     17      0    StackhourBenchR\n 20260723    18:45:06       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:06       0       2400     G      0      0      -      -      -      -     21      0    StackhourBenchR\n 20260723    18:45:07       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:07       0       2400     G      0      0      -      -      -      -     21      0    StackhourBenchR\n 20260723    18:45:08       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:08       0       2400     G      1      0      -      -      -      -     21      0    StackhourBenchR\n 20260723    18:45:09       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:09       0       2400     G      1      0      -      -      -      -     21      0    StackhourBenchR\n 20260723    18:45:10       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:10       0       2400     G      1      0      -      -      -      -     21      0    StackhourBenchR\n 20260723    18:45:11       0       1762     G      -      -      -      -      -      -     26      0    Xorg           \n 20260723    18:45:11       0       2400     G      1      0      -      -      -      -     21      0    StackhourBenchR\n",
+  "pmonError": ""
+}

@@ -1,0 +1,1455 @@
+{
+  "generatedAt": "2026-07-23T19:04:16.503Z",
+  "runs": [
+    {
+      "file": "vue-tauri-cold-1.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 330.47214,
+        "launchToTree": 394.846752,
+        "projectOpenToTree": 59.736685,
+        "fileClickToRead": 1.678187,
+        "fileClickToPresented": 28.358422,
+        "fileSwitchToStable": 41.424373,
+        "lspRoundTrip": 3337.160717,
+        "lspResponseToOutline": 12.717816
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 27.00000000000091,
+        "p99Ms": 34,
+        "worstMs": 48.00000000000091,
+        "over16_7": 591,
+        "over33_3": 7
+      },
+      "longestMainThreadStallMs": 31.30000000000091,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11622,
+              "rssKb": 128860
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11635,
+              "rssKb": 48172
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11643,
+              "rssKb": 143632
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 336727924
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11622,
+              "rssKb": 159036
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11635,
+              "rssKb": 48120
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11643,
+              "rssKb": 160888
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 11673,
+              "rssKb": 136252
+            },
+            {
+              "group": "tsserver",
+              "pid": 11689,
+              "rssKb": 283128
+            },
+            {
+              "group": "tsserver",
+              "pid": 11690,
+              "rssKb": 277476
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11703,
+              "rssKb": 78068
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 3819417240
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11622,
+              "rssKb": 137432
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11635,
+              "rssKb": 48376
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11643,
+              "rssKb": 281408
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 11673,
+              "rssKb": 82856
+            },
+            {
+              "group": "tsserver",
+              "pid": 11689,
+              "rssKb": 283128
+            },
+            {
+              "group": "tsserver",
+              "pid": 11690,
+              "rssKb": 356188
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11703,
+              "rssKb": 75668
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 18086598473
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-cold-2.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 314.130045,
+        "launchToTree": 374.743067,
+        "projectOpenToTree": 54.810538,
+        "fileClickToRead": 1.038751,
+        "fileClickToPresented": 31.998137,
+        "fileSwitchToStable": 45.370119,
+        "lspRoundTrip": 3390.452928,
+        "lspResponseToOutline": 14.782251
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 28.999999999999545,
+        "p99Ms": 34.99999999999909,
+        "worstMs": 49,
+        "over16_7": 589,
+        "over33_3": 9
+      },
+      "longestMainThreadStallMs": 32.3,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11729,
+              "rssKb": 128676
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11741,
+              "rssKb": 48172
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11749,
+              "rssKb": 143524
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 320420675
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11729,
+              "rssKb": 160220
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11741,
+              "rssKb": 48140
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11749,
+              "rssKb": 161012
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 11779,
+              "rssKb": 138864
+            },
+            {
+              "group": "tsserver",
+              "pid": 11795,
+              "rssKb": 283836
+            },
+            {
+              "group": "tsserver",
+              "pid": 11796,
+              "rssKb": 280060
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11809,
+              "rssKb": 78200
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 3864099854
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11729,
+              "rssKb": 137740
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11741,
+              "rssKb": 48396
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11749,
+              "rssKb": 286860
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 11779,
+              "rssKb": 84792
+            },
+            {
+              "group": "tsserver",
+              "pid": 11795,
+              "rssKb": 283836
+            },
+            {
+              "group": "tsserver",
+              "pid": 11796,
+              "rssKb": 354312
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11809,
+              "rssKb": 75392
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 18107019624
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-cold-3.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 326.159088,
+        "launchToTree": 388.378118,
+        "projectOpenToTree": 58.720392,
+        "fileClickToRead": 0.98636,
+        "fileClickToPresented": 27.287798,
+        "fileSwitchToStable": 40.869183,
+        "lspRoundTrip": 3398.34454,
+        "lspResponseToOutline": 17.061946
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19.99999999999909,
+        "p95Ms": 29.00000000000091,
+        "p99Ms": 34,
+        "worstMs": 42,
+        "over16_7": 594,
+        "over33_3": 7
+      },
+      "longestMainThreadStallMs": 25.3,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11837,
+              "rssKb": 128424
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11849,
+              "rssKb": 48308
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11857,
+              "rssKb": 143532
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 332487031
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11837,
+              "rssKb": 159216
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11849,
+              "rssKb": 48256
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11857,
+              "rssKb": 163808
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 11887,
+              "rssKb": 138548
+            },
+            {
+              "group": "tsserver",
+              "pid": 11903,
+              "rssKb": 282416
+            },
+            {
+              "group": "tsserver",
+              "pid": 11904,
+              "rssKb": 280508
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11917,
+              "rssKb": 78196
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 3877739555
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11837,
+              "rssKb": 136972
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11849,
+              "rssKb": 48512
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11857,
+              "rssKb": 285100
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 11887,
+              "rssKb": 84488
+            },
+            {
+              "group": "tsserver",
+              "pid": 11903,
+              "rssKb": 282416
+            },
+            {
+              "group": "tsserver",
+              "pid": 11904,
+              "rssKb": 356872
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11917,
+              "rssKb": 75520
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 18037830440
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-cold-4.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 329.259567,
+        "launchToTree": 398.680412,
+        "projectOpenToTree": 60.119751,
+        "fileClickToRead": 1.068789,
+        "fileClickToPresented": 27.988721,
+        "fileSwitchToStable": 41.584563,
+        "lspRoundTrip": 3489.780077,
+        "lspResponseToOutline": 17.12287
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 28,
+        "p99Ms": 34.99999999999909,
+        "worstMs": 38,
+        "over16_7": 586,
+        "over33_3": 9
+      },
+      "longestMainThreadStallMs": 21.3,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11945,
+              "rssKb": 128724
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11957,
+              "rssKb": 48232
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11965,
+              "rssKb": 143676
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 339214874
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11945,
+              "rssKb": 159716
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11957,
+              "rssKb": 48180
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11965,
+              "rssKb": 162592
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 11995,
+              "rssKb": 137792
+            },
+            {
+              "group": "tsserver",
+              "pid": 12011,
+              "rssKb": 275216
+            },
+            {
+              "group": "tsserver",
+              "pid": 12012,
+              "rssKb": 292300
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12025,
+              "rssKb": 78240
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 3976250016
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 11945,
+              "rssKb": 137664
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11957,
+              "rssKb": 48436
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 11965,
+              "rssKb": 284128
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 11995,
+              "rssKb": 85636
+            },
+            {
+              "group": "tsserver",
+              "pid": 12011,
+              "rssKb": 275216
+            },
+            {
+              "group": "tsserver",
+              "pid": 12012,
+              "rssKb": 359340
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12025,
+              "rssKb": 74908
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 18138490098
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-cold-5.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 323.492028,
+        "launchToTree": 390.195625,
+        "projectOpenToTree": 58.12441,
+        "fileClickToRead": 1.102027,
+        "fileClickToPresented": 26.846596,
+        "fileSwitchToStable": 40.302505,
+        "lspRoundTrip": 3553.960458,
+        "lspResponseToOutline": 10.976905
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 28,
+        "p99Ms": 32,
+        "worstMs": 43.00000000000182,
+        "over16_7": 589,
+        "over33_3": 5
+      },
+      "longestMainThreadStallMs": 26.30000000000182,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12052,
+              "rssKb": 128612
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12064,
+              "rssKb": 48288
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12072,
+              "rssKb": 143444
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 333511392
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12052,
+              "rssKb": 158936
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12064,
+              "rssKb": 48256
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12072,
+              "rssKb": 160976
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12102,
+              "rssKb": 137952
+            },
+            {
+              "group": "tsserver",
+              "pid": 12118,
+              "rssKb": 272844
+            },
+            {
+              "group": "tsserver",
+              "pid": 12119,
+              "rssKb": 295704
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12132,
+              "rssKb": 78016
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 4023858050
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12052,
+              "rssKb": 137604
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12064,
+              "rssKb": 48512
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12072,
+              "rssKb": 281632
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12102,
+              "rssKb": 83948
+            },
+            {
+              "group": "tsserver",
+              "pid": 12118,
+              "rssKb": 272844
+            },
+            {
+              "group": "tsserver",
+              "pid": 12119,
+              "rssKb": 359736
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12132,
+              "rssKb": 75484
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 18183691684
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-warm-1.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 321.796042,
+        "launchToTree": 384.694485,
+        "projectOpenToTree": 60.256757,
+        "fileClickToRead": 1.170712,
+        "fileClickToPresented": 26.983777,
+        "fileSwitchToStable": 40.215144,
+        "lspRoundTrip": 3630.553444,
+        "lspResponseToOutline": 16.889057
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 28,
+        "p99Ms": 34,
+        "worstMs": 42,
+        "over16_7": 586,
+        "over33_3": 8
+      },
+      "longestMainThreadStallMs": 25.3,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12158,
+              "rssKb": 128712
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12170,
+              "rssKb": 48176
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12178,
+              "rssKb": 143528
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 328128916
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12158,
+              "rssKb": 159036
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12170,
+              "rssKb": 48128
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12178,
+              "rssKb": 160196
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12208,
+              "rssKb": 139712
+            },
+            {
+              "group": "tsserver",
+              "pid": 12224,
+              "rssKb": 283452
+            },
+            {
+              "group": "tsserver",
+              "pid": 12225,
+              "rssKb": 313932
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12238,
+              "rssKb": 78176
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 4098289114
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12158,
+              "rssKb": 137136
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12170,
+              "rssKb": 48384
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12178,
+              "rssKb": 283664
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12208,
+              "rssKb": 87324
+            },
+            {
+              "group": "tsserver",
+              "pid": 12224,
+              "rssKb": 283452
+            },
+            {
+              "group": "tsserver",
+              "pid": 12225,
+              "rssKb": 360336
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12238,
+              "rssKb": 74456
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 18345515868
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-warm-2.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 320.15874,
+        "launchToTree": 381.11903,
+        "projectOpenToTree": 57.961011,
+        "fileClickToRead": 1.030155,
+        "fileClickToPresented": 28.407698,
+        "fileSwitchToStable": 41.523863,
+        "lspRoundTrip": 3512.262003,
+        "lspResponseToOutline": 18.502474
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29.99999999999818,
+        "p99Ms": 35,
+        "worstMs": 42,
+        "over16_7": 590,
+        "over33_3": 13
+      },
+      "longestMainThreadStallMs": 25.3,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12266,
+              "rssKb": 128600
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12279,
+              "rssKb": 48192
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12287,
+              "rssKb": 143516
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 326371227
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12266,
+              "rssKb": 158944
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12279,
+              "rssKb": 48160
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12287,
+              "rssKb": 163668
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12317,
+              "rssKb": 138356
+            },
+            {
+              "group": "tsserver",
+              "pid": 12333,
+              "rssKb": 284324
+            },
+            {
+              "group": "tsserver",
+              "pid": 12334,
+              "rssKb": 283680
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12347,
+              "rssKb": 78196
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 3997214531
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12266,
+              "rssKb": 163856
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12279,
+              "rssKb": 48416
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12287,
+              "rssKb": 285988
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12317,
+              "rssKb": 84264
+            },
+            {
+              "group": "tsserver",
+              "pid": 12333,
+              "rssKb": 284324
+            },
+            {
+              "group": "tsserver",
+              "pid": 12334,
+              "rssKb": 359300
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12347,
+              "rssKb": 74708
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 18285087922
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-warm-3.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 331.315716,
+        "launchToTree": 396.722455,
+        "projectOpenToTree": 59.852975,
+        "fileClickToRead": 0.920841,
+        "fileClickToPresented": 27.087012,
+        "fileSwitchToStable": 40.122278,
+        "lspRoundTrip": 3487.249694,
+        "lspResponseToOutline": 18.891562
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 34.000000000000455,
+        "worstMs": 44,
+        "over16_7": 593,
+        "over33_3": 8
+      },
+      "longestMainThreadStallMs": 27.3,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12374,
+              "rssKb": 128796
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12387,
+              "rssKb": 48356
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12395,
+              "rssKb": 143520
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 337757461
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12374,
+              "rssKb": 163496
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12387,
+              "rssKb": 48304
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12395,
+              "rssKb": 160440
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12425,
+              "rssKb": 135852
+            },
+            {
+              "group": "tsserver",
+              "pid": 12441,
+              "rssKb": 283952
+            },
+            {
+              "group": "tsserver",
+              "pid": 12442,
+              "rssKb": 292588
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12455,
+              "rssKb": 78060
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 3972889115
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12374,
+              "rssKb": 138036
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12387,
+              "rssKb": 48560
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12395,
+              "rssKb": 294860
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12425,
+              "rssKb": 84056
+            },
+            {
+              "group": "tsserver",
+              "pid": 12441,
+              "rssKb": 283952
+            },
+            {
+              "group": "tsserver",
+              "pid": 12442,
+              "rssKb": 359976
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12455,
+              "rssKb": 75588
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 18241348411
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-warm-4.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 323.944797,
+        "launchToTree": 384.851001,
+        "projectOpenToTree": 57.543342,
+        "fileClickToRead": 1.188542,
+        "fileClickToPresented": 28.253999,
+        "fileSwitchToStable": 41.371997,
+        "lspRoundTrip": 3380.335712,
+        "lspResponseToOutline": 12.422515
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 34,
+        "worstMs": 44,
+        "over16_7": 589,
+        "over33_3": 9
+      },
+      "longestMainThreadStallMs": 27.3,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12483,
+              "rssKb": 128444
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12496,
+              "rssKb": 48352
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12504,
+              "rssKb": 143452
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 330294954
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12483,
+              "rssKb": 129824
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12496,
+              "rssKb": 48300
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12504,
+              "rssKb": 162960
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12534,
+              "rssKb": 137944
+            },
+            {
+              "group": "tsserver",
+              "pid": 12550,
+              "rssKb": 282984
+            },
+            {
+              "group": "tsserver",
+              "pid": 12551,
+              "rssKb": 275996
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12564,
+              "rssKb": 78144
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 3859942651
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12483,
+              "rssKb": 137344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12496,
+              "rssKb": 48556
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12504,
+              "rssKb": 287936
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12534,
+              "rssKb": 83944
+            },
+            {
+              "group": "tsserver",
+              "pid": 12550,
+              "rssKb": 282984
+            },
+            {
+              "group": "tsserver",
+              "pid": 12551,
+              "rssKb": 355528
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12564,
+              "rssKb": 74804
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 18161544960
+        }
+      ]
+    },
+    {
+      "file": "vue-tauri-warm-5.jsonl",
+      "candidate": "vue-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 316.550871,
+        "launchToTree": 381.483862,
+        "projectOpenToTree": 59.305816,
+        "fileClickToRead": 1.01499,
+        "fileClickToPresented": 27.685422,
+        "fileSwitchToStable": 42.410577,
+        "lspRoundTrip": 3413.273924,
+        "lspResponseToOutline": 16.143333
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 35,
+        "worstMs": 41,
+        "over16_7": 588,
+        "over33_3": 8
+      },
+      "longestMainThreadStallMs": 24.3,
+      "memory": [
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12591,
+              "rssKb": 128968
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12603,
+              "rssKb": 48352
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12611,
+              "rssKb": 143664
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 326338353
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12591,
+              "rssKb": 159768
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12603,
+              "rssKb": 48320
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12611,
+              "rssKb": 160828
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12641,
+              "rssKb": 138616
+            },
+            {
+              "group": "tsserver",
+              "pid": 12657,
+              "rssKb": 282268
+            },
+            {
+              "group": "tsserver",
+              "pid": 12658,
+              "rssKb": 276880
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12671,
+              "rssKb": 78188
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 3886088351
+        },
+        {
+          "candidate": "vue-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 12591,
+              "rssKb": 137252
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12603,
+              "rssKb": 48576
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12611,
+              "rssKb": 255064
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 12641,
+              "rssKb": 85136
+            },
+            {
+              "group": "tsserver",
+              "pid": 12657,
+              "rssKb": 282268
+            },
+            {
+              "group": "tsserver",
+              "pid": 12658,
+              "rssKb": 356444
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 12671,
+              "rssKb": 74356
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 18115804627
+        }
+      ]
+    }
+  ]
+}

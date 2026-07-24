@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "candidate": "gpui",
+  "phase": "cold",
+  "runId": "cold-3",
+  "capturedAt": "2026-07-24T05:36:00.069Z",
+  "gpu": {
+    "display": ":99",
+    "directRendering": "Yes",
+    "vendor": "NVIDIA Corporation",
+    "renderer": "Tesla T4/PCIe/SSE2",
+    "nvidia": [
+      "0, Tesla T4, GPU-360fdfae-2803-07f0-aaae-01f633da268b, 595.71.05"
+    ]
+  },
+  "trackedPids": [
+    3323,
+    3324,
+    3353,
+    3367,
+    3380,
+    3388,
+    3392,
+    3410,
+    3426,
+    3427,
+    3440
+  ],
+  "gpuProcessSamples": [
+    " 20260724    05:35:46       0       3324   C+G      1      0      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:47       0       3324   C+G      1      0      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:49       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:50       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:51       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:52       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:53       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:54       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:55       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:56       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:57       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench",
+    " 20260724    05:35:58       0       3324   C+G      0      0      -      -      -      -    126      0    stackhour-bench"
+  ],
+  "pmon": "#Date        Time         gpu         pid   type     sm    mem    enc    dec    jpg    ofa     fb   ccpm    command \n#YYYYMMDD    HH:MM:SS     Idx           #    C/G      %      %      %      %      %      %     MB     MB    name \n 20260724    05:35:45       0       2491     G      2      0      -      -      -      -     42      0    Xorg           \n 20260724    05:35:46       0       2491     G      0      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:46       0       3324   C+G      1      0      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:47       0       2491     G      2      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:47       0       3324   C+G      1      0      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:49       0       2491     G      5      1      -      -      -      -     61      0    Xorg           \n 20260724    05:35:49       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:50       0       2491     G      4      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:50       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:51       0       2491     G      3      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:51       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:52       0       2491     G      3      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:52       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:53       0       2491     G      4      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:53       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:54       0       2491     G      3      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:54       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:55       0       2491     G      4      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:55       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:56       0       2491     G      3      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:56       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:57       0       2491     G      4      1      -      -      -      -     61      0    Xorg           \n 20260724    05:35:57       0       3324   C+G      -      -      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:58       0       2491     G      3      0      -      -      -      -     61      0    Xorg           \n 20260724    05:35:58       0       3324   C+G      0      0      -      -      -      -    126      0    stackhour-bench\n 20260724    05:35:59       0       2491     G      4      0      -      -      -      -     42      0    Xorg           \n",
+  "pmonError": ""
+}

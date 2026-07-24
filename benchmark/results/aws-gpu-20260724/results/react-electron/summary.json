@@ -1,0 +1,1605 @@
+{
+  "generatedAt": "2026-07-23T18:46:46.092Z",
+  "runs": [
+    {
+      "file": "react-electron-cold-1.jsonl",
+      "candidate": "react-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 629.313483,
+        "launchToTree": 758.281228,
+        "projectOpenToTree": 127.612009,
+        "fileClickToRead": 3.451807,
+        "fileClickToPresented": 60.083147,
+        "fileSwitchToStable": 61.487657,
+        "lspRoundTrip": 3753.554969,
+        "lspResponseToOutline": 0.182455
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.19999999999709,
+        "p95Ms": 15.19999999999709,
+        "p99Ms": 20.80000000000291,
+        "worstMs": 33.39999999999418,
+        "over16_7": 19,
+        "over33_3": 1
+      },
+      "longestMainThreadStallMs": 16.69999999999418,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-1",
+          "timestampNs": 64334765418,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 2247,
+              "rssKb": 154908,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2279,
+              "rssKb": 183580,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2284,
+              "rssKb": 78776,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2304,
+              "rssKb": 105072,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-1",
+          "timestampNs": 68287381234,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 2247,
+              "rssKb": 174452,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2279,
+              "rssKb": 239524,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2284,
+              "rssKb": 78776,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2304,
+              "rssKb": 124572,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2317,
+              "rssKb": 137876,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2333,
+              "rssKb": 283952,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2334,
+              "rssKb": 310360,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2347,
+              "rssKb": 78104,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-1",
+          "timestampNs": 74723754658,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 2247,
+              "rssKb": 180724,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2279,
+              "rssKb": 252752,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2284,
+              "rssKb": 78776,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2304,
+              "rssKb": 213536,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2317,
+              "rssKb": 138460,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2333,
+              "rssKb": 283952,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2334,
+              "rssKb": 366012,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2347,
+              "rssKb": 78104,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-cold-2.jsonl",
+      "candidate": "react-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 607.305809,
+        "launchToTree": 773.527809,
+        "projectOpenToTree": 163.68258,
+        "fileClickToRead": 3.363021,
+        "fileClickToPresented": 17.841177,
+        "fileSwitchToStable": 19.396107,
+        "lspRoundTrip": 3644.464748,
+        "lspResponseToOutline": 0.223436
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.30000000000291,
+        "p95Ms": 15.599999999991269,
+        "p99Ms": 20.79999999998836,
+        "worstMs": 30.40000000000873,
+        "over16_7": 20,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 13.700000000008732,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-2",
+          "timestampNs": 76738706381,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 2368,
+              "rssKb": 154676,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2400,
+              "rssKb": 184084,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2405,
+              "rssKb": 79636,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2425,
+              "rssKb": 103576,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-2",
+          "timestampNs": 80575838887,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 2368,
+              "rssKb": 174384,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2400,
+              "rssKb": 239976,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2405,
+              "rssKb": 79636,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2425,
+              "rssKb": 123832,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2438,
+              "rssKb": 137840,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2454,
+              "rssKb": 284436,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2455,
+              "rssKb": 299896,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2468,
+              "rssKb": 77936,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-2",
+          "timestampNs": 87102675064,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 2368,
+              "rssKb": 180548,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2400,
+              "rssKb": 252876,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2405,
+              "rssKb": 79636,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2425,
+              "rssKb": 221048,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2438,
+              "rssKb": 138424,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2454,
+              "rssKb": 284436,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2455,
+              "rssKb": 366496,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2468,
+              "rssKb": 77936,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-cold-3.jsonl",
+      "candidate": "react-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 597.082086,
+        "launchToTree": 741.833451,
+        "projectOpenToTree": 143.432239,
+        "fileClickToRead": 5.94638,
+        "fileClickToPresented": 40.766531,
+        "fileSwitchToStable": 42.275926,
+        "lspRoundTrip": 3735.637012,
+        "lspResponseToOutline": 3.439759
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.30000000000291,
+        "p95Ms": 14.80000000000291,
+        "p99Ms": 19.69999999999709,
+        "worstMs": 32.39999999999418,
+        "over16_7": 17,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 15.69999999999418,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-3",
+          "timestampNs": 88190772089,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 2485,
+              "rssKb": 154776,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2516,
+              "rssKb": 183788,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2521,
+              "rssKb": 80168,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2542,
+              "rssKb": 104368,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-3",
+          "timestampNs": 92129645809,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 2485,
+              "rssKb": 174060,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2516,
+              "rssKb": 240092,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2521,
+              "rssKb": 80168,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2542,
+              "rssKb": 125096,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2555,
+              "rssKb": 138776,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2571,
+              "rssKb": 281580,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2572,
+              "rssKb": 315248,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2585,
+              "rssKb": 78036,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-3",
+          "timestampNs": 98531269050,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 2485,
+              "rssKb": 180200,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2516,
+              "rssKb": 253124,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2521,
+              "rssKb": 80168,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2542,
+              "rssKb": 217580,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2555,
+              "rssKb": 139360,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2571,
+              "rssKb": 281580,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2572,
+              "rssKb": 362156,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2585,
+              "rssKb": 78036,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-cold-4.jsonl",
+      "candidate": "react-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 613.326446,
+        "launchToTree": 744.492514,
+        "projectOpenToTree": 129.419431,
+        "fileClickToRead": 5.085392,
+        "fileClickToPresented": 51.492568,
+        "fileSwitchToStable": 53.077992,
+        "lspRoundTrip": 3665.199244,
+        "lspResponseToOutline": 0.335383
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.19999999999709,
+        "p95Ms": 14.69999999999709,
+        "p99Ms": 18.39999999999418,
+        "worstMs": 28.39999999999418,
+        "over16_7": 15,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 11.69999999999418,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-4",
+          "timestampNs": 99676810141,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 2602,
+              "rssKb": 155308,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2634,
+              "rssKb": 183484,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2639,
+              "rssKb": 79996,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2659,
+              "rssKb": 103952,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-4",
+          "timestampNs": 103543228148,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 2602,
+              "rssKb": 215336,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2634,
+              "rssKb": 239848,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2639,
+              "rssKb": 80000,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2659,
+              "rssKb": 124496,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2672,
+              "rssKb": 138396,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2688,
+              "rssKb": 273140,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2689,
+              "rssKb": 302500,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2702,
+              "rssKb": 77924,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-4",
+          "timestampNs": 109925196310,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 2602,
+              "rssKb": 182888,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2634,
+              "rssKb": 252472,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2639,
+              "rssKb": 80000,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2659,
+              "rssKb": 209912,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2672,
+              "rssKb": 138980,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2688,
+              "rssKb": 273140,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2689,
+              "rssKb": 362640,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2702,
+              "rssKb": 77924,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-cold-5.jsonl",
+      "candidate": "react-electron",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 626.404014,
+        "launchToTree": 743.026317,
+        "projectOpenToTree": 114.870737,
+        "fileClickToRead": 5.341138,
+        "fileClickToPresented": 65.013112,
+        "fileSwitchToStable": 66.562175,
+        "lspRoundTrip": 3643.047051,
+        "lspResponseToOutline": 0.590514
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.30000000000291,
+        "p95Ms": 14.5,
+        "p99Ms": 18.59999999999127,
+        "worstMs": 33.19999999999709,
+        "over16_7": 15,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 16.49999999999709,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-5",
+          "timestampNs": 111106757787,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 2718,
+              "rssKb": 154948,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2750,
+              "rssKb": 183160,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2755,
+              "rssKb": 79296,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2775,
+              "rssKb": 104992,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-5",
+          "timestampNs": 114944649943,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 2718,
+              "rssKb": 174140,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2750,
+              "rssKb": 239448,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2755,
+              "rssKb": 79296,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2775,
+              "rssKb": 124992,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2788,
+              "rssKb": 138708,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2804,
+              "rssKb": 282492,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2805,
+              "rssKb": 294448,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2818,
+              "rssKb": 77936,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "cold",
+          "runId": "cold-5",
+          "timestampNs": 121388357211,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 2718,
+              "rssKb": 180308,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2750,
+              "rssKb": 252140,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2755,
+              "rssKb": 79296,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2775,
+              "rssKb": 209148,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2788,
+              "rssKb": 139288,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2804,
+              "rssKb": 282492,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2805,
+              "rssKb": 361608,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2818,
+              "rssKb": 77936,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-warm-1.jsonl",
+      "candidate": "react-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 599.247003,
+        "launchToTree": 697.933321,
+        "projectOpenToTree": 97.44049,
+        "fileClickToRead": 3.766771,
+        "fileClickToPresented": 18.452769,
+        "fileSwitchToStable": 19.844626,
+        "lspRoundTrip": 3641.520917,
+        "lspResponseToOutline": 0.419382
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.200000000011642,
+        "p95Ms": 14.400000000008731,
+        "p99Ms": 20.90000000000873,
+        "worstMs": 29.19999999999709,
+        "over16_7": 15,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 12.49999999999709,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-1",
+          "timestampNs": 122532644907,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 2834,
+              "rssKb": 149584,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2866,
+              "rssKb": 165320,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2871,
+              "rssKb": 71956,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2891,
+              "rssKb": 104684,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-1",
+          "timestampNs": 126306199424,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 2834,
+              "rssKb": 169344,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2866,
+              "rssKb": 181136,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2871,
+              "rssKb": 71960,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2891,
+              "rssKb": 124920,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2904,
+              "rssKb": 137236,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2920,
+              "rssKb": 282824,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2921,
+              "rssKb": 302656,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2934,
+              "rssKb": 78108,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-1",
+          "timestampNs": 132735934624,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 2834,
+              "rssKb": 175556,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2866,
+              "rssKb": 194564,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2871,
+              "rssKb": 71964,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2891,
+              "rssKb": 209952,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2904,
+              "rssKb": 137816,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 2920,
+              "rssKb": 282824,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2921,
+              "rssKb": 363172,
+              "group": "tsserver"
+            },
+            {
+              "pid": 2934,
+              "rssKb": 78108,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-warm-2.jsonl",
+      "candidate": "react-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 606.534318,
+        "launchToTree": 705.612135,
+        "projectOpenToTree": 97.624081,
+        "fileClickToRead": 3.612784,
+        "fileClickToPresented": 17.886297,
+        "fileSwitchToStable": 19.352056,
+        "lspRoundTrip": 3755.982718,
+        "lspResponseToOutline": 0.213791
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.200000000011642,
+        "p95Ms": 14.800000000017462,
+        "p99Ms": 18.60000000000582,
+        "worstMs": 22.79999999998836,
+        "over16_7": 18,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 6.099999999988359,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-2",
+          "timestampNs": 133957453007,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 2950,
+              "rssKb": 150912,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2981,
+              "rssKb": 166008,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2986,
+              "rssKb": 71644,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3008,
+              "rssKb": 104160,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-2",
+          "timestampNs": 137844721261,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 2950,
+              "rssKb": 198304,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2981,
+              "rssKb": 181416,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2986,
+              "rssKb": 71648,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3008,
+              "rssKb": 125104,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3021,
+              "rssKb": 138872,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3037,
+              "rssKb": 273884,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3038,
+              "rssKb": 313024,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3051,
+              "rssKb": 78144,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-2",
+          "timestampNs": 144252631002,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 2950,
+              "rssKb": 203072,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2981,
+              "rssKb": 194892,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 2986,
+              "rssKb": 71652,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3008,
+              "rssKb": 215000,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3021,
+              "rssKb": 139452,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3037,
+              "rssKb": 273884,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3038,
+              "rssKb": 361760,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3051,
+              "rssKb": 78144,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-warm-3.jsonl",
+      "candidate": "react-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 594.473216,
+        "launchToTree": 692.753942,
+        "projectOpenToTree": 96.44424,
+        "fileClickToRead": 3.059261,
+        "fileClickToPresented": 25.28233,
+        "fileSwitchToStable": 26.686251,
+        "lspRoundTrip": 3716.667517,
+        "lspResponseToOutline": 0.190271
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.300000000017462,
+        "p95Ms": 14.800000000017462,
+        "p99Ms": 18.39999999999418,
+        "worstMs": 36.09999999997672,
+        "over16_7": 17,
+        "over33_3": 1
+      },
+      "longestMainThreadStallMs": 19.399999999976718,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-3",
+          "timestampNs": 145345146032,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3067,
+              "rssKb": 151200,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3099,
+              "rssKb": 165196,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3104,
+              "rssKb": 72628,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3124,
+              "rssKb": 104704,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-3",
+          "timestampNs": 149201714344,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3067,
+              "rssKb": 170776,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3099,
+              "rssKb": 180992,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3104,
+              "rssKb": 72632,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3124,
+              "rssKb": 125028,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3137,
+              "rssKb": 137864,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3153,
+              "rssKb": 284004,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3154,
+              "rssKb": 298596,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3167,
+              "rssKb": 77904,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-3",
+          "timestampNs": 155674460221,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3067,
+              "rssKb": 176792,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3099,
+              "rssKb": 194448,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3104,
+              "rssKb": 72636,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3124,
+              "rssKb": 214764,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3137,
+              "rssKb": 138448,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3153,
+              "rssKb": 284004,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3154,
+              "rssKb": 361304,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3167,
+              "rssKb": 77904,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-warm-4.jsonl",
+      "candidate": "react-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 601.22139,
+        "launchToTree": 699.532716,
+        "projectOpenToTree": 96.961464,
+        "fileClickToRead": 3.727678,
+        "fileClickToPresented": 19.134264,
+        "fileSwitchToStable": 20.606923,
+        "lspRoundTrip": 3627.297668,
+        "lspResponseToOutline": 0.418187
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.300000000017462,
+        "p95Ms": 15,
+        "p99Ms": 20.099999999976717,
+        "worstMs": 34.5,
+        "over16_7": 21,
+        "over33_3": 1
+      },
+      "longestMainThreadStallMs": 17.8,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-4",
+          "timestampNs": 156777382744,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3183,
+              "rssKb": 150764,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3214,
+              "rssKb": 165704,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3219,
+              "rssKb": 71556,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3240,
+              "rssKb": 104648,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-4",
+          "timestampNs": 160539305903,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3183,
+              "rssKb": 180984,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3214,
+              "rssKb": 181580,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3219,
+              "rssKb": 71560,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3240,
+              "rssKb": 125264,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3253,
+              "rssKb": 138000,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3269,
+              "rssKb": 282836,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3270,
+              "rssKb": 295612,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3283,
+              "rssKb": 78088,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-4",
+          "timestampNs": 167088213398,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3183,
+              "rssKb": 185668,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3214,
+              "rssKb": 194756,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3219,
+              "rssKb": 71564,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3240,
+              "rssKb": 211192,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3253,
+              "rssKb": 138584,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3269,
+              "rssKb": 282836,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3270,
+              "rssKb": 362388,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3283,
+              "rssKb": 78088,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "react-electron-warm-5.jsonl",
+      "candidate": "react-electron",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 600.009261,
+        "launchToTree": 697.894197,
+        "projectOpenToTree": 96.432061,
+        "fileClickToRead": 3.198799,
+        "fileClickToPresented": 17.903104,
+        "fileSwitchToStable": 19.258236,
+        "lspRoundTrip": 3697.385817,
+        "lspResponseToOutline": 0.207832
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 8.299999999988358,
+        "p95Ms": 14.39999999999418,
+        "p99Ms": 19.89999999999418,
+        "worstMs": 29.10000000000582,
+        "over16_7": 17,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 12.400000000005821,
+      "memory": [
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-5",
+          "timestampNs": 168219714006,
+          "event": "memory_sample",
+          "label": "idle",
+          "processes": [
+            {
+              "pid": 3299,
+              "rssKb": 151088,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3331,
+              "rssKb": 165460,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3337,
+              "rssKb": 71480,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3361,
+              "rssKb": 103968,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-5",
+          "timestampNs": 172044631103,
+          "event": "memory_sample",
+          "label": "loaded",
+          "processes": [
+            {
+              "pid": 3299,
+              "rssKb": 170832,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3331,
+              "rssKb": 180924,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3337,
+              "rssKb": 71484,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3361,
+              "rssKb": 124400,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3374,
+              "rssKb": 138132,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3390,
+              "rssKb": 282272,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3391,
+              "rssKb": 297400,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3404,
+              "rssKb": 78044,
+              "group": "ui-runtime"
+            }
+          ]
+        },
+        {
+          "schemaVersion": 1,
+          "candidate": "react-electron",
+          "phase": "warm",
+          "runId": "warm-5",
+          "timestampNs": 178490811125,
+          "event": "memory_sample",
+          "label": "complete",
+          "processes": [
+            {
+              "pid": 3299,
+              "rssKb": 176876,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3331,
+              "rssKb": 194396,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3337,
+              "rssKb": 71488,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3361,
+              "rssKb": 216824,
+              "group": "ui-runtime"
+            },
+            {
+              "pid": 3374,
+              "rssKb": 138712,
+              "group": "typescript-language-server"
+            },
+            {
+              "pid": 3390,
+              "rssKb": 282272,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3391,
+              "rssKb": 360100,
+              "group": "tsserver"
+            },
+            {
+              "pid": 3404,
+              "rssKb": 78044,
+              "group": "ui-runtime"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1165 @@
+{
+  "generatedAt": "2026-07-23T19:12:36.546Z",
+  "runs": [
+    {
+      "file": "iced-cold-1.jsonl",
+      "candidate": "iced",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 456.654328,
+        "launchToTree": 489.290489,
+        "launchToUsable": 503.608701,
+        "projectOpenToTree": 29.459282,
+        "fileClickToRead": 0.974975,
+        "fileClickToPresented": 13.251349,
+        "fileSwitchToStable": 14.28801,
+        "lspRoundTrip": 4259.720526,
+        "lspResponseToOutline": 3.168899
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.081544,
+        "p95Ms": 1.761619,
+        "p99Ms": 4.537801,
+        "worstMs": 12.679751,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18537,
+              "rssKb": 233324
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 459843001
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18537,
+              "rssKb": 368404
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18552,
+              "rssKb": 137748
+            },
+            {
+              "group": "tsserver",
+              "pid": 18568,
+              "rssKb": 282728
+            },
+            {
+              "group": "tsserver",
+              "pid": 18569,
+              "rssKb": 276988
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18582,
+              "rssKb": 78088
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 4775484310
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18537,
+              "rssKb": 371500
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18552,
+              "rssKb": 137768
+            },
+            {
+              "group": "tsserver",
+              "pid": 18568,
+              "rssKb": 282728
+            },
+            {
+              "group": "tsserver",
+              "pid": 18569,
+              "rssKb": 342136
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18582,
+              "rssKb": 78088
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 5797261260
+        }
+      ]
+    },
+    {
+      "file": "iced-cold-2.jsonl",
+      "candidate": "iced",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 447.956357,
+        "launchToTree": 474.158649,
+        "launchToUsable": 484.30352,
+        "projectOpenToTree": 22.995964,
+        "fileClickToRead": 0.7152,
+        "fileClickToPresented": 9.261659,
+        "fileSwitchToStable": 10.101788,
+        "lspRoundTrip": 4344.67302,
+        "lspResponseToOutline": 2.287946
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.052738,
+        "p95Ms": 2.167562,
+        "p99Ms": 5.238760999999999,
+        "worstMs": 9.990498,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18597,
+              "rssKb": 233600
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 451186768
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18597,
+              "rssKb": 368516
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18612,
+              "rssKb": 137800
+            },
+            {
+              "group": "tsserver",
+              "pid": 18628,
+              "rssKb": 274248
+            },
+            {
+              "group": "tsserver",
+              "pid": 18629,
+              "rssKb": 279672
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18642,
+              "rssKb": 78024
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 4838444704
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18597,
+              "rssKb": 371628
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18612,
+              "rssKb": 137824
+            },
+            {
+              "group": "tsserver",
+              "pid": 18628,
+              "rssKb": 274248
+            },
+            {
+              "group": "tsserver",
+              "pid": 18629,
+              "rssKb": 345092
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18642,
+              "rssKb": 78024
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 5836380530
+        }
+      ]
+    },
+    {
+      "file": "iced-cold-3.jsonl",
+      "candidate": "iced",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 459.860129,
+        "launchToTree": 494.737297,
+        "launchToUsable": 508.792075,
+        "projectOpenToTree": 31.63054,
+        "fileClickToRead": 0.947536,
+        "fileClickToPresented": 13.197761,
+        "fileSwitchToStable": 14.027909,
+        "lspRoundTrip": 4294.89856,
+        "lspResponseToOutline": 2.821153
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.156603,
+        "p95Ms": 1.949357,
+        "p99Ms": 4.6495310000000005,
+        "worstMs": 10.326922,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18657,
+              "rssKb": 233468
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 463114945
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18657,
+              "rssKb": 368604
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18672,
+              "rssKb": 138468
+            },
+            {
+              "group": "tsserver",
+              "pid": 18688,
+              "rssKb": 273184
+            },
+            {
+              "group": "tsserver",
+              "pid": 18689,
+              "rssKb": 275204
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18702,
+              "rssKb": 78256
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 4813490069
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18657,
+              "rssKb": 371728
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18672,
+              "rssKb": 138484
+            },
+            {
+              "group": "tsserver",
+              "pid": 18688,
+              "rssKb": 273184
+            },
+            {
+              "group": "tsserver",
+              "pid": 18689,
+              "rssKb": 340060
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18702,
+              "rssKb": 78256
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 5848005041
+        }
+      ]
+    },
+    {
+      "file": "iced-cold-4.jsonl",
+      "candidate": "iced",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 488.006028,
+        "launchToTree": 518.523532,
+        "launchToUsable": 528.738224,
+        "projectOpenToTree": 27.24974,
+        "fileClickToRead": 0.741229,
+        "fileClickToPresented": 9.336944,
+        "fileSwitchToStable": 10.178935,
+        "lspRoundTrip": 4478.514469,
+        "lspResponseToOutline": 3.086476
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.2410240000000001,
+        "p95Ms": 2.5278980000000004,
+        "p99Ms": 5.029691000000001,
+        "worstMs": 13.428867,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18717,
+              "rssKb": 233692
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 491289304
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18717,
+              "rssKb": 368628
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18732,
+              "rssKb": 139028
+            },
+            {
+              "group": "tsserver",
+              "pid": 18748,
+              "rssKb": 283212
+            },
+            {
+              "group": "tsserver",
+              "pid": 18749,
+              "rssKb": 295116
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18762,
+              "rssKb": 78200
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 5019929982
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18717,
+              "rssKb": 371712
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18732,
+              "rssKb": 139052
+            },
+            {
+              "group": "tsserver",
+              "pid": 18748,
+              "rssKb": 283212
+            },
+            {
+              "group": "tsserver",
+              "pid": 18749,
+              "rssKb": 349344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18762,
+              "rssKb": 78200
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 6057793645
+        }
+      ]
+    },
+    {
+      "file": "iced-cold-5.jsonl",
+      "candidate": "iced",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 453.872973,
+        "launchToTree": 484.456285,
+        "launchToUsable": 494.659975,
+        "projectOpenToTree": 27.248943,
+        "fileClickToRead": 0.713168,
+        "fileClickToPresented": 9.339109,
+        "fileSwitchToStable": 10.161559,
+        "lspRoundTrip": 4549.573168,
+        "lspResponseToOutline": 1.891616
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.178669,
+        "p95Ms": 2.096926,
+        "p99Ms": 4.550707,
+        "worstMs": 8.847248,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18777,
+              "rssKb": 233616
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 457227355
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18777,
+              "rssKb": 368536
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18792,
+              "rssKb": 137436
+            },
+            {
+              "group": "tsserver",
+              "pid": 18808,
+              "rssKb": 282580
+            },
+            {
+              "group": "tsserver",
+              "pid": 18809,
+              "rssKb": 306148
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18822,
+              "rssKb": 78240
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 5052581242
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18777,
+              "rssKb": 371656
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18792,
+              "rssKb": 137460
+            },
+            {
+              "group": "tsserver",
+              "pid": 18808,
+              "rssKb": 282580
+            },
+            {
+              "group": "tsserver",
+              "pid": 18809,
+              "rssKb": 351976
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18822,
+              "rssKb": 78240
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 6065513909
+        }
+      ]
+    },
+    {
+      "file": "iced-warm-1.jsonl",
+      "candidate": "iced",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 453.90521,
+        "launchToTree": 487.089698,
+        "launchToUsable": 499.006734,
+        "projectOpenToTree": 30.007983,
+        "fileClickToRead": 0.88017,
+        "fileClickToPresented": 10.853509,
+        "fileSwitchToStable": 11.883084,
+        "lspRoundTrip": 4262.824691,
+        "lspResponseToOutline": 3.020108
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.088428,
+        "p95Ms": 2.436107,
+        "p99Ms": 4.663958999999999,
+        "worstMs": 13.412144000000001,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18837,
+              "rssKb": 233836
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 457094244
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18837,
+              "rssKb": 368748
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18852,
+              "rssKb": 137892
+            },
+            {
+              "group": "tsserver",
+              "pid": 18868,
+              "rssKb": 283260
+            },
+            {
+              "group": "tsserver",
+              "pid": 18869,
+              "rssKb": 278512
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18882,
+              "rssKb": 78172
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 4774380523
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18837,
+              "rssKb": 371928
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18852,
+              "rssKb": 137908
+            },
+            {
+              "group": "tsserver",
+              "pid": 18868,
+              "rssKb": 283260
+            },
+            {
+              "group": "tsserver",
+              "pid": 18869,
+              "rssKb": 346072
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18882,
+              "rssKb": 78172
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 5826787389
+        }
+      ]
+    },
+    {
+      "file": "iced-warm-2.jsonl",
+      "candidate": "iced",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 457.971416,
+        "launchToTree": 489.73285,
+        "launchToUsable": 502.077058,
+        "projectOpenToTree": 28.543562,
+        "fileClickToRead": 0.693294,
+        "fileClickToPresented": 11.256586,
+        "fileSwitchToStable": 12.306848,
+        "lspRoundTrip": 4277.763679,
+        "lspResponseToOutline": 2.056198
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.0862479999999999,
+        "p95Ms": 2.0784670000000003,
+        "p99Ms": 4.3310759999999995,
+        "worstMs": 9.518795,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18897,
+              "rssKb": 233504
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 461205567
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18897,
+              "rssKb": 368416
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18912,
+              "rssKb": 137636
+            },
+            {
+              "group": "tsserver",
+              "pid": 18928,
+              "rssKb": 282864
+            },
+            {
+              "group": "tsserver",
+              "pid": 18929,
+              "rssKb": 283768
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18942,
+              "rssKb": 78112
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 4788838308
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18897,
+              "rssKb": 371532
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18912,
+              "rssKb": 137656
+            },
+            {
+              "group": "tsserver",
+              "pid": 18928,
+              "rssKb": 282864
+            },
+            {
+              "group": "tsserver",
+              "pid": 18929,
+              "rssKb": 348664
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 18942,
+              "rssKb": 78112
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 5800452481
+        }
+      ]
+    },
+    {
+      "file": "iced-warm-3.jsonl",
+      "candidate": "iced",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 453.224216,
+        "launchToTree": 488.408303,
+        "launchToUsable": 501.296567,
+        "projectOpenToTree": 31.942828,
+        "fileClickToRead": 0.953377,
+        "fileClickToPresented": 11.999018,
+        "fileSwitchToStable": 12.858079,
+        "lspRoundTrip": 4618.034351,
+        "lspResponseToOutline": 4.603772
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.069769,
+        "p95Ms": 1.816019,
+        "p99Ms": 4.33859,
+        "worstMs": 14.996508,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18957,
+              "rssKb": 233380
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 456478316
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18957,
+              "rssKb": 368504
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18972,
+              "rssKb": 137204
+            },
+            {
+              "group": "tsserver",
+              "pid": 18988,
+              "rssKb": 282928
+            },
+            {
+              "group": "tsserver",
+              "pid": 18989,
+              "rssKb": 312624
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 19002,
+              "rssKb": 78080
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 5133470559
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 18957,
+              "rssKb": 371632
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 18972,
+              "rssKb": 137224
+            },
+            {
+              "group": "tsserver",
+              "pid": 18988,
+              "rssKb": 282928
+            },
+            {
+              "group": "tsserver",
+              "pid": 18989,
+              "rssKb": 348656
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 19002,
+              "rssKb": 78080
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 6116088455
+        }
+      ]
+    },
+    {
+      "file": "iced-warm-4.jsonl",
+      "candidate": "iced",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 453.017895,
+        "launchToTree": 489.232035,
+        "launchToUsable": 504.898081,
+        "projectOpenToTree": 33.011053,
+        "fileClickToRead": 0.896414,
+        "fileClickToPresented": 14.566264,
+        "fileSwitchToStable": 15.635143,
+        "lspRoundTrip": 4369.135401,
+        "lspResponseToOutline": 3.08965
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.133185,
+        "p95Ms": 2.046911,
+        "p99Ms": 4.51162,
+        "worstMs": 12.242721,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 19017,
+              "rssKb": 233284
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 456233295
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 19017,
+              "rssKb": 368424
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 19032,
+              "rssKb": 138664
+            },
+            {
+              "group": "tsserver",
+              "pid": 19048,
+              "rssKb": 282652
+            },
+            {
+              "group": "tsserver",
+              "pid": 19049,
+              "rssKb": 283588
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 19062,
+              "rssKb": 78148
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 4885455115
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 19017,
+              "rssKb": 371800
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 19032,
+              "rssKb": 138684
+            },
+            {
+              "group": "tsserver",
+              "pid": 19048,
+              "rssKb": 282652
+            },
+            {
+              "group": "tsserver",
+              "pid": 19049,
+              "rssKb": 347496
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 19062,
+              "rssKb": 78148
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 5908783457
+        }
+      ]
+    },
+    {
+      "file": "iced-warm-5.jsonl",
+      "candidate": "iced",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 449.909323,
+        "launchToTree": 475.441014,
+        "launchToUsable": 485.97049,
+        "projectOpenToTree": 22.218584,
+        "fileClickToRead": 0.735456,
+        "fileClickToPresented": 9.64445,
+        "fileSwitchToStable": 10.495658,
+        "lspRoundTrip": 4519.165806,
+        "lspResponseToOutline": 1.908857
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 1.106584,
+        "p95Ms": 2.6731239999999996,
+        "p99Ms": 4.6120220000000005,
+        "worstMs": 8.869404,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 19077,
+              "rssKb": 233328
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 453236678
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 19077,
+              "rssKb": 368452
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 19092,
+              "rssKb": 137144
+            },
+            {
+              "group": "tsserver",
+              "pid": 19108,
+              "rssKb": 274484
+            },
+            {
+              "group": "tsserver",
+              "pid": 19109,
+              "rssKb": 293312
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 19122,
+              "rssKb": 78208
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 5013523682
+        },
+        {
+          "candidate": "iced",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 19077,
+              "rssKb": 371580
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 19092,
+              "rssKb": 137168
+            },
+            {
+              "group": "tsserver",
+              "pid": 19108,
+              "rssKb": 274484
+            },
+            {
+              "group": "tsserver",
+              "pid": 19109,
+              "rssKb": 348604
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 19122,
+              "rssKb": 78208
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 6028726332
+        }
+      ]
+    }
+  ]
+}

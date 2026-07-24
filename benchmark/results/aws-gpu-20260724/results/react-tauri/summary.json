@@ -1,0 +1,1455 @@
+{
+  "generatedAt": "2026-07-23T18:53:55.576Z",
+  "runs": [
+    {
+      "file": "react-tauri-cold-1.jsonl",
+      "candidate": "react-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 353.873764,
+        "launchToTree": 425.490023,
+        "projectOpenToTree": 66.092298,
+        "fileClickToRead": 1.058183,
+        "fileClickToPresented": 26.365567,
+        "fileSwitchToStable": 39.459111,
+        "lspRoundTrip": 3399.698377,
+        "lspResponseToOutline": 24.935858
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19.99999999999818,
+        "p95Ms": 30.00000000000182,
+        "p99Ms": 35,
+        "worstMs": 49,
+        "over16_7": 615,
+        "over33_3": 11
+      },
+      "longestMainThreadStallMs": 32.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7729,
+              "rssKb": 129532
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7742,
+              "rssKb": 48308
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7750,
+              "rssKb": 149860
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 360395050
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7729,
+              "rssKb": 159456
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7742,
+              "rssKb": 48260
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7750,
+              "rssKb": 164992
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 7780,
+              "rssKb": 137328
+            },
+            {
+              "group": "tsserver",
+              "pid": 7796,
+              "rssKb": 282468
+            },
+            {
+              "group": "tsserver",
+              "pid": 7797,
+              "rssKb": 278488
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7810,
+              "rssKb": 78132
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 3915164562
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7729,
+              "rssKb": 137592
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7742,
+              "rssKb": 48536
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7750,
+              "rssKb": 270272
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 7780,
+              "rssKb": 83436
+            },
+            {
+              "group": "tsserver",
+              "pid": 7796,
+              "rssKb": 282468
+            },
+            {
+              "group": "tsserver",
+              "pid": 7797,
+              "rssKb": 361980
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7810,
+              "rssKb": 74800
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 18593860192
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-cold-2.jsonl",
+      "candidate": "react-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 339.249014,
+        "launchToTree": 404.717167,
+        "projectOpenToTree": 59.886579,
+        "fileClickToRead": 1.073979,
+        "fileClickToPresented": 26.584266,
+        "fileSwitchToStable": 39.586938,
+        "lspRoundTrip": 3365.92129,
+        "lspResponseToOutline": 58.55897
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 30,
+        "p99Ms": 39.99999999999909,
+        "worstMs": 62,
+        "over16_7": 619,
+        "over33_3": 11
+      },
+      "longestMainThreadStallMs": 45.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7837,
+              "rssKb": 129376
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7850,
+              "rssKb": 48260
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7858,
+              "rssKb": 150128
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 345615624
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7837,
+              "rssKb": 162384
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7850,
+              "rssKb": 48216
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7858,
+              "rssKb": 170808
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 7888,
+              "rssKb": 137924
+            },
+            {
+              "group": "tsserver",
+              "pid": 7904,
+              "rssKb": 281428
+            },
+            {
+              "group": "tsserver",
+              "pid": 7905,
+              "rssKb": 287408
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7918,
+              "rssKb": 77992
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 3898548862
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7837,
+              "rssKb": 137632
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7850,
+              "rssKb": 48468
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7858,
+              "rssKb": 263604
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 7888,
+              "rssKb": 83860
+            },
+            {
+              "group": "tsserver",
+              "pid": 7904,
+              "rssKb": 281428
+            },
+            {
+              "group": "tsserver",
+              "pid": 7905,
+              "rssKb": 364944
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7918,
+              "rssKb": 74416
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 18701457227
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-cold-3.jsonl",
+      "candidate": "react-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 335.446654,
+        "launchToTree": 401.280263,
+        "projectOpenToTree": 60.385068,
+        "fileClickToRead": 1.081919,
+        "fileClickToPresented": 26.66683,
+        "fileSwitchToStable": 40.148293,
+        "lspRoundTrip": 3464.444198,
+        "lspResponseToOutline": 28.848891
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 30,
+        "p99Ms": 36.00000000000091,
+        "worstMs": 51.99999999999909,
+        "over16_7": 617,
+        "over33_3": 10
+      },
+      "longestMainThreadStallMs": 35.29999999999909,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7944,
+              "rssKb": 129664
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7957,
+              "rssKb": 48268
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7965,
+              "rssKb": 149984
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 341811502
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7944,
+              "rssKb": 159916
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7957,
+              "rssKb": 48224
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7965,
+              "rssKb": 164200
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 7995,
+              "rssKb": 139032
+            },
+            {
+              "group": "tsserver",
+              "pid": 8011,
+              "rssKb": 283772
+            },
+            {
+              "group": "tsserver",
+              "pid": 8012,
+              "rssKb": 279232
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8025,
+              "rssKb": 78180
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 3962345234
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 7944,
+              "rssKb": 137176
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7957,
+              "rssKb": 48496
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 7965,
+              "rssKb": 274192
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 7995,
+              "rssKb": 85052
+            },
+            {
+              "group": "tsserver",
+              "pid": 8011,
+              "rssKb": 283772
+            },
+            {
+              "group": "tsserver",
+              "pid": 8012,
+              "rssKb": 361520
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8025,
+              "rssKb": 74304
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 18803583252
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-cold-4.jsonl",
+      "candidate": "react-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 333.580789,
+        "launchToTree": 402.064682,
+        "projectOpenToTree": 59.106935,
+        "fileClickToRead": 1.06255,
+        "fileClickToPresented": 26.236349,
+        "fileSwitchToStable": 39.77323,
+        "lspRoundTrip": 3501.506514,
+        "lspResponseToOutline": 22.619833
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 30.00000000000091,
+        "p99Ms": 36.99999999999909,
+        "worstMs": 49,
+        "over16_7": 617,
+        "over33_3": 14
+      },
+      "longestMainThreadStallMs": 32.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8051,
+              "rssKb": 129512
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8064,
+              "rssKb": 48360
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8072,
+              "rssKb": 149856
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 343511574
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8051,
+              "rssKb": 159592
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8064,
+              "rssKb": 48312
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8072,
+              "rssKb": 166660
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8102,
+              "rssKb": 136412
+            },
+            {
+              "group": "tsserver",
+              "pid": 8118,
+              "rssKb": 284464
+            },
+            {
+              "group": "tsserver",
+              "pid": 8119,
+              "rssKb": 282132
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8132,
+              "rssKb": 78228
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 3998724643
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8051,
+              "rssKb": 138176
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8064,
+              "rssKb": 48568
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8072,
+              "rssKb": 262668
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8102,
+              "rssKb": 84276
+            },
+            {
+              "group": "tsserver",
+              "pid": 8118,
+              "rssKb": 284464
+            },
+            {
+              "group": "tsserver",
+              "pid": 8119,
+              "rssKb": 362304
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8132,
+              "rssKb": 74352
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 18833449293
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-cold-5.jsonl",
+      "candidate": "react-tauri",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 347.478692,
+        "launchToTree": 413.147619,
+        "projectOpenToTree": 59.98963,
+        "fileClickToRead": 1.086664,
+        "fileClickToPresented": 27.663866,
+        "fileSwitchToStable": 42.864023,
+        "lspRoundTrip": 3469.706464,
+        "lspResponseToOutline": 23.323287
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 31,
+        "p99Ms": 35,
+        "worstMs": 47,
+        "over16_7": 628,
+        "over33_3": 14
+      },
+      "longestMainThreadStallMs": 30.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8158,
+              "rssKb": 129396
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8171,
+              "rssKb": 48244
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8179,
+              "rssKb": 149992
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 353983141
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8158,
+              "rssKb": 160052
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8171,
+              "rssKb": 48200
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8179,
+              "rssKb": 166068
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8209,
+              "rssKb": 137416
+            },
+            {
+              "group": "tsserver",
+              "pid": 8225,
+              "rssKb": 282724
+            },
+            {
+              "group": "tsserver",
+              "pid": 8226,
+              "rssKb": 278512
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8239,
+              "rssKb": 78092
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 3984892229
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8158,
+              "rssKb": 137412
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8171,
+              "rssKb": 48456
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8179,
+              "rssKb": 271688
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8209,
+              "rssKb": 83720
+            },
+            {
+              "group": "tsserver",
+              "pid": 8225,
+              "rssKb": 282724
+            },
+            {
+              "group": "tsserver",
+              "pid": 8226,
+              "rssKb": 361876
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8239,
+              "rssKb": 75408
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 19176985505
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-warm-1.jsonl",
+      "candidate": "react-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 333.868557,
+        "launchToTree": 398.617852,
+        "projectOpenToTree": 59.576881,
+        "fileClickToRead": 1.200666,
+        "fileClickToPresented": 27.609656,
+        "fileSwitchToStable": 41.420877,
+        "lspRoundTrip": 3443.517193,
+        "lspResponseToOutline": 27.824478
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 30.99999999999909,
+        "p99Ms": 36,
+        "worstMs": 51,
+        "over16_7": 624,
+        "over33_3": 15
+      },
+      "longestMainThreadStallMs": 34.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8266,
+              "rssKb": 129200
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8278,
+              "rssKb": 48336
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8286,
+              "rssKb": 150136
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 340291562
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8266,
+              "rssKb": 162260
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8278,
+              "rssKb": 48292
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8286,
+              "rssKb": 165968
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8316,
+              "rssKb": 139092
+            },
+            {
+              "group": "tsserver",
+              "pid": 8332,
+              "rssKb": 282400
+            },
+            {
+              "group": "tsserver",
+              "pid": 8333,
+              "rssKb": 285556
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8346,
+              "rssKb": 78076
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 3943614578
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8266,
+              "rssKb": 137352
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8278,
+              "rssKb": 48548
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8286,
+              "rssKb": 276032
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8316,
+              "rssKb": 86724
+            },
+            {
+              "group": "tsserver",
+              "pid": 8332,
+              "rssKb": 282400
+            },
+            {
+              "group": "tsserver",
+              "pid": 8333,
+              "rssKb": 365240
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8346,
+              "rssKb": 75200
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 18980522261
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-warm-2.jsonl",
+      "candidate": "react-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 340.848595,
+        "launchToTree": 409.632848,
+        "projectOpenToTree": 59.631439,
+        "fileClickToRead": 1.079308,
+        "fileClickToPresented": 27.135625,
+        "fileSwitchToStable": 40.609998,
+        "lspRoundTrip": 3561.634183,
+        "lspResponseToOutline": 24.566896
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 30,
+        "p99Ms": 35,
+        "worstMs": 55,
+        "over16_7": 625,
+        "over33_3": 12
+      },
+      "longestMainThreadStallMs": 38.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8372,
+              "rssKb": 129456
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8385,
+              "rssKb": 48372
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8393,
+              "rssKb": 150028
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 350731611
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8372,
+              "rssKb": 159908
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8385,
+              "rssKb": 48320
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8393,
+              "rssKb": 165984
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8423,
+              "rssKb": 138072
+            },
+            {
+              "group": "tsserver",
+              "pid": 8439,
+              "rssKb": 283456
+            },
+            {
+              "group": "tsserver",
+              "pid": 8440,
+              "rssKb": 294088
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8453,
+              "rssKb": 78180
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 4064575319
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8372,
+              "rssKb": 137904
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8385,
+              "rssKb": 48592
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8393,
+              "rssKb": 273292
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8423,
+              "rssKb": 83904
+            },
+            {
+              "group": "tsserver",
+              "pid": 8439,
+              "rssKb": 283456
+            },
+            {
+              "group": "tsserver",
+              "pid": 8440,
+              "rssKb": 362380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8453,
+              "rssKb": 75404
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 18954326882
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-warm-3.jsonl",
+      "candidate": "react-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 344.556984,
+        "launchToTree": 414.150625,
+        "projectOpenToTree": 60.267527,
+        "fileClickToRead": 1.160668,
+        "fileClickToPresented": 27.582936,
+        "fileSwitchToStable": 41.189732,
+        "lspRoundTrip": 3411.573985,
+        "lspResponseToOutline": 31.262387
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 31,
+        "p99Ms": 40,
+        "worstMs": 49,
+        "over16_7": 624,
+        "over33_3": 17
+      },
+      "longestMainThreadStallMs": 32.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8480,
+              "rssKb": 129396
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8493,
+              "rssKb": 48076
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8501,
+              "rssKb": 149788
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 354483850
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8480,
+              "rssKb": 162440
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8493,
+              "rssKb": 48024
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8501,
+              "rssKb": 168372
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8531,
+              "rssKb": 137780
+            },
+            {
+              "group": "tsserver",
+              "pid": 8547,
+              "rssKb": 282160
+            },
+            {
+              "group": "tsserver",
+              "pid": 8548,
+              "rssKb": 282232
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8561,
+              "rssKb": 78024
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 3936198811
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8480,
+              "rssKb": 137632
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8493,
+              "rssKb": 48288
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8501,
+              "rssKb": 273076
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8531,
+              "rssKb": 83652
+            },
+            {
+              "group": "tsserver",
+              "pid": 8547,
+              "rssKb": 282160
+            },
+            {
+              "group": "tsserver",
+              "pid": 8548,
+              "rssKb": 361620
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8561,
+              "rssKb": 75368
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 18952020923
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-warm-4.jsonl",
+      "candidate": "react-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 338.541082,
+        "launchToTree": 406.992623,
+        "projectOpenToTree": 59.05618,
+        "fileClickToRead": 1.017182,
+        "fileClickToPresented": 26.72179,
+        "fileSwitchToStable": 40.31808,
+        "lspRoundTrip": 3427.008894,
+        "lspResponseToOutline": 19.212873
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 34,
+        "worstMs": 60,
+        "over16_7": 618,
+        "over33_3": 10
+      },
+      "longestMainThreadStallMs": 43.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8588,
+              "rssKb": 129412
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8601,
+              "rssKb": 48380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8609,
+              "rssKb": 149732
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 348625909
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8588,
+              "rssKb": 159496
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8601,
+              "rssKb": 48336
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8609,
+              "rssKb": 165268
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8639,
+              "rssKb": 137584
+            },
+            {
+              "group": "tsserver",
+              "pid": 8655,
+              "rssKb": 270464
+            },
+            {
+              "group": "tsserver",
+              "pid": 8656,
+              "rssKb": 287280
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8669,
+              "rssKb": 78120
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 3922315077
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8588,
+              "rssKb": 138120
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8601,
+              "rssKb": 48588
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8609,
+              "rssKb": 271108
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8639,
+              "rssKb": 83712
+            },
+            {
+              "group": "tsserver",
+              "pid": 8655,
+              "rssKb": 270464
+            },
+            {
+              "group": "tsserver",
+              "pid": 8656,
+              "rssKb": 364044
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8669,
+              "rssKb": 74384
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 18859280387
+        }
+      ]
+    },
+    {
+      "file": "react-tauri-warm-5.jsonl",
+      "candidate": "react-tauri",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 336.574008,
+        "launchToTree": 402.982628,
+        "projectOpenToTree": 60.931006,
+        "fileClickToRead": 1.080096,
+        "fileClickToPresented": 26.723949,
+        "fileSwitchToStable": 40.132687,
+        "lspRoundTrip": 3397.715082,
+        "lspResponseToOutline": 33.535569
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20,
+        "p95Ms": 29,
+        "p99Ms": 35,
+        "worstMs": 51,
+        "over16_7": 621,
+        "over33_3": 9
+      },
+      "longestMainThreadStallMs": 34.3,
+      "memory": [
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8695,
+              "rssKb": 129236
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8708,
+              "rssKb": 48396
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8716,
+              "rssKb": 149936
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 342961218
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8695,
+              "rssKb": 159328
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8708,
+              "rssKb": 48352
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8716,
+              "rssKb": 168984
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8746,
+              "rssKb": 137580
+            },
+            {
+              "group": "tsserver",
+              "pid": 8762,
+              "rssKb": 282840
+            },
+            {
+              "group": "tsserver",
+              "pid": 8763,
+              "rssKb": 279568
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8776,
+              "rssKb": 78164
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 3909983790
+        },
+        {
+          "candidate": "react-tauri",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 8695,
+              "rssKb": 137576
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8708,
+              "rssKb": 48608
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8716,
+              "rssKb": 270020
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 8746,
+              "rssKb": 83496
+            },
+            {
+              "group": "tsserver",
+              "pid": 8762,
+              "rssKb": 282840
+            },
+            {
+              "group": "tsserver",
+              "pid": 8763,
+              "rssKb": 362992
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 8776,
+              "rssKb": 74568
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 18821593846
+        }
+      ]
+    }
+  ]
+}

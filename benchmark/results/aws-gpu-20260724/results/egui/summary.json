@@ -1,0 +1,1165 @@
+{
+  "generatedAt": "2026-07-23T19:08:28.163Z",
+  "runs": [
+    {
+      "file": "egui-cold-1.jsonl",
+      "candidate": "egui",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 210.828392,
+        "launchToTree": 259.705724,
+        "launchToUsable": 281.299026,
+        "projectOpenToTree": 45.126154,
+        "fileClickToRead": 0.726972,
+        "fileClickToPresented": 20.669281,
+        "fileSwitchToStable": 21.56494,
+        "lspRoundTrip": 4405.364791,
+        "lspResponseToOutline": 2.242407
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.7650270000000003,
+        "p95Ms": 6.224359,
+        "p99Ms": 8.972239,
+        "worstMs": 12.902538,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15492,
+              "rssKb": 143588
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 214600943
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15492,
+              "rssKb": 299560
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15500,
+              "rssKb": 138560
+            },
+            {
+              "group": "tsserver",
+              "pid": 15516,
+              "rssKb": 284172
+            },
+            {
+              "group": "tsserver",
+              "pid": 15517,
+              "rssKb": 292268
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15530,
+              "rssKb": 78276
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 4699138819
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15492,
+              "rssKb": 303992
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15500,
+              "rssKb": 139144
+            },
+            {
+              "group": "tsserver",
+              "pid": 15516,
+              "rssKb": 284172
+            },
+            {
+              "group": "tsserver",
+              "pid": 15517,
+              "rssKb": 356988
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15530,
+              "rssKb": 78276
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 7015491214
+        }
+      ]
+    },
+    {
+      "file": "egui-cold-2.jsonl",
+      "candidate": "egui",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 202.208277,
+        "launchToTree": 249.98189,
+        "launchToUsable": 271.612463,
+        "projectOpenToTree": 44.575717,
+        "fileClickToRead": 0.746141,
+        "fileClickToPresented": 20.695534,
+        "fileSwitchToStable": 21.603235,
+        "lspRoundTrip": 4413.566443,
+        "lspResponseToOutline": 2.891958
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.756081,
+        "p95Ms": 5.926333,
+        "p99Ms": 9.57154,
+        "worstMs": 16.384534,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15545,
+              "rssKb": 143884
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 205433518
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15545,
+              "rssKb": 299684
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15553,
+              "rssKb": 137880
+            },
+            {
+              "group": "tsserver",
+              "pid": 15569,
+              "rssKb": 282200
+            },
+            {
+              "group": "tsserver",
+              "pid": 15570,
+              "rssKb": 297216
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15583,
+              "rssKb": 78272
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 4695968251
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15545,
+              "rssKb": 304304
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15553,
+              "rssKb": 138468
+            },
+            {
+              "group": "tsserver",
+              "pid": 15569,
+              "rssKb": 282200
+            },
+            {
+              "group": "tsserver",
+              "pid": 15570,
+              "rssKb": 356212
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15583,
+              "rssKb": 78272
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 6989525204
+        }
+      ]
+    },
+    {
+      "file": "egui-cold-3.jsonl",
+      "candidate": "egui",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 213.291253,
+        "launchToTree": 252.312241,
+        "launchToUsable": 283.752601,
+        "projectOpenToTree": 35.765219,
+        "fileClickToRead": 0.797321,
+        "fileClickToPresented": 30.427668,
+        "fileSwitchToStable": 31.410492,
+        "lspRoundTrip": 4179.07768,
+        "lspResponseToOutline": 3.38442
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.835152,
+        "p95Ms": 6.153008,
+        "p99Ms": 8.388359,
+        "worstMs": 11.899414,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15598,
+              "rssKb": 143528
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 216574137
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15598,
+              "rssKb": 298488
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15606,
+              "rssKb": 138616
+            },
+            {
+              "group": "tsserver",
+              "pid": 15622,
+              "rssKb": 283696
+            },
+            {
+              "group": "tsserver",
+              "pid": 15623,
+              "rssKb": 279724
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15636,
+              "rssKb": 78180
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 4476155093
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15598,
+              "rssKb": 303152
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15606,
+              "rssKb": 139200
+            },
+            {
+              "group": "tsserver",
+              "pid": 15622,
+              "rssKb": 283696
+            },
+            {
+              "group": "tsserver",
+              "pid": 15623,
+              "rssKb": 360080
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15636,
+              "rssKb": 78180
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 6831631054
+        }
+      ]
+    },
+    {
+      "file": "egui-cold-4.jsonl",
+      "candidate": "egui",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 211.230055,
+        "launchToTree": 259.497777,
+        "launchToUsable": 281.034161,
+        "projectOpenToTree": 44.555314,
+        "fileClickToRead": 0.72347,
+        "fileClickToPresented": 20.593893,
+        "fileSwitchToStable": 21.509159,
+        "lspRoundTrip": 4233.980122,
+        "lspResponseToOutline": 3.456519
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.804593,
+        "p95Ms": 6.8511370000000005,
+        "p99Ms": 10.768201999999999,
+        "worstMs": 15.704413,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15651,
+              "rssKb": 143672
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 214951711
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15651,
+              "rssKb": 299268
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15659,
+              "rssKb": 138288
+            },
+            {
+              "group": "tsserver",
+              "pid": 15675,
+              "rssKb": 283228
+            },
+            {
+              "group": "tsserver",
+              "pid": 15676,
+              "rssKb": 276968
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15689,
+              "rssKb": 78204
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 4528560735
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15651,
+              "rssKb": 302980
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15659,
+              "rssKb": 138872
+            },
+            {
+              "group": "tsserver",
+              "pid": 15675,
+              "rssKb": 283228
+            },
+            {
+              "group": "tsserver",
+              "pid": 15676,
+              "rssKb": 356768
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15689,
+              "rssKb": 78204
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 6923787917
+        }
+      ]
+    },
+    {
+      "file": "egui-cold-5.jsonl",
+      "candidate": "egui",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 212.013957,
+        "launchToTree": 260.735424,
+        "launchToUsable": 282.383186,
+        "projectOpenToTree": 44.434176,
+        "fileClickToRead": 0.718508,
+        "fileClickToPresented": 20.712486,
+        "fileSwitchToStable": 21.619475,
+        "lspRoundTrip": 4274.011842,
+        "lspResponseToOutline": 3.737691
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.7810740000000003,
+        "p95Ms": 6.441019,
+        "p99Ms": 11.557746,
+        "worstMs": 14.520424,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15704,
+              "rssKb": 143704
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 216315285
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15704,
+              "rssKb": 299512
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15712,
+              "rssKb": 137140
+            },
+            {
+              "group": "tsserver",
+              "pid": 15728,
+              "rssKb": 274548
+            },
+            {
+              "group": "tsserver",
+              "pid": 15729,
+              "rssKb": 276132
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15742,
+              "rssKb": 78244
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 4568262864
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15704,
+              "rssKb": 304228
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15712,
+              "rssKb": 137724
+            },
+            {
+              "group": "tsserver",
+              "pid": 15728,
+              "rssKb": 274548
+            },
+            {
+              "group": "tsserver",
+              "pid": 15729,
+              "rssKb": 356544
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15742,
+              "rssKb": 78244
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 6926537846
+        }
+      ]
+    },
+    {
+      "file": "egui-warm-1.jsonl",
+      "candidate": "egui",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 204.014173,
+        "launchToTree": 251.722137,
+        "launchToUsable": 273.409571,
+        "projectOpenToTree": 44.480216,
+        "fileClickToRead": 0.744016,
+        "fileClickToPresented": 20.704604,
+        "fileSwitchToStable": 21.659351,
+        "lspRoundTrip": 4296.400297,
+        "lspResponseToOutline": 3.473707
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.7651730000000003,
+        "p95Ms": 6.4929310000000005,
+        "p99Ms": 8.683193000000001,
+        "worstMs": 13.049313999999999,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15758,
+              "rssKb": 143596
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 207257152
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15758,
+              "rssKb": 299408
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15766,
+              "rssKb": 137992
+            },
+            {
+              "group": "tsserver",
+              "pid": 15782,
+              "rssKb": 282756
+            },
+            {
+              "group": "tsserver",
+              "pid": 15783,
+              "rssKb": 284584
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15796,
+              "rssKb": 78244
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 4582721386
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15758,
+              "rssKb": 303776
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15766,
+              "rssKb": 138572
+            },
+            {
+              "group": "tsserver",
+              "pid": 15782,
+              "rssKb": 282756
+            },
+            {
+              "group": "tsserver",
+              "pid": 15783,
+              "rssKb": 357728
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15796,
+              "rssKb": 78244
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 6908772625
+        }
+      ]
+    },
+    {
+      "file": "egui-warm-2.jsonl",
+      "candidate": "egui",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 209.098899,
+        "launchToTree": 246.671742,
+        "launchToUsable": 278.142572,
+        "projectOpenToTree": 34.173107,
+        "fileClickToRead": 0.788246,
+        "fileClickToPresented": 30.490486,
+        "fileSwitchToStable": 31.443801,
+        "lspRoundTrip": 4137.83121,
+        "lspResponseToOutline": 4.354254
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.920321,
+        "p95Ms": 6.881311,
+        "p99Ms": 9.164121000000002,
+        "worstMs": 12.462211,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15811,
+              "rssKb": 143692
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 212514132
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15811,
+              "rssKb": 299784
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15819,
+              "rssKb": 137896
+            },
+            {
+              "group": "tsserver",
+              "pid": 15835,
+              "rssKb": 283300
+            },
+            {
+              "group": "tsserver",
+              "pid": 15836,
+              "rssKb": 272076
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15849,
+              "rssKb": 78240
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 4430154577
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15811,
+              "rssKb": 303748
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15819,
+              "rssKb": 138480
+            },
+            {
+              "group": "tsserver",
+              "pid": 15835,
+              "rssKb": 283300
+            },
+            {
+              "group": "tsserver",
+              "pid": 15836,
+              "rssKb": 353136
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15849,
+              "rssKb": 78240
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 6886775522
+        }
+      ]
+    },
+    {
+      "file": "egui-warm-3.jsonl",
+      "candidate": "egui",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 205.260102,
+        "launchToTree": 244.963729,
+        "launchToUsable": 276.426685,
+        "projectOpenToTree": 36.439626,
+        "fileClickToRead": 0.747538,
+        "fileClickToPresented": 30.453473,
+        "fileSwitchToStable": 31.431932,
+        "lspRoundTrip": 4166.781434,
+        "lspResponseToOutline": 3.699143
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.773362,
+        "p95Ms": 6.1424080000000005,
+        "p99Ms": 8.90185,
+        "worstMs": 13.219377,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15864,
+              "rssKb": 143636
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 208551951
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15864,
+              "rssKb": 299132
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15872,
+              "rssKb": 139084
+            },
+            {
+              "group": "tsserver",
+              "pid": 15888,
+              "rssKb": 283748
+            },
+            {
+              "group": "tsserver",
+              "pid": 15889,
+              "rssKb": 282636
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15902,
+              "rssKb": 78228
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 4456901074
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15864,
+              "rssKb": 302904
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15872,
+              "rssKb": 139672
+            },
+            {
+              "group": "tsserver",
+              "pid": 15888,
+              "rssKb": 283748
+            },
+            {
+              "group": "tsserver",
+              "pid": 15889,
+              "rssKb": 358752
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15902,
+              "rssKb": 78228
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 6778318070
+        }
+      ]
+    },
+    {
+      "file": "egui-warm-4.jsonl",
+      "candidate": "egui",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 208.319174,
+        "launchToTree": 247.372554,
+        "launchToUsable": 279.097454,
+        "projectOpenToTree": 35.804113,
+        "fileClickToRead": 0.72686,
+        "fileClickToPresented": 30.692511,
+        "fileSwitchToStable": 31.696884,
+        "lspRoundTrip": 4453.850183,
+        "lspResponseToOutline": 3.61165
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.745861,
+        "p95Ms": 6.366079999999999,
+        "p99Ms": 9.429712,
+        "worstMs": 12.088901000000002,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15917,
+              "rssKb": 143704
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 211590003
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15917,
+              "rssKb": 300024
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15925,
+              "rssKb": 138500
+            },
+            {
+              "group": "tsserver",
+              "pid": 15941,
+              "rssKb": 284060
+            },
+            {
+              "group": "tsserver",
+              "pid": 15942,
+              "rssKb": 295804
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15955,
+              "rssKb": 78232
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 4743050203
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15917,
+              "rssKb": 304768
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15925,
+              "rssKb": 139084
+            },
+            {
+              "group": "tsserver",
+              "pid": 15941,
+              "rssKb": 284060
+            },
+            {
+              "group": "tsserver",
+              "pid": 15942,
+              "rssKb": 357716
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 15955,
+              "rssKb": 78232
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 7013427224
+        }
+      ]
+    },
+    {
+      "file": "egui-warm-5.jsonl",
+      "candidate": "egui",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 214.659409,
+        "launchToTree": 252.782946,
+        "launchToUsable": 284.167747,
+        "projectOpenToTree": 33.7767,
+        "fileClickToRead": 0.721976,
+        "fileClickToPresented": 30.371388,
+        "fileSwitchToStable": 31.355263,
+        "lspRoundTrip": 4134.487747,
+        "lspResponseToOutline": 6.149448
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 2.830191,
+        "p95Ms": 6.921481999999999,
+        "p99Ms": 9.677392,
+        "worstMs": 12.955108,
+        "over16_7": 0,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 0,
+      "memory": [
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15970,
+              "rssKb": 143596
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 219014742
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15970,
+              "rssKb": 298712
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15978,
+              "rssKb": 136984
+            },
+            {
+              "group": "tsserver",
+              "pid": 15994,
+              "rssKb": 282280
+            },
+            {
+              "group": "tsserver",
+              "pid": 15995,
+              "rssKb": 274812
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 16008,
+              "rssKb": 78248
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 4434730341
+        },
+        {
+          "candidate": "egui",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 15970,
+              "rssKb": 303412
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 15978,
+              "rssKb": 137572
+            },
+            {
+              "group": "tsserver",
+              "pid": 15994,
+              "rssKb": 282280
+            },
+            {
+              "group": "tsserver",
+              "pid": 15995,
+              "rssKb": 353732
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 16008,
+              "rssKb": 78248
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 6846180388
+        }
+      ]
+    }
+  ]
+}

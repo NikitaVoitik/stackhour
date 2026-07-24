@@ -1,0 +1,1465 @@
+{
+  "generatedAt": "2026-07-23T19:25:02.171Z",
+  "runs": [
+    {
+      "file": "dioxus-desktop-cold-1.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 25314.412174,
+        "launchToTree": 25352.426066,
+        "launchToUsable": 25420.870471,
+        "projectOpenToTree": 28.04747,
+        "fileClickToRead": 28.5481,
+        "fileClickToPresented": 46.148428,
+        "fileSwitchToStable": 68.39774,
+        "lspRoundTrip": 3546.608681,
+        "lspResponseToOutline": 22.436203
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20.873069,
+        "p95Ms": 33.427416,
+        "p99Ms": 41.286847,
+        "worstMs": 58.369296,
+        "over16_7": 587,
+        "over33_3": 36
+      },
+      "longestMainThreadStallMs": 41.669296,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25258,
+              "rssKb": 134100
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25276,
+              "rssKb": 51384
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25278,
+              "rssKb": 137888
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 25324380832
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25258,
+              "rssKb": 268160
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25276,
+              "rssKb": 51388
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25278,
+              "rssKb": 148992
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25311,
+              "rssKb": 137852
+            },
+            {
+              "group": "tsserver",
+              "pid": 25327,
+              "rssKb": 284652
+            },
+            {
+              "group": "tsserver",
+              "pid": 25328,
+              "rssKb": 291264
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25341,
+              "rssKb": 78252
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 29004949591
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25258,
+              "rssKb": 275012
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25276,
+              "rssKb": 59436
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25278,
+              "rssKb": 236456
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25311,
+              "rssKb": 83608
+            },
+            {
+              "group": "tsserver",
+              "pid": 25327,
+              "rssKb": 284652
+            },
+            {
+              "group": "tsserver",
+              "pid": 25328,
+              "rssKb": 355548
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25341,
+              "rssKb": 74860
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 45835992043
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-cold-2.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 25333.171017,
+        "launchToTree": 25372.292106,
+        "launchToUsable": 25423.507597,
+        "projectOpenToTree": 32.514404,
+        "fileClickToRead": 11.877655,
+        "fileClickToPresented": 29.216018,
+        "fileSwitchToStable": 51.165615,
+        "lspRoundTrip": 3423.926467,
+        "lspResponseToOutline": 18.529418
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 21.348556000000002,
+        "p95Ms": 33.580163000000006,
+        "p99Ms": 38.345135,
+        "worstMs": 52.081823,
+        "over16_7": 588,
+        "over33_3": 39
+      },
+      "longestMainThreadStallMs": 35.381823,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25364,
+              "rssKb": 133912
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25382,
+              "rssKb": 51296
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25384,
+              "rssKb": 137884
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 25339797168
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25364,
+              "rssKb": 267828
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25382,
+              "rssKb": 51388
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25384,
+              "rssKb": 149024
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25417,
+              "rssKb": 138096
+            },
+            {
+              "group": "tsserver",
+              "pid": 25433,
+              "rssKb": 284080
+            },
+            {
+              "group": "tsserver",
+              "pid": 25434,
+              "rssKb": 285024
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25447,
+              "rssKb": 78076
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 28879413505
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25364,
+              "rssKb": 275260
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25382,
+              "rssKb": 59508
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25384,
+              "rssKb": 239908
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25417,
+              "rssKb": 85724
+            },
+            {
+              "group": "tsserver",
+              "pid": 25433,
+              "rssKb": 284080
+            },
+            {
+              "group": "tsserver",
+              "pid": 25434,
+              "rssKb": 361072
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25447,
+              "rssKb": 74500
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 45858318454
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-cold-3.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 25311.89001,
+        "launchToTree": 25356.104967,
+        "launchToUsable": 25407.587972,
+        "projectOpenToTree": 35.632444,
+        "fileClickToRead": 11.898057,
+        "fileClickToPresented": 29.193765,
+        "fileSwitchToStable": 51.443858,
+        "lspRoundTrip": 3559.753054,
+        "lspResponseToOutline": 18.877739
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20.480334,
+        "p95Ms": 33.907632,
+        "p99Ms": 42.45986,
+        "worstMs": 51.148042999999994,
+        "over16_7": 586,
+        "over33_3": 43
+      },
+      "longestMainThreadStallMs": 34.448043,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25471,
+              "rssKb": 134016
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25497,
+              "rssKb": 51368
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25499,
+              "rssKb": 137896
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 25320479691
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25471,
+              "rssKb": 267964
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25497,
+              "rssKb": 51460
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25499,
+              "rssKb": 148960
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25532,
+              "rssKb": 138472
+            },
+            {
+              "group": "tsserver",
+              "pid": 25548,
+              "rssKb": 282648
+            },
+            {
+              "group": "tsserver",
+              "pid": 25549,
+              "rssKb": 296404
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25562,
+              "rssKb": 78052
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 28996142478
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25471,
+              "rssKb": 276196
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25497,
+              "rssKb": 59456
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25499,
+              "rssKb": 237112
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25532,
+              "rssKb": 84552
+            },
+            {
+              "group": "tsserver",
+              "pid": 25548,
+              "rssKb": 282648
+            },
+            {
+              "group": "tsserver",
+              "pid": 25549,
+              "rssKb": 361172
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25562,
+              "rssKb": 74424
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 45638692011
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-cold-4.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 25332.082441,
+        "launchToTree": 25374.153206,
+        "launchToUsable": 25425.956099,
+        "projectOpenToTree": 32.07574,
+        "fileClickToRead": 12.387879,
+        "fileClickToPresented": 29.83344,
+        "fileSwitchToStable": 51.757234,
+        "lspRoundTrip": 3574.311577,
+        "lspResponseToOutline": 18.747137
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 21.000747,
+        "p95Ms": 34.191662,
+        "p99Ms": 41.261704,
+        "worstMs": 50.242311,
+        "over16_7": 591,
+        "over33_3": 48
+      },
+      "longestMainThreadStallMs": 33.542311,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25586,
+              "rssKb": 133948
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25604,
+              "rssKb": 51392
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25606,
+              "rssKb": 137748
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 25342083302
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25586,
+              "rssKb": 267940
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25604,
+              "rssKb": 51492
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25606,
+              "rssKb": 148668
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25639,
+              "rssKb": 137684
+            },
+            {
+              "group": "tsserver",
+              "pid": 25655,
+              "rssKb": 284252
+            },
+            {
+              "group": "tsserver",
+              "pid": 25656,
+              "rssKb": 296396
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25669,
+              "rssKb": 78044
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 29029131881
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25586,
+              "rssKb": 274820
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25604,
+              "rssKb": 59616
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25606,
+              "rssKb": 240000
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25639,
+              "rssKb": 84036
+            },
+            {
+              "group": "tsserver",
+              "pid": 25655,
+              "rssKb": 284252
+            },
+            {
+              "group": "tsserver",
+              "pid": 25656,
+              "rssKb": 360756
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25669,
+              "rssKb": 74672
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 45842895739
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-cold-5.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 25339.530696,
+        "launchToTree": 25383.943389,
+        "launchToUsable": 25436.171125,
+        "projectOpenToTree": 38.22318,
+        "fileClickToRead": 13.104044,
+        "fileClickToPresented": 30.150925,
+        "fileSwitchToStable": 52.184405,
+        "lspRoundTrip": 3547.794911,
+        "lspResponseToOutline": 26.752707
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20.477491,
+        "p95Ms": 33.921075,
+        "p99Ms": 42.909813,
+        "worstMs": 60.857721,
+        "over16_7": 587,
+        "over33_3": 45
+      },
+      "longestMainThreadStallMs": 44.157720999999995,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25693,
+              "rssKb": 133868
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25711,
+              "rssKb": 51280
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25713,
+              "rssKb": 137696
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 25345739686
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25693,
+              "rssKb": 267904
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25711,
+              "rssKb": 51376
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25713,
+              "rssKb": 148900
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25746,
+              "rssKb": 140272
+            },
+            {
+              "group": "tsserver",
+              "pid": 25762,
+              "rssKb": 281276
+            },
+            {
+              "group": "tsserver",
+              "pid": 25763,
+              "rssKb": 306616
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25776,
+              "rssKb": 78092
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 29026409811
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25693,
+              "rssKb": 276224
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25711,
+              "rssKb": 59356
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25713,
+              "rssKb": 240016
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25746,
+              "rssKb": 86820
+            },
+            {
+              "group": "tsserver",
+              "pid": 25762,
+              "rssKb": 281276
+            },
+            {
+              "group": "tsserver",
+              "pid": 25763,
+              "rssKb": 356068
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25776,
+              "rssKb": 75768
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 45914464246
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-warm-1.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 25320.191894,
+        "launchToTree": 25364.782918,
+        "launchToUsable": 25421.344932,
+        "projectOpenToTree": 37.196292,
+        "fileClickToRead": 12.362118,
+        "fileClickToPresented": 29.753776,
+        "fileSwitchToStable": 56.515344,
+        "lspRoundTrip": 3381.351657,
+        "lspResponseToOutline": 18.956859
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 21.204614,
+        "p95Ms": 33.727645,
+        "p99Ms": 40.131313,
+        "worstMs": 52.382931,
+        "over16_7": 588,
+        "over33_3": 39
+      },
+      "longestMainThreadStallMs": 35.682930999999996,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25800,
+              "rssKb": 133888
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25826,
+              "rssKb": 51328
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25828,
+              "rssKb": 137544
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 25327609912
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25800,
+              "rssKb": 268020
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25826,
+              "rssKb": 51420
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25828,
+              "rssKb": 148864
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25861,
+              "rssKb": 138460
+            },
+            {
+              "group": "tsserver",
+              "pid": 25877,
+              "rssKb": 282284
+            },
+            {
+              "group": "tsserver",
+              "pid": 25878,
+              "rssKb": 280308
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25891,
+              "rssKb": 78196
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 28840590038
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25800,
+              "rssKb": 276044
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25826,
+              "rssKb": 59380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25828,
+              "rssKb": 237944
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25861,
+              "rssKb": 84464
+            },
+            {
+              "group": "tsserver",
+              "pid": 25877,
+              "rssKb": 282284
+            },
+            {
+              "group": "tsserver",
+              "pid": 25878,
+              "rssKb": 360764
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25891,
+              "rssKb": 74852
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 45746974272
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-warm-2.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 25346.35139,
+        "launchToTree": 25381.869744,
+        "launchToUsable": 25437.451475,
+        "projectOpenToTree": 28.30293,
+        "fileClickToRead": 11.554333,
+        "fileClickToPresented": 29.075415,
+        "fileSwitchToStable": 55.545579,
+        "lspRoundTrip": 3542.168335,
+        "lspResponseToOutline": 18.220086
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20.537706999999997,
+        "p95Ms": 33.59306,
+        "p99Ms": 42.60834,
+        "worstMs": 53.566991,
+        "over16_7": 590,
+        "over33_3": 44
+      },
+      "longestMainThreadStallMs": 36.866991,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25917,
+              "rssKb": 133748
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25935,
+              "rssKb": 51388
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25937,
+              "rssKb": 137816
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 25353581562
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25917,
+              "rssKb": 267820
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25935,
+              "rssKb": 51484
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25937,
+              "rssKb": 148808
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25970,
+              "rssKb": 137488
+            },
+            {
+              "group": "tsserver",
+              "pid": 25986,
+              "rssKb": 284568
+            },
+            {
+              "group": "tsserver",
+              "pid": 25987,
+              "rssKb": 292684
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26000,
+              "rssKb": 78016
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 29007547754
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 25917,
+              "rssKb": 276020
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25935,
+              "rssKb": 59488
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 25937,
+              "rssKb": 240108
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 25970,
+              "rssKb": 83944
+            },
+            {
+              "group": "tsserver",
+              "pid": 25986,
+              "rssKb": 284568
+            },
+            {
+              "group": "tsserver",
+              "pid": 25987,
+              "rssKb": 355520
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26000,
+              "rssKb": 74504
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 45822239668
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-warm-3.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 25317.298236,
+        "launchToTree": 25362.362574,
+        "launchToUsable": 25414.299711,
+        "projectOpenToTree": 35.144431,
+        "fileClickToRead": 12.662212,
+        "fileClickToPresented": 29.904124,
+        "fileSwitchToStable": 51.892693,
+        "lspRoundTrip": 3416.581795,
+        "lspResponseToOutline": 20.816595
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20.698524,
+        "p95Ms": 33.528802000000006,
+        "p99Ms": 43.386791,
+        "worstMs": 50.706654,
+        "over16_7": 587,
+        "over33_3": 35
+      },
+      "longestMainThreadStallMs": 34.006654,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26024,
+              "rssKb": 134020
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26042,
+              "rssKb": 51248
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26044,
+              "rssKb": 137876
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 25327221768
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26024,
+              "rssKb": 267976
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26042,
+              "rssKb": 51344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26044,
+              "rssKb": 148880
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 26077,
+              "rssKb": 137120
+            },
+            {
+              "group": "tsserver",
+              "pid": 26093,
+              "rssKb": 284984
+            },
+            {
+              "group": "tsserver",
+              "pid": 26094,
+              "rssKb": 289708
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26107,
+              "rssKb": 78096
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 28860065322
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26024,
+              "rssKb": 276264
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26042,
+              "rssKb": 59204
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26044,
+              "rssKb": 235728
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 26077,
+              "rssKb": 82916
+            },
+            {
+              "group": "tsserver",
+              "pid": 26093,
+              "rssKb": 284984
+            },
+            {
+              "group": "tsserver",
+              "pid": 26094,
+              "rssKb": 357052
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26107,
+              "rssKb": 75532
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 45588575159
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-warm-4.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 25313.46722,
+        "launchToTree": 25370.861982,
+        "launchToUsable": 25423.300976,
+        "projectOpenToTree": 51.103377,
+        "fileClickToRead": 12.602872,
+        "fileClickToPresented": 30.14612,
+        "fileSwitchToStable": 52.370098,
+        "lspRoundTrip": 3430.452378,
+        "lspResponseToOutline": 22.460741
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20.478665,
+        "p95Ms": 34.347982,
+        "p99Ms": 42.436853,
+        "worstMs": 54.513064,
+        "over16_7": 585,
+        "over33_3": 44
+      },
+      "longestMainThreadStallMs": 37.813064,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26131,
+              "rssKb": 134152
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26157,
+              "rssKb": 51584
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26159,
+              "rssKb": 138080
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 25319795498
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26131,
+              "rssKb": 268164
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26157,
+              "rssKb": 51580
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26159,
+              "rssKb": 146200
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 26192,
+              "rssKb": 139104
+            },
+            {
+              "group": "tsserver",
+              "pid": 26208,
+              "rssKb": 282128
+            },
+            {
+              "group": "tsserver",
+              "pid": 26209,
+              "rssKb": 276472
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26222,
+              "rssKb": 78296
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 28893707709
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26131,
+              "rssKb": 276496
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26157,
+              "rssKb": 59652
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26159,
+              "rssKb": 240384
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 26192,
+              "rssKb": 84904
+            },
+            {
+              "group": "tsserver",
+              "pid": 26208,
+              "rssKb": 282128
+            },
+            {
+              "group": "tsserver",
+              "pid": 26209,
+              "rssKb": 357064
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26222,
+              "rssKb": 75524
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 45527342778
+        }
+      ]
+    },
+    {
+      "file": "dioxus-desktop-warm-5.jsonl",
+      "candidate": "dioxus-desktop",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 25326.020471,
+        "launchToTree": 25369.401528,
+        "launchToUsable": 25434.608147,
+        "projectOpenToTree": 37.198009,
+        "fileClickToRead": 25.528521,
+        "fileClickToPresented": 43.050236,
+        "fileSwitchToStable": 65.168198,
+        "lspRoundTrip": 3411.876549,
+        "lspResponseToOutline": 21.493872
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 20.751693000000003,
+        "p95Ms": 34.161928,
+        "p99Ms": 43.168462999999996,
+        "worstMs": 52.910965,
+        "over16_7": 589,
+        "over33_3": 40
+      },
+      "longestMainThreadStallMs": 36.210965,
+      "memory": [
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26246,
+              "rssKb": 133968
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26328,
+              "rssKb": 51144
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26330,
+              "rssKb": 137632
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 25332218424
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26246,
+              "rssKb": 267852
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26328,
+              "rssKb": 51144
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26330,
+              "rssKb": 145940
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 26363,
+              "rssKb": 138316
+            },
+            {
+              "group": "tsserver",
+              "pid": 26379,
+              "rssKb": 284860
+            },
+            {
+              "group": "tsserver",
+              "pid": 26380,
+              "rssKb": 283480
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26393,
+              "rssKb": 78220
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 28883610548
+        },
+        {
+          "candidate": "dioxus-desktop",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 26246,
+              "rssKb": 274748
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26328,
+              "rssKb": 59112
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26330,
+              "rssKb": 236504
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 26363,
+              "rssKb": 84376
+            },
+            {
+              "group": "tsserver",
+              "pid": 26379,
+              "rssKb": 284860
+            },
+            {
+              "group": "tsserver",
+              "pid": 26380,
+              "rssKb": 357512
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 26393,
+              "rssKb": 74696
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 45643333913
+        }
+      ]
+    }
+  ]
+}

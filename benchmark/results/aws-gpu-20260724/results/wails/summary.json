@@ -1,0 +1,1455 @@
+{
+  "generatedAt": "2026-07-23T19:30:14.980Z",
+  "runs": [
+    {
+      "file": "wails-cold-1.jsonl",
+      "candidate": "wails",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 157.311794,
+        "launchToTree": 214.099596,
+        "projectOpenToTree": 49.385537,
+        "fileClickToRead": 1.113558,
+        "fileClickToPresented": 37.521811,
+        "fileSwitchToStable": 60.076467,
+        "lspRoundTrip": 3819.895272,
+        "lspResponseToOutline": 15.088149
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 26,
+        "p99Ms": 31,
+        "worstMs": 35.000000000000455,
+        "over16_7": 639,
+        "over33_3": 2
+      },
+      "longestMainThreadStallMs": 18.300000000000455,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31203,
+              "rssKb": 137764
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31217,
+              "rssKb": 48512
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31221,
+              "rssKb": 141724
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 277338898
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31203,
+              "rssKb": 260948
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31217,
+              "rssKb": 48464
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31221,
+              "rssKb": 153760
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31256,
+              "rssKb": 136624
+            },
+            {
+              "group": "tsserver",
+              "pid": 31272,
+              "rssKb": 282780
+            },
+            {
+              "group": "tsserver",
+              "pid": 31273,
+              "rssKb": 321044
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31286,
+              "rssKb": 78172
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 4245393059
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31203,
+              "rssKb": 152200
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31217,
+              "rssKb": 48656
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31221,
+              "rssKb": 325932
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31256,
+              "rssKb": 82828
+            },
+            {
+              "group": "tsserver",
+              "pid": 31272,
+              "rssKb": 282780
+            },
+            {
+              "group": "tsserver",
+              "pid": 31273,
+              "rssKb": 355892
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31286,
+              "rssKb": 75580
+            }
+          ],
+          "runId": "cold-1",
+          "schemaVersion": 1,
+          "timestampNs": 18575714412
+        }
+      ]
+    },
+    {
+      "file": "wails-cold-2.jsonl",
+      "candidate": "wails",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 150.840334,
+        "launchToTree": 203.88077,
+        "projectOpenToTree": 45.212128,
+        "fileClickToRead": 1.017127,
+        "fileClickToPresented": 37.946008,
+        "fileSwitchToStable": 55.579781,
+        "lspRoundTrip": 3855.012081,
+        "lspResponseToOutline": 13.734537
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 26,
+        "p99Ms": 29,
+        "worstMs": 32,
+        "over16_7": 639,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 15.3,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31315,
+              "rssKb": 138196
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31329,
+              "rssKb": 48344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31333,
+              "rssKb": 141824
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 268852670
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31315,
+              "rssKb": 262692
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31329,
+              "rssKb": 48296
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31333,
+              "rssKb": 153836
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31368,
+              "rssKb": 138444
+            },
+            {
+              "group": "tsserver",
+              "pid": 31384,
+              "rssKb": 283552
+            },
+            {
+              "group": "tsserver",
+              "pid": 31385,
+              "rssKb": 334260
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31398,
+              "rssKb": 78012
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 4257375198
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31315,
+              "rssKb": 150628
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31329,
+              "rssKb": 48488
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31333,
+              "rssKb": 344624
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31368,
+              "rssKb": 86096
+            },
+            {
+              "group": "tsserver",
+              "pid": 31384,
+              "rssKb": 283552
+            },
+            {
+              "group": "tsserver",
+              "pid": 31385,
+              "rssKb": 359680
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31398,
+              "rssKb": 74536
+            }
+          ],
+          "runId": "cold-2",
+          "schemaVersion": 1,
+          "timestampNs": 18586980460
+        }
+      ]
+    },
+    {
+      "file": "wails-cold-3.jsonl",
+      "candidate": "wails",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 157.718173,
+        "launchToTree": 211.640026,
+        "projectOpenToTree": 44.450621,
+        "fileClickToRead": 0.953147,
+        "fileClickToPresented": 37.426707,
+        "fileSwitchToStable": 60.321177,
+        "lspRoundTrip": 3829.761905,
+        "lspResponseToOutline": 15.21765
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 26,
+        "p99Ms": 31,
+        "worstMs": 38.99999999999909,
+        "over16_7": 639,
+        "over33_3": 2
+      },
+      "longestMainThreadStallMs": 22.29999999999909,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31425,
+              "rssKb": 138220
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31439,
+              "rssKb": 48524
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31443,
+              "rssKb": 141952
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 284216726
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31425,
+              "rssKb": 271936
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31439,
+              "rssKb": 48476
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31443,
+              "rssKb": 156916
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31478,
+              "rssKb": 138952
+            },
+            {
+              "group": "tsserver",
+              "pid": 31494,
+              "rssKb": 283288
+            },
+            {
+              "group": "tsserver",
+              "pid": 31495,
+              "rssKb": 325440
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31508,
+              "rssKb": 78248
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 4265343451
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31425,
+              "rssKb": 150712
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31439,
+              "rssKb": 48668
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31443,
+              "rssKb": 314212
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31478,
+              "rssKb": 85356
+            },
+            {
+              "group": "tsserver",
+              "pid": 31494,
+              "rssKb": 283288
+            },
+            {
+              "group": "tsserver",
+              "pid": 31495,
+              "rssKb": 355980
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31508,
+              "rssKb": 74760
+            }
+          ],
+          "runId": "cold-3",
+          "schemaVersion": 1,
+          "timestampNs": 18527012680
+        }
+      ]
+    },
+    {
+      "file": "wails-cold-4.jsonl",
+      "candidate": "wails",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 156.542663,
+        "launchToTree": 206.769804,
+        "projectOpenToTree": 44.117118,
+        "fileClickToRead": 0.961166,
+        "fileClickToPresented": 37.452166,
+        "fileSwitchToStable": 55.399025,
+        "lspRoundTrip": 3819.654224,
+        "lspResponseToOutline": 14.704874
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 26,
+        "p99Ms": 31,
+        "worstMs": 40,
+        "over16_7": 639,
+        "over33_3": 4
+      },
+      "longestMainThreadStallMs": 23.3,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31537,
+              "rssKb": 138012
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31551,
+              "rssKb": 48356
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31554,
+              "rssKb": 141904
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 277880475
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31537,
+              "rssKb": 265632
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31551,
+              "rssKb": 48308
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31554,
+              "rssKb": 154000
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31590,
+              "rssKb": 139028
+            },
+            {
+              "group": "tsserver",
+              "pid": 31606,
+              "rssKb": 282436
+            },
+            {
+              "group": "tsserver",
+              "pid": 31607,
+              "rssKb": 319744
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31620,
+              "rssKb": 78256
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 4233160123
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31537,
+              "rssKb": 152308
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31551,
+              "rssKb": 48500
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31554,
+              "rssKb": 329624
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31590,
+              "rssKb": 84988
+            },
+            {
+              "group": "tsserver",
+              "pid": 31606,
+              "rssKb": 282436
+            },
+            {
+              "group": "tsserver",
+              "pid": 31607,
+              "rssKb": 353784
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31620,
+              "rssKb": 74404
+            }
+          ],
+          "runId": "cold-4",
+          "schemaVersion": 1,
+          "timestampNs": 18646432020
+        }
+      ]
+    },
+    {
+      "file": "wails-cold-5.jsonl",
+      "candidate": "wails",
+      "phase": "cold",
+      "timingsMs": {
+        "launchToFirstFrame": 151.198917,
+        "launchToTree": 201.484116,
+        "projectOpenToTree": 44.318374,
+        "fileClickToRead": 1.017065,
+        "fileClickToPresented": 35.975901,
+        "fileSwitchToStable": 53.691362,
+        "lspRoundTrip": 3834.178038,
+        "lspResponseToOutline": 11.782967
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 26,
+        "p99Ms": 33,
+        "worstMs": 45,
+        "over16_7": 640,
+        "over33_3": 5
+      },
+      "longestMainThreadStallMs": 28.3,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31649,
+              "rssKb": 138120
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31663,
+              "rssKb": 48520
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31667,
+              "rssKb": 142040
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 272877842
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31649,
+              "rssKb": 262444
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31663,
+              "rssKb": 48488
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31667,
+              "rssKb": 153940
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31702,
+              "rssKb": 137948
+            },
+            {
+              "group": "tsserver",
+              "pid": 31718,
+              "rssKb": 282804
+            },
+            {
+              "group": "tsserver",
+              "pid": 31719,
+              "rssKb": 324456
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31732,
+              "rssKb": 78200
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 4233898634
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "cold",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31649,
+              "rssKb": 151208
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31663,
+              "rssKb": 48680
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31667,
+              "rssKb": 330796
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31702,
+              "rssKb": 84036
+            },
+            {
+              "group": "tsserver",
+              "pid": 31718,
+              "rssKb": 282804
+            },
+            {
+              "group": "tsserver",
+              "pid": 31719,
+              "rssKb": 357488
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31732,
+              "rssKb": 74636
+            }
+          ],
+          "runId": "cold-5",
+          "schemaVersion": 1,
+          "timestampNs": 18665023736
+        }
+      ]
+    },
+    {
+      "file": "wails-warm-1.jsonl",
+      "candidate": "wails",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 155.568298,
+        "launchToTree": 206.794722,
+        "projectOpenToTree": 43.891337,
+        "fileClickToRead": 0.884255,
+        "fileClickToPresented": 35.390201,
+        "fileSwitchToStable": 53.266223,
+        "lspRoundTrip": 3869.281229,
+        "lspResponseToOutline": 15.087895
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 27,
+        "p99Ms": 31,
+        "worstMs": 33,
+        "over16_7": 639,
+        "over33_3": 0
+      },
+      "longestMainThreadStallMs": 16.3,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31761,
+              "rssKb": 138068
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31775,
+              "rssKb": 48428
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31780,
+              "rssKb": 141932
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 276857819
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31761,
+              "rssKb": 256924
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31775,
+              "rssKb": 48380
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31780,
+              "rssKb": 154008
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31814,
+              "rssKb": 138772
+            },
+            {
+              "group": "tsserver",
+              "pid": 31830,
+              "rssKb": 273448
+            },
+            {
+              "group": "tsserver",
+              "pid": 31831,
+              "rssKb": 333000
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31844,
+              "rssKb": 78216
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 4278873703
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31761,
+              "rssKb": 162344
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31775,
+              "rssKb": 48572
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31780,
+              "rssKb": 312280
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31814,
+              "rssKb": 85148
+            },
+            {
+              "group": "tsserver",
+              "pid": 31830,
+              "rssKb": 273448
+            },
+            {
+              "group": "tsserver",
+              "pid": 31831,
+              "rssKb": 359744
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31844,
+              "rssKb": 74420
+            }
+          ],
+          "runId": "warm-1",
+          "schemaVersion": 1,
+          "timestampNs": 18566622846
+        }
+      ]
+    },
+    {
+      "file": "wails-warm-2.jsonl",
+      "candidate": "wails",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 157.036408,
+        "launchToTree": 208.364207,
+        "projectOpenToTree": 45.277986,
+        "fileClickToRead": 0.96733,
+        "fileClickToPresented": 36.132637,
+        "fileSwitchToStable": 54.056408,
+        "lspRoundTrip": 3883.131964,
+        "lspResponseToOutline": 16.486046
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 26,
+        "p99Ms": 31.00000000000091,
+        "worstMs": 48,
+        "over16_7": 639,
+        "over33_3": 4
+      },
+      "longestMainThreadStallMs": 31.3,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31873,
+              "rssKb": 137884
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31887,
+              "rssKb": 48444
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31891,
+              "rssKb": 141860
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 274860004
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31873,
+              "rssKb": 264208
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31887,
+              "rssKb": 48412
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31891,
+              "rssKb": 156020
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31926,
+              "rssKb": 137564
+            },
+            {
+              "group": "tsserver",
+              "pid": 31942,
+              "rssKb": 281916
+            },
+            {
+              "group": "tsserver",
+              "pid": 31943,
+              "rssKb": 331996
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31956,
+              "rssKb": 78196
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 4304745428
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31873,
+              "rssKb": 151264
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31887,
+              "rssKb": 48604
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31891,
+              "rssKb": 324784
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 31926,
+              "rssKb": 83376
+            },
+            {
+              "group": "tsserver",
+              "pid": 31942,
+              "rssKb": 281916
+            },
+            {
+              "group": "tsserver",
+              "pid": 31943,
+              "rssKb": 356888
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31956,
+              "rssKb": 74824
+            }
+          ],
+          "runId": "warm-2",
+          "schemaVersion": 1,
+          "timestampNs": 18656064858
+        }
+      ]
+    },
+    {
+      "file": "wails-warm-3.jsonl",
+      "candidate": "wails",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 161.715297,
+        "launchToTree": 214.585999,
+        "projectOpenToTree": 40.845886,
+        "fileClickToRead": 0.914434,
+        "fileClickToPresented": 37.436029,
+        "fileSwitchToStable": 60.362542,
+        "lspRoundTrip": 3872.620031,
+        "lspResponseToOutline": 11.756715
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 26,
+        "p99Ms": 33,
+        "worstMs": 39,
+        "over16_7": 639,
+        "over33_3": 5
+      },
+      "longestMainThreadStallMs": 22.3,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31984,
+              "rssKb": 138036
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31998,
+              "rssKb": 48480
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32003,
+              "rssKb": 141788
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 290504765
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31984,
+              "rssKb": 261180
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31998,
+              "rssKb": 48448
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32003,
+              "rssKb": 153948
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 32037,
+              "rssKb": 137624
+            },
+            {
+              "group": "tsserver",
+              "pid": 32053,
+              "rssKb": 282560
+            },
+            {
+              "group": "tsserver",
+              "pid": 32054,
+              "rssKb": 324660
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32067,
+              "rssKb": 78204
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 4296031542
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 31984,
+              "rssKb": 152500
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 31998,
+              "rssKb": 48640
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32003,
+              "rssKb": 327116
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 32037,
+              "rssKb": 83700
+            },
+            {
+              "group": "tsserver",
+              "pid": 32053,
+              "rssKb": 282560
+            },
+            {
+              "group": "tsserver",
+              "pid": 32054,
+              "rssKb": 358516
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32067,
+              "rssKb": 75552
+            }
+          ],
+          "runId": "warm-3",
+          "schemaVersion": 1,
+          "timestampNs": 18644182383
+        }
+      ]
+    },
+    {
+      "file": "wails-warm-4.jsonl",
+      "candidate": "wails",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 155.289396,
+        "launchToTree": 203.205403,
+        "projectOpenToTree": 41.250935,
+        "fileClickToRead": 0.789473,
+        "fileClickToPresented": 38.142885,
+        "fileSwitchToStable": 57.225101,
+        "lspRoundTrip": 3919.488426,
+        "lspResponseToOutline": 12.88257
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19,
+        "p95Ms": 25.00000000000182,
+        "p99Ms": 31,
+        "worstMs": 48,
+        "over16_7": 639,
+        "over33_3": 1
+      },
+      "longestMainThreadStallMs": 31.3,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 32096,
+              "rssKb": 138280
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32110,
+              "rssKb": 48412
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32115,
+              "rssKb": 141816
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 280002790
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 32096,
+              "rssKb": 265596
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32110,
+              "rssKb": 48364
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32115,
+              "rssKb": 153780
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 32149,
+              "rssKb": 139532
+            },
+            {
+              "group": "tsserver",
+              "pid": 32165,
+              "rssKb": 283016
+            },
+            {
+              "group": "tsserver",
+              "pid": 32166,
+              "rssKb": 338812
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32179,
+              "rssKb": 78220
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 4337908987
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 32096,
+              "rssKb": 158316
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32110,
+              "rssKb": 48556
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32115,
+              "rssKb": 321964
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 32149,
+              "rssKb": 85436
+            },
+            {
+              "group": "tsserver",
+              "pid": 32165,
+              "rssKb": 283016
+            },
+            {
+              "group": "tsserver",
+              "pid": 32166,
+              "rssKb": 357896
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32179,
+              "rssKb": 75540
+            }
+          ],
+          "runId": "warm-4",
+          "schemaVersion": 1,
+          "timestampNs": 18676982936
+        }
+      ]
+    },
+    {
+      "file": "wails-warm-5.jsonl",
+      "candidate": "wails",
+      "phase": "warm",
+      "timingsMs": {
+        "launchToFirstFrame": 156.006286,
+        "launchToTree": 208.272885,
+        "projectOpenToTree": 44.277253,
+        "fileClickToRead": 0.660953,
+        "fileClickToPresented": 36.189755,
+        "fileSwitchToStable": 57.203122,
+        "lspRoundTrip": 4001.47993,
+        "lspResponseToOutline": 15.140128
+      },
+      "frames": {
+        "count": 640,
+        "medianMs": 19.00000000000091,
+        "p95Ms": 25,
+        "p99Ms": 31,
+        "worstMs": 35,
+        "over16_7": 639,
+        "over33_3": 2
+      },
+      "longestMainThreadStallMs": 18.3,
+      "memory": [
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "idle",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 32208,
+              "rssKb": 138116
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32222,
+              "rssKb": 48420
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32226,
+              "rssKb": 142036
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 279528932
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "loaded",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 32208,
+              "rssKb": 262692
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32222,
+              "rssKb": 48388
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32226,
+              "rssKb": 156028
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 32262,
+              "rssKb": 138016
+            },
+            {
+              "group": "tsserver",
+              "pid": 32278,
+              "rssKb": 284644
+            },
+            {
+              "group": "tsserver",
+              "pid": 32279,
+              "rssKb": 338520
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32292,
+              "rssKb": 78080
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 4420251102
+        },
+        {
+          "candidate": "wails",
+          "event": "memory_sample",
+          "label": "complete",
+          "phase": "warm",
+          "processes": [
+            {
+              "group": "ui-runtime",
+              "pid": 32208,
+              "rssKb": 154228
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32222,
+              "rssKb": 48580
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32226,
+              "rssKb": 324856
+            },
+            {
+              "group": "typescript-language-server",
+              "pid": 32262,
+              "rssKb": 83904
+            },
+            {
+              "group": "tsserver",
+              "pid": 32278,
+              "rssKb": 284644
+            },
+            {
+              "group": "tsserver",
+              "pid": 32279,
+              "rssKb": 359832
+            },
+            {
+              "group": "ui-runtime",
+              "pid": 32292,
+              "rssKb": 75708
+            }
+          ],
+          "runId": "warm-5",
+          "schemaVersion": 1,
+          "timestampNs": 18866606069
+        }
+      ]
+    }
+  ]
+}
