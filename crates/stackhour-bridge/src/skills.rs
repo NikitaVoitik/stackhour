@@ -687,7 +687,7 @@ pre = ["/bin/echo", "{{skill}}", "{{arg:note}}", "{{arg:missing}}"]
     fn a_successful_pre_hook_lets_the_turn_proceed() {
         let (_d, reg) = registry(&[(
             "skills/s/skill.toml",
-            "description = \"d\"\n[hooks]\npre = [\"/bin/true\"]\npost = [\"/bin/true\"]\n",
+            "description = \"d\"\n[hooks]\npre = [\"/usr/bin/true\"]\npost = [\"/usr/bin/true\"]\n",
         )]);
         let plan = plan_invocation(&reg, "s", "").expect("plan");
         assert_eq!(run_pre_hooks(&plan), Ok(()));
@@ -711,7 +711,7 @@ pre = ["/bin/echo", "{{skill}}", "{{arg:note}}", "{{arg:missing}}"]
     fn a_failing_post_hook_is_reported_but_not_fatal() {
         let (_d, reg) = registry(&[(
             "skills/s/skill.toml",
-            "description = \"d\"\n[hooks]\npost = [\"/bin/false\"]\n",
+            "description = \"d\"\n[hooks]\npost = [\"/usr/bin/false\"]\n",
         )]);
         let plan = plan_invocation(&reg, "s", "").expect("plan");
         let msg = run_post_hooks(&plan).expect("a log line");
