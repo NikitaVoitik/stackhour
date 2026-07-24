@@ -5,6 +5,7 @@ import { gpuEnvironment, runGpuChecked } from "./gpu-harness.mjs";
 
 const base = join(dirname(fileURLToPath(import.meta.url)), "..");
 const executable = join(base, "gpui", "target", "release", "stackhour-bench-gpui");
+const x11Runner = join(base, "scripts", "with-gpui-x11.sh");
 await mkdir(join(base, "results", "raw"), { recursive: true });
 await stat(executable);
 async function run(phase, index, prime = false) {
@@ -28,7 +29,8 @@ async function run(phase, index, prime = false) {
     candidate: "gpui",
     phase,
     index,
-    command: executable,
+    command: x11Runner,
+    args: [executable],
     env,
   });
 }

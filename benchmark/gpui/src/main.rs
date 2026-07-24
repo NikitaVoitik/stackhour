@@ -637,10 +637,7 @@ fn main() {
     let autorun = std::env::var("BENCH_AUTORUN").as_deref() == Ok("1");
     Application::new().run(move |cx: &mut App| {
         let bounds = Bounds {
-            // GPUI's X11 backend adds a two-pixel X offset when creating the
-            // native window. Compensate so the canonical 1280x800 surface
-            // starts at the display origin when no window manager is active.
-            origin: point(px(-2.), px(0.)),
+            origin: point(px(0.), px(0.)),
             size: size(px(1280.), px(800.)),
         };
         cx.open_window(
