@@ -2,6 +2,7 @@
 set -euo pipefail
 base="$(cd "$(dirname "$0")/.." && pwd)"
 app="$base/gpui/target/release/stackhour-bench-gpui"
+display="${BENCH_DISPLAY:-${DISPLAY:-:0}}"
 mkdir -p "$base/screenshots"
 capture="$(mktemp -d /tmp/stackhour-gpui-capture.XXXXXX)"
 cleanup() {
@@ -9,7 +10,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-xvfb-run -a -s '-screen 0 1280x800x24 -dpi 96' bash -c '
+BENCH_DISPLAY="$display" DISPLAY="$display" node "$base/scripts/gpu-preflight.mjs"
+DISPLAY="$display" BENCH_DISPLAY="$display" bash -c '
   set -euo pipefail
   base="$1"
   app="$2"
@@ -21,7 +23,6 @@ xvfb-run -a -s '-screen 0 1280x800x24 -dpi 96' bash -c '
     --backend=x11-backend.so \
     --width=1280 \
     --height=800 \
-    --use-pixman \
     --shell=kiosk-shell.so \
     --socket=wayland-gpui \
     --debug \
@@ -34,10 +35,9 @@ xvfb-run -a -s '-screen 0 1280x800x24 -dpi 96' bash -c '
     sleep 0.05
   done
   XDG_RUNTIME_DIR="$runtime" WAYLAND_DISPLAY=wayland-gpui \
+    DISPLAY="$BENCH_DISPLAY" BENCH_DISPLAY="$BENCH_DISPLAY" \
     BENCH_FIXTURE="$base/.fixture" \
     BENCH_LSP="$base/node_modules/.bin/typescript-language-server" \
-    VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json \
-    LIBGL_ALWAYS_SOFTWARE=1 \
     "$app" &
   app_pid=$!
   sleep 8
