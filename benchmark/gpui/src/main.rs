@@ -642,7 +642,7 @@ fn main() {
         };
         cx.open_window(
             WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_bounds: Some(WindowBounds::Fullscreen(bounds)),
                 titlebar: Some(TitlebarOptions {
                     title: Some("Stackhour UI Benchmark".into()),
                     appears_transparent: true,
