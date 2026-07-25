@@ -128,10 +128,18 @@ config.json as-is.** The Rust coordinator parses the Node's config file
 verbatim: `token`, `chatId`, `defaultTarget`, all three `targets`, and
 `elevenLabsApiKey` are exactly the keys it wants. This also keeps `state.json`
 (offset, active target, engine, sessions), `jobs/`, `inprogress/`, `results/`,
-`media/` and `worker-heartbeat` in place, and — critically — keeps the Mac
-worker working, because the worker SSHes to `<remoteDir>/claim.mjs` and
-`<remoteDir>/return.mjs`, which are the Node scripts already sitting in
-`~/.claude-remote`. Nothing on the Mac needs to change. Note the Node config
+`media/` and `worker-heartbeat` in place.
+
+A legacy Mac worker keeps working unchanged on this layout: it SSHes to
+`<remoteDir>/claim.mjs` and `<remoteDir>/return.mjs`, and those Node scripts
+are already sitting in `~/.claude-remote` on the leader — they were never
+part of this repository, so removing the repo's Node tree did not touch them.
+
+If you also upgrade the Mac to the `stackhour` worker, that changes: it runs
+`<remoteDir>/stackhour bridge claim` instead. Run `bridge install coordinator`
+on the leader first so the binary is present in the runtime dir, and note the
+installer no longer writes `.mjs` shims — an upgraded leader plus a legacy
+Node worker only works while the old scripts remain in place. Note the legacy config
 has no `ship` key, so `/ship` on this layout parks on `defaultTarget` unless
 you add `"ship": { "target": "blort", "engine": "claude" }` to it.
 
@@ -146,9 +154,10 @@ and sent `🤖 Claude + Codex bridge online. Active: Claude on ☁️ GCP.`
 
 **(b) A separate migrated runtime dir.** Boots as-is with the `ship`
 destination already set, but you must still copy `state.json` across and
-re-point the Mac worker's `remoteDir` at the new directory with
-`claim.mjs`/`return.mjs` present there — those two steps are why (a) stays
-the recommendation for the live box.
+re-point the Mac worker's `remoteDir` at the new directory — with the
+`stackhour` binary present there for an upgraded worker, or the legacy
+`claim.mjs`/`return.mjs` copied across for a legacy one. Those two steps are
+why (a) stays the recommendation for the live box.
 
 ---
 
@@ -238,7 +247,7 @@ on pull-workers (see "Topologies" in [bridge.md](bridge.md)).
    leader-only (drop the local target, keep one entry per worker).
 3. Re-point every worker's `leaderSsh` (legacy spelling: `gcpSsh`) in its
    `worker-config.json` at the new host and restart the workers.
-4. **Targeted-claim rollout hazard.** Upgrade the leader's `claim.mjs` shim
+4. **Targeted-claim rollout hazard (legacy workers only).** Upgrade the leader's `claim.mjs` shim
    — re-running `stackhour bridge install coordinator` rewrites it —
    **before** giving any worker a `target` name in its
    `worker-config.json`. The ORIGINAL Node `claim.mjs` ignores its target
@@ -322,7 +331,7 @@ repo has ever contacted `api.telegram.org`.
 | Final-message rendering: rich-first then delete-status then HTML fallback, chunking, ASCII table conversion | `rendering_parity_with_the_node.rs`, payload-for-payload against a captured Node fixture |
 | Telegram transport: retry ladder, 400/404 terminal, 409, 429 + `retry_after`, `not modified`, long-poll parameters | `transport_telegram.rs` |
 | `tg-send`: rich-then-plain, chunking at 4000, `--from`, stdin, exit codes | `transport_tg_send.rs` |
-| Mac job protocol: dispatch → the **real** `claim.mjs` → the **real** `return.mjs` → delivery; heartbeat; atomic publish | `mac_worker_wire_compat.rs` — runs the owner's actual Node scripts |
+| Mac job protocol: dispatch → `claim` → `return` → delivery; heartbeat; atomic publish | `mac_worker_wire_compat.rs` (lane round trip) and `mac_worker_cli_wire_compat.rs` (the compiled binary's argv/stdout/exit contract) |
 | Config parsing: reads the live `~/.claude-remote/config.json` shape unchanged | `bridge_migrate_fixture.rs` over the committed fixture; plus a rehearsal boot against a copy of the real runtime dir |
 | Migration content: every legacy key reaches a destination, all three targets and every per-target field survive, dry-run writes nothing, secrets masked | `bridge_migrate_fixture.rs` |
 
@@ -345,7 +354,7 @@ both pass on this tree.
 | Difference | Detail |
 |---|---|
 | **`/ship`'s destination is a config key, not a hardcode** | `coordinator.mjs:363` hardcodes `state.active = 'blort'`; the Rust `ship_cfg` reads the runtime `ship` key (falling back to `defaultTarget`). The migration writes `"ship": { "target": "blort", "engine": "claude" }`, so a migrated runtime dir behaves like the live Node. On layout (a) of §1.4 — reusing the Node's own config.json — add that key by hand. Pinned by `the_ship_destination_is_carried_into_the_runtime_config`. |
-| **`bridge install` installs the binary, not the `.mjs` files** | `install` / `doctor` / `status` / `restart` are implemented (`installer.rs` / `doctor.rs`; the `stackhour bridge doctor` instruction printed by `bridge migrate` now works). The runtime install copies the *running* stackhour binary into the runtime dir plus node-runnable `claim.mjs`/`return.mjs`/`tg-send.mjs` shims that exec it, instead of Node's five `.mjs` files — so a Node Mac worker keeps calling `node claim.mjs` unchanged. The doctor checks `stackhour` where the Node checked `coordinator.mjs`/`worker.mjs`, keeps the `Node.js >=22` line as a PATH probe (the shims still need node), and additionally surfaces registry validation errors as ✗ lines. `bridge install coordinator` writes a **user** unit whose `ExecStart` is `<runtime-dir>/stackhour bridge coordinator` — never node — while §2.1's cutover unit stays a hand-written **system** unit. |
+| **`bridge install` installs the binary, and only the binary** | `install` / `doctor` / `status` / `restart` are implemented (`installer.rs` / `doctor.rs`; the `stackhour bridge doctor` instruction printed by `bridge migrate` works). The runtime install copies the *running* stackhour binary into the runtime dir, instead of Node's five `.mjs` files. It briefly also wrote `claim.mjs`/`return.mjs`/`tg-send.mjs` shims so a legacy Node worker could keep calling `node claim.mjs`; those are gone, along with the doctor's `Node.js >=22` PATH probe, now that a worker runs `<remoteDir>/stackhour bridge claim` directly. **Consequence for a half-migrated rollout:** an upgraded leader no longer *creates* the shims, so a legacy Node worker only keeps working while the original scripts remain in its `remoteDir`. The doctor checks `stackhour` where the Node checked `coordinator.mjs`/`worker.mjs`, and additionally surfaces registry validation errors as ✗ lines. `bridge install coordinator` writes a **user** unit whose `ExecStart` is `<runtime-dir>/stackhour bridge coordinator`, while §2.1's cutover unit stays a hand-written **system** unit. |
 | **A missing `defaultTarget` falls back to `gcp`** | Deliberate. `coordinator.mjs` does `s.active ||= CONFIG.defaultTarget` with no validation, so an absent key leaves `active` undefined and every later `targets[active]` lookup silently misses. That is a bug in the Node, not a contract. The installer's strict validator still rejects the key. |
 | **Targets outside `gcp`/`mac` are second-class** | The registry pins targets to `gcp|mac`. `blort` survives in `targets` and still runs, but nothing in the command surface switches to it. |
 | **`engines/*.toml` are frozen at migration time** | Migrating with engines (the default) freezes the built-in argv construction to disk; later upstream argv fixes will not reach them. Use `--no-engines` to keep tracking the built-ins. |

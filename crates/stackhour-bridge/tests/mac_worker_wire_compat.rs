@@ -1,26 +1,23 @@
-//! Wire compatibility with the EXISTING Node Mac-worker scripts.
+//! The full worker round trip through the coordinator's lane.
 //!
-//! The Mac worker is not being ported in lockstep with the coordinator: for
-//! as long as the owner runs the shipped `claim.mjs` / `return.mjs` on his
-//! laptop, the Rust coordinator has to speak exactly the protocol those two
-//! scripts speak. These tests therefore do NOT re-implement the Node side —
-//! they run it, with `node`, as a real child process, against a temp runtime
-//! directory:
+//! Both halves of the queue protocol, end to end against a temp runtime dir:
 //!
-//! * the coordinator's [`WorkerLane::dispatch`] writes a job → the real
-//!   `claim.mjs` claims it, atomically, and prints it back;
-//! * the real `return.mjs` publishes a result → the coordinator's
+//! * the coordinator's [`WorkerLane::dispatch`] writes a job → `claim` takes
+//!   it, atomically, and hands back its raw JSON;
+//! * `return` publishes a result → the coordinator's
 //!   [`WorkerLane::poll_results`] picks it up and delivers the answer.
+//!
+//! These tests used to spawn the shipped `claim.mjs` / `return.mjs` with
+//! `node`, because the Mac worker ran those scripts while the coordinator was
+//! being ported. Node is retired: a worker now runs
+//! `<remoteDir>/stackhour bridge claim|return` over SSH, so the protocol under
+//! test is reached through [`jobs`] directly. The subprocess-level contract —
+//! argv, stdout, exit codes — is covered separately, against the real compiled
+//! binary, by `crates/stackhour/tests/mac_worker_cli_wire_compat.rs`.
 //!
 //! SAFETY: the Telegram half runs against the local mock in
 //! `common/mock_bot_api.rs`, never `api.telegram.org`. The filesystem half
-//! runs in a `tempfile::tempdir()`, never `~/.claude-remote/` — the scripts
-//! resolve their queue directories from their OWN location, so copying them
-//! into the temp dir is what keeps the owner's live queue untouched.
-//!
-//! The scripts under test are the repo copies in `src/bridge/`. `claim.mjs`
-//! is byte-identical to the deployed one; `return.mjs` differs only by the
-//! job-id validation the repo added, which every real (UUID) id passes.
+//! runs in a `tempfile::tempdir()`, never `~/.claude-remote/`.
 
 #[path = "common/mock_bot_api.rs"]
 mod mock;
@@ -31,8 +28,7 @@ use stackhour_bridge::local_lane::{LaneContext, LocalTarget};
 use stackhour_bridge::telegram::{Tg, TgConfig};
 use stackhour_bridge::worker_lane::{WorkerContext, WorkerLane};
 use stackhour_bridge::{jobs, BridgePaths};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -98,16 +94,12 @@ struct Harness {
     paths: BridgePaths,
 }
 
-/// A temp runtime dir with the queue layout AND the two Node scripts copied
-/// in beside it, exactly as they sit in `~/.claude-remote/`.
+/// A temp runtime dir with the queue layout the worker lane expects.
 fn harness() -> Harness {
     let api = MockApi::start();
     let dir = tempfile::tempdir().unwrap();
     let paths = BridgePaths::from_runtime_dir(dir.path());
     paths.ensure_dirs().unwrap();
-    for script in ["claim.mjs", "return.mjs"] {
-        std::fs::copy(node_script(script), dir.path().join(script)).unwrap();
-    }
 
     let mut cfg = TgConfig::new("test-token", CHAT).with_api_root(api.base.clone());
     cfg.backoff_base_ms = 1;
@@ -147,68 +139,32 @@ fn delivered_text(api: &MockApi) -> String {
         .to_string()
 }
 
-fn node_script(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../src/bridge")
-        .join(name)
+/// One `bridge claim` poll. Returns what the verb would print on stdout:
+/// either one raw job JSON, or empty for "no work".
+///
+/// This is the body of [`jobs::run_claim`]'s loop without its blocking wait —
+/// that verb polls for up to ~25s before reporting an empty claim, which
+/// would add half a minute to every "nothing claimable" assertion here for no
+/// extra coverage. The claim itself, the heartbeat, and the `.json` filter are
+/// the same calls the verb makes.
+fn claim(dir: &Path) -> String {
+    let paths = BridgePaths::from_runtime_dir(dir);
+    jobs::beat(&jobs::heartbeat_path_for(&paths, None));
+    jobs::try_claim_target(&paths.jobs_dir, &paths.inprogress_dir, None).unwrap_or_default()
 }
 
-/// `node` is not a build dependency of this crate, so a box without it skips
-/// rather than fails — but say so loudly, because a silent skip would let the
-/// protocol rot.
-fn node_available() -> bool {
-    match Command::new("node").arg("--version").output() {
-        Ok(o) if o.status.success() => true,
-        _ => {
-            eprintln!("SKIPPED: `node` is not on PATH; the Node wire-compat half did not run");
-            false
-        }
-    }
-}
-
-/// Run the real `claim.mjs` in the temp runtime dir. Returns its stdout,
-/// which is either one raw job JSON or empty.
-fn node_claim(dir: &Path) -> String {
-    let out = Command::new("node")
-        .arg(dir.join("claim.mjs"))
-        .output()
-        .expect("spawn claim.mjs");
-    assert!(out.status.success(), "claim.mjs exit: {:?}", out.status);
-    String::from_utf8(out.stdout).expect("claim.mjs stdout is utf8")
-}
-
-/// Run the real `return.mjs <id>` with `payload` on stdin. Returns its exit
-/// code.
-fn node_return(dir: &Path, id: &str, payload: &str) -> i32 {
-    use std::io::Write as _;
-    let mut child = Command::new("node")
-        .arg(dir.join("return.mjs"))
-        .arg(id)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("spawn return.mjs");
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(payload.as_bytes())
-        .unwrap();
-    let out = child.wait_with_output().unwrap();
-    out.status.code().unwrap_or(-1)
+/// `bridge return <id>` with `payload` as its stdin. Returns the exit code.
+fn ret(dir: &Path, id: &str, payload: &str) -> i32 {
+    jobs::run_return_with(dir, id, payload)
 }
 
 // ------------------------------------------------- coordinator -> worker
 
-/// The job file the Rust coordinator writes must be claimable, verbatim, by
-/// the worker script the owner is running today: same directory, same
-/// `.json` filter, same rename-into-`inprogress` claim, same fields.
+/// The job file the coordinator writes must be claimable verbatim: same
+/// directory, same `.json` filter, same rename-into-`inprogress` claim, and
+/// the same fields a worker reads.
 #[test]
-fn a_rust_dispatched_job_is_claimed_intact_by_the_real_claim_mjs() {
-    if !node_available() {
-        return;
-    }
+fn a_rust_dispatched_job_is_claimed_intact() {
     let h = harness();
     jobs::beat(&h.paths.heartbeat_path);
     h.api.push(Reply::ok(json!({ "message_id": 1 })));
@@ -218,8 +174,8 @@ fn a_rust_dispatched_job_is_claimed_intact_by_the_real_claim_mjs() {
         .dispatch("ship the thing", "codex", None, None)
         .expect("dispatched");
 
-    let claimed = node_claim(h.dir.path());
-    let job: Value = serde_json::from_str(&claimed).expect("claim.mjs printed valid job json");
+    let claimed = claim(h.dir.path());
+    let job: Value = serde_json::from_str(&claimed).expect("claim printed valid job json");
     assert_eq!(job["id"], id);
     assert_eq!(job["prompt"], "ship the thing");
     assert_eq!(job["engine"], "codex");
@@ -227,7 +183,7 @@ fn a_rust_dispatched_job_is_claimed_intact_by_the_real_claim_mjs() {
     assert_eq!(job["sessionId"], Value::Null);
     assert_eq!(
         job["target"], "mac",
-        "the roster stamp — an unknown field the Node worker ignores"
+        "the roster stamp"
     );
     assert!(job["ts"].is_number());
 
@@ -237,21 +193,18 @@ fn a_rust_dispatched_job_is_claimed_intact_by_the_real_claim_mjs() {
 
     // Nothing left to claim, and the second poll still exits 0 with empty
     // stdout — that is how the worker tells "no work" from "a job".
-    assert_eq!(node_claim(h.dir.path()), "");
+    assert_eq!(claim(h.dir.path()), "");
 }
 
-/// The tmp+rename publish: `claim.mjs` filters on `.json`, so the in-flight
-/// `.json.tmp` a Rust dispatch writes is invisible to it and can never be
-/// claimed half-written.
+/// The tmp+rename publish: claim filters on `.json`, so the in-flight
+/// `.json.tmp` a dispatch writes is invisible to it and can never be claimed
+/// half-written.
 #[test]
-fn the_tmp_publish_file_is_invisible_to_the_real_claim_mjs() {
-    if !node_available() {
-        return;
-    }
+fn the_tmp_publish_file_is_invisible_to_claim() {
     let h = harness();
     // A torn write left behind by a crashed dispatch.
     std::fs::write(h.paths.jobs_dir.join("aaaa.json.tmp"), r#"{"id":"aaaa","pro"#).unwrap();
-    assert_eq!(node_claim(h.dir.path()), "", "a .json.tmp must not be claimable");
+    assert_eq!(claim(h.dir.path()), "", "a .json.tmp must not be claimable");
     assert!(h.paths.jobs_dir.join("aaaa.json.tmp").exists());
     assert_eq!(std::fs::read_dir(&h.paths.inprogress_dir).unwrap().count(), 0);
 }
@@ -260,19 +213,16 @@ fn the_tmp_publish_file_is_invisible_to_the_real_claim_mjs() {
 /// test must read the file the NODE side writes. This is the whole
 /// online/offline signal, and it is a bare `Date.now()` with no newline.
 #[test]
-fn the_heartbeat_the_real_claim_mjs_writes_reads_as_online_in_rust() {
-    if !node_available() {
-        return;
-    }
+fn the_heartbeat_claim_writes_reads_as_online() {
     let h = harness();
     assert!(!h.lane.worker_alive(), "no heartbeat file yet: offline");
 
-    node_claim(h.dir.path()); // claims nothing, beats anyway
+    claim(h.dir.path()); // claims nothing, beats anyway
 
-    let raw = std::fs::read_to_string(&h.paths.heartbeat_path).expect("claim.mjs wrote a heartbeat");
+    let raw = std::fs::read_to_string(&h.paths.heartbeat_path).expect("claim wrote a heartbeat");
     assert!(!raw.ends_with('\n'), "bare ms epoch, no newline: {raw:?}");
     assert!(raw.parse::<i64>().is_ok(), "decimal ms: {raw:?}");
-    assert!(h.lane.worker_alive(), "a just-written Node heartbeat is online");
+    assert!(h.lane.worker_alive(), "a just-written heartbeat is online");
 
     // The 60s liveness window, from both sides of the boundary.
     let beat_at = raw.parse::<i64>().unwrap();
@@ -287,9 +237,6 @@ fn the_heartbeat_the_real_claim_mjs_writes_reads_as_online_in_rust() {
 /// it — which is the point of the queue.
 #[test]
 fn a_job_dispatched_while_the_worker_is_offline_is_claimed_when_it_wakes() {
-    if !node_available() {
-        return;
-    }
     let h = harness();
     std::fs::write(&h.paths.heartbeat_path, (jobs::now_ms() - 120_000).to_string()).unwrap();
     h.api.push(Reply::ok(json!({ "message_id": 7 })));
@@ -306,26 +253,22 @@ fn a_job_dispatched_while_the_worker_is_offline_is_claimed_when_it_wakes() {
     assert_eq!(h.lane.pending_len(), 1, "still pending, not dropped");
 
     // The Mac wakes: its first poll both beats and takes the queued job.
-    let job: Value = serde_json::from_str(&node_claim(h.dir.path())).unwrap();
+    let job: Value = serde_json::from_str(&claim(h.dir.path())).unwrap();
     assert_eq!(job["id"], id);
     assert!(h.lane.worker_alive(), "the wake-up poll flipped it online");
 }
 
 // ------------------------------------------------- worker -> coordinator
 
-/// The other direction: a result published by the real `return.mjs` must be
-/// consumed by `pollResults`, delivered to the user, and clear the
-/// inprogress marker.
+/// The other direction: a published result must be consumed by
+/// `pollResults`, delivered to the user, and clear the inprogress marker.
 #[test]
-fn a_result_published_by_the_real_return_mjs_is_delivered_by_poll_results() {
-    if !node_available() {
-        return;
-    }
+fn a_published_result_is_delivered_by_poll_results() {
     let h = harness();
     jobs::beat(&h.paths.heartbeat_path);
     h.api.push(Reply::ok(json!({ "message_id": 55 })));
     let id = h.lane.dispatch("what is 2+2", "claude", None, None).unwrap();
-    node_claim(h.dir.path());
+    claim(h.dir.path());
     h.ctx.now.store(3_500, Ordering::SeqCst); // 3.5s of "work"
 
     let payload = json!({
@@ -333,7 +276,7 @@ fn a_result_published_by_the_real_return_mjs_is_delivered_by_poll_results() {
         "sessionId": "sess-from-mac", "code": 0, "error": null
     })
     .to_string();
-    assert_eq!(node_return(h.dir.path(), &id, &payload), 0);
+    assert_eq!(ret(h.dir.path(), &id, &payload), 0);
 
     // Published atomically, with no litter for the 1s poller to trip over.
     let names: Vec<String> = std::fs::read_dir(&h.paths.results_dir)
@@ -343,7 +286,7 @@ fn a_result_published_by_the_real_return_mjs_is_delivered_by_poll_results() {
     assert_eq!(names, vec![format!("{id}.json")], "no .json.tmp left behind");
     assert!(
         !h.paths.inprogress_dir.join(format!("{id}.json")).exists(),
-        "return.mjs clears the inprogress marker"
+        "return clears the inprogress marker"
     );
 
     h.api.push(Reply::ok(json!({ "ok": true }))); // deleteMessage
@@ -366,21 +309,18 @@ fn a_result_published_by_the_real_return_mjs_is_delivered_by_poll_results() {
     assert_eq!(delivered_text(&h.api), "4\n\n— Codex · 🖥️ Mac · 4s");
 }
 
-/// The worker pipes nothing when the engine produced nothing. `return.mjs`
-/// turns empty stdin into `{}`, and the coordinator must render a message
-/// rather than go silent.
+/// The worker pipes nothing when the engine produced nothing. `return`
+/// turns an empty payload into `{}`, and the coordinator must render a
+/// message rather than go silent.
 #[test]
-fn an_empty_payload_from_the_real_return_mjs_still_reaches_the_user() {
-    if !node_available() {
-        return;
-    }
+fn an_empty_return_payload_still_reaches_the_user() {
     let h = harness();
     jobs::beat(&h.paths.heartbeat_path);
     h.api.push(Reply::ok(json!({ "message_id": 60 })));
     let id = h.lane.dispatch("silence", "claude", None, None).unwrap();
-    node_claim(h.dir.path());
+    claim(h.dir.path());
 
-    assert_eq!(node_return(h.dir.path(), &id, ""), 0);
+    assert_eq!(ret(h.dir.path(), &id, ""), 0);
     assert_eq!(
         std::fs::read_to_string(h.paths.results_dir.join(format!("{id}.json"))).unwrap(),
         "{}"
@@ -392,22 +332,19 @@ fn an_empty_payload_from_the_real_return_mjs_still_reaches_the_user() {
     assert_eq!(delivered_text(&h.api), "(no output)\n\n— Claude · 🖥️ Mac · 0s");
 }
 
-/// The full loop, both scripts, one job: dispatch → claim → return →
-/// deliver, ending with all three directories empty.
+/// The full loop, one job: dispatch → claim → return → deliver, ending with
+/// all three directories empty.
 #[test]
-fn the_whole_job_round_trip_runs_through_both_node_scripts() {
-    if !node_available() {
-        return;
-    }
+fn the_whole_job_round_trip_runs_through_both_verbs() {
     let h = harness();
     jobs::beat(&h.paths.heartbeat_path);
     h.api.push(Reply::ok(json!({ "message_id": 70 })));
     let id = h.lane.dispatch("round trip", "claude", None, None).unwrap();
 
-    let job: Value = serde_json::from_str(&node_claim(h.dir.path())).unwrap();
+    let job: Value = serde_json::from_str(&claim(h.dir.path())).unwrap();
     let echo = json!({ "id": job["id"], "engine": job["engine"], "text": "done",
                        "sessionId": "s9", "code": 0, "error": null });
-    assert_eq!(node_return(h.dir.path(), &id, &echo.to_string()), 0);
+    assert_eq!(ret(h.dir.path(), &id, &echo.to_string()), 0);
 
     h.api.push(Reply::ok(json!({ "ok": true })));
     h.api.push(Reply::ok(json!({ "message_id": 71 })));

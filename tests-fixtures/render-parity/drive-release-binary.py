@@ -12,7 +12,7 @@ import http.server, json, os, pathlib, subprocess, sys, tempfile, threading, tim
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 BIN = REPO / "target/release/stackhour"
-CASES = json.loads((REPO / "test/render-parity/cases.json").read_text())
+CASES = json.loads((REPO / "tests-fixtures/render-parity/cases.json").read_text())
 
 case_name = sys.argv[1] if len(sys.argv) > 1 else "markdown-table"
 case = next(c for c in CASES if c["name"] == case_name)

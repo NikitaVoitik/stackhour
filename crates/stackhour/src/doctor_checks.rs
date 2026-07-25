@@ -1,8 +1,8 @@
 //! The individual doctor checks with EXACT names/statuses/messages (split
 //! from doctor.rs for the line budget).
 //!
-//! Inventory, in order: 'node' (kept as a check NAME even though the Rust
-//! build has no Node runtime — see `runtime_check`), 'sqlite',
+//! Inventory, in order: 'runtime' (was 'node' before Node was retired — see
+//! `runtime_check`), 'sqlite',
 //! 'config' / 'config-permissions' (octal 3-pad, ' (recommend 600)',
 //! missing-file warn WITHOUT a following ok line), 'data-dir' (ancestor
 //! walk-up), 'offline-queue' (byte message in both ok and warn branches),
@@ -38,17 +38,21 @@ pub fn zed_db_paths(home: &Path) -> Vec<PathBuf> {
     ]
 }
 
-/// The 'node' check.
+/// The 'runtime' check.
 ///
-/// PARITY DECISION: Node's doctor reports the Node major version and errors
-/// below 22. The Rust binary has no Node dependency at all, so there is
-/// nothing to be too old — but the check NAME is a documented output key that
-/// scripts grep for, so it is kept and always reports ok with the Rust build.
+/// The Node doctor reported its interpreter's major version and errored below
+/// 22. The port kept the check keyed `node` — reporting "no node runtime
+/// required" — so scripts grepping that key kept working during the
+/// migration. Node is now gone from the project entirely, and a check named
+/// after it is exactly the stale artifact that misleads a reader about what
+/// the program needs, so the key is `runtime`.
+///
+/// BREAKING (`doctor --json`): `checks[0].name` is `runtime`, was `node`.
 fn runtime_check() -> Check {
     Check::new(
-        "node",
+        "runtime",
         StatusOk,
-        format!("rust {} (no node runtime required)", stackhour_core::VERSION),
+        format!("rust {}", stackhour_core::VERSION),
     )
 }
 
@@ -993,7 +997,7 @@ mod tests {
     /// pre-feature version.
     #[cfg(all(feature = "tracker", feature = "agent", feature = "bridge"))]
     #[test]
-    fn check_order_matches_the_node_inventory() {
+    fn check_order_matches_the_documented_inventory() {
         let tmp = TempDir::new().unwrap();
         let opts = opts_for(&tmp);
         let cfg = config_at(&opts.config_path, "{}");
@@ -1008,7 +1012,7 @@ mod tests {
         assert_eq!(
             names,
             vec![
-                "node",
+                "runtime",
                 "sqlite",
                 "config",
                 "config-permissions",

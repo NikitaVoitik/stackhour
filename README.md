@@ -10,51 +10,29 @@ you control.
   macOS machines.
 - Offline agents queue heartbeats on disk and retry automatically.
 
-## Implementation status (Rust rewrite in progress)
+## Building
 
-This repository currently contains **two implementations side by side**. Read
-this section before following any command below.
-
-| Area | Node (`src/`, `bin/stackhour`) | Rust (`crates/`) |
-|---|---|---|
-| `serve` — ingest API, dashboard, read APIs | works | works |
-| `agent` — file/claude/codex/ssh/mac/zed watchers | works | works |
-| `status`, `doctor`, `init`, `install`, `token` | works | works |
-| `data`, `backup`, `import-wakatime` | works | works |
-| `bridge` — Telegram control plane | works | **not implemented** |
-| Config registry (custom engines/agents/skills) | not available | library only, not reachable at runtime |
-
-The Rust tracker is a behaviour-for-behaviour port of the Node tracker,
-including its JavaScript number and rounding semantics, and it is the part of
-the rewrite that is genuinely finished. **The Telegram bridge exists only in
-Node.** `stackhour bridge` in the Rust binary exits 1 with
-`` `bridge` is not implemented in the Rust port yet ``.
-
-Known difference: `stackhour install` in the Rust binary generates systemd and
-launchd units whose `ExecStart` points at `<repo>/bin/stackhour` — the **Node**
-launcher. Installing services from the Rust binary therefore deploys the Node
-runtime. Point the units at `target/release/stackhour` by hand if you want the
-Rust daemons under supervision.
-
-### Building and running the Rust implementation
-
-Requirements: a stable Rust toolchain (built and tested on 1.97), Git, and
-Linux or macOS. SQLite is vendored, so there is nothing else to install.
+Stackhour is one Rust binary. Requirements: a stable Rust toolchain (built and
+tested on 1.97), Git, and Linux or macOS. SQLite is vendored and there is no
+interpreter or package manager to install.
 
 ```sh
 cargo build --release          # -> target/release/stackhour
 ./target/release/stackhour doctor
 ```
 
-### Running the Node implementation
+Every command in this README is written as `./target/release/stackhour …`.
+Copy or symlink the binary onto your `PATH` if you would rather type
+`stackhour`; `install` and `bridge install` both deploy whichever binary you
+invoked them with, so installing from a stable location is worth doing.
 
-Requirements: Node.js 22 or newer, Git, and Linux or macOS. There are no npm
-packages to install. The `bin/stackhour` launcher enables Node's
-`--experimental-sqlite` flag.
-
-The commands throughout this README are written as `./bin/stackhour …` (Node).
-Substitute `./target/release/stackhour …` to use the Rust binary for anything
-except `bridge`. Both read the same config file and the same database.
+> Stackhour was originally a Node application and was ported to Rust
+> behaviour-for-behaviour, including JavaScript's number and rounding
+> semantics. The Node implementation, its launcher, and its test suite have
+> been removed — nothing in the project needs a Node runtime any more,
+> including the Telegram bridge and its remote workers. If you are upgrading a
+> deployment that predates this change, see
+> [docs/bridge-migration.md](docs/bridge-migration.md).
 
 ## Quick start
 
@@ -70,7 +48,7 @@ git clone https://github.com/NikitaVoitik/stackhour.git ~/stackhour
 cd ~/stackhour
 mkdir -p "$HOME/dev"
 
-./bin/stackhour init server \
+./target/release/stackhour init server \
   --public-url=http://stackhour-server:4040 \
   --project-root="$HOME/dev" \
   --install
@@ -87,7 +65,7 @@ This one command:
 Check the result:
 
 ```sh
-./bin/stackhour doctor
+./target/release/stackhour doctor
 curl http://127.0.0.1:4040/api/health
 systemctl --user status stackhour-server stackhour-agent
 ```
@@ -103,7 +81,7 @@ If service installation failed after the config was created, it can be retried
 without regenerating credentials:
 
 ```sh
-./bin/stackhour install server
+./target/release/stackhour install server
 ```
 
 ### 2. Enroll another machine
@@ -113,7 +91,7 @@ in reports:
 
 ```sh
 cd ~/stackhour
-./bin/stackhour token create nikita-macbook
+./target/release/stackhour token create nikita-macbook
 ```
 
 The command prints one copy-and-paste command containing an enrollment code.
@@ -127,21 +105,21 @@ git clone https://github.com/NikitaVoitik/stackhour.git ~/stackhour
 cd ~/stackhour
 
 # Paste the generated command and add roots before --install, for example:
-./bin/stackhour init agent \
+./target/release/stackhour init agent \
   --enrollment=PASTE_THE_GENERATED_CODE \
   --project-root="$HOME/dev" \
   --project-root="$HOME/client" \
   --install
 
-./bin/stackhour doctor
+./target/release/stackhour doctor
 ```
 
 The macOS installer creates
 `~/Library/LaunchAgents/com.stackhour.agent.plist`, loads it with `launchctl`,
 and writes logs to `/tmp/stackhour-agent.log`. The first poll can trigger an
 Automation permission prompt. For focused-window project detection, also grant
-Accessibility permission to the Node executable or terminal in System Settings
-→ Privacy & Security.
+Accessibility permission to your terminal in System Settings → Privacy &
+Security.
 
 The same enrollment command works on another Linux machine; `--install` creates
 only its `stackhour-agent.service`.
@@ -150,16 +128,16 @@ only its `stackhour-agent.service`.
 
 ```sh
 # Server: rotate the credential and print a new enrollment command.
-./bin/stackhour token create nikita-macbook --force
+./target/release/stackhour token create nikita-macbook --force
 
 # MacBook: apply the replacement and restart/reinstall the launch agent.
-./bin/stackhour init agent --enrollment=NEW_CODE --force --install
+./target/release/stackhour init agent --enrollment=NEW_CODE --force --install
 
 # Server: permanently reject that machine's current credential.
-./bin/stackhour token revoke nikita-macbook
+./target/release/stackhour token revoke nikita-macbook
 
 # Names only; secrets are never listed.
-./bin/stackhour token list
+./target/release/stackhour token list
 ```
 
 ## What Stackhour tracks
@@ -187,8 +165,8 @@ heartbeat earns the gap until the next heartbeat in its stream, capped by
 `summary.capSeconds`.
 
 Token and cost fields ride on heartbeats. Costs are API-equivalent estimates
-from `src/pricing.js` (Rust: `crates/stackhour-core/src/pricing.rs`), not
-invoices or actual subscription spend.
+from `crates/stackhour-core/src/pricing.rs`, not invoices or actual
+subscription spend.
 
 An illustrative stored heartbeat looks like this:
 
@@ -198,10 +176,10 @@ An illustrative stored heartbeat looks like this:
   "machine": "nikita-macbook",
   "source": "codex-desktop",
   "project": "NikitaVoitik/stackhour",
-  "entity": "/Users/nikita/dev/stackhour/src/server.js",
+  "entity": "/Users/nikita/dev/stackhour/crates/stackhour-server/src/lib.rs",
   "entity_type": "file",
   "category": "ai coding",
-  "language": "JavaScript",
+  "language": "Rust",
   "branch": "main",
   "is_write": 1,
   "actor": "agent",
@@ -258,7 +236,7 @@ Tests and temporary deployments can isolate everything with
 ```sh
 STACKHOUR_CONFIG=/tmp/stackhour/config.json \
 STACKHOUR_DATA=/tmp/stackhour/data \
-./bin/stackhour init server --public-url=http://127.0.0.1:4141 --port=4141
+./target/release/stackhour init server --public-url=http://127.0.0.1:4141 --port=4141
 ```
 
 A representative configuration is:
@@ -309,11 +287,11 @@ Important tuning fields:
 - `summary.reattributeWindowSeconds`: file-save-to-agent-edit matching window;
 - `pricing`: per-model API pricing overrides in USD per million tokens.
 
-## Config registry (Rust only, not yet reachable at runtime)
+## Config registry
 
-The Rust rewrite adds a config-directory registry that extends the Telegram
-bridge — custom engines, agents, skills, commands, and prompt overrides — with
-no code changes. It lives beside `config.json`, rooted at the config directory
+A config-directory registry extends the Telegram bridge — custom engines,
+agents, skills, commands, and prompt overrides — with no code changes. It
+lives beside `config.json`, rooted at the config directory
 (`~/.config/stackhour/`, overridable with `STACKHOUR_CONFIG_DIR`):
 
 ```
@@ -333,14 +311,12 @@ fatal, and the reason is collected for callers to surface. Absent directories
 mean built-ins only. See
 `crates/stackhour-core/src/registry/defaults/README.md` for the full schema.
 
-**Status: this is a library, not a shipped feature.** The loader, validation,
-cycle detection, hot reload, engine selection, argv assembly, soul composition,
-skill loading, and process spawning are all implemented and covered by
-integration tests — including one that adds a brand-new engine by config alone
-and spawns it. But the only runtime consumers are the bridge coordinator and
-worker, which are unimplemented stubs, so **no running program reads these
-directories today**. The `stackhour bridge doctor` command that the schema
-README says will report validation errors does not exist yet.
+The loader, validation, cycle detection, hot reload, engine selection, argv
+assembly, soul composition, skill loading, and process spawning are covered by
+integration tests, including one that adds a brand-new engine by config alone
+and spawns it. The running bridge coordinator and worker both read these
+directories, and `stackhour bridge doctor` reports each validation error as its
+own `✗ registry: …` line after the standard checks.
 
 ## Modules (compile-time and runtime)
 
@@ -412,8 +388,8 @@ a disabled agent module.
 `stackhour doctor` is read-only. It checks the runtime and SQLite support,
 config permissions, project roots, watcher inputs, queue state, server
 authentication, database integrity, versions, clock skew, parser silence, and
-user services. The Rust build reports its runtime check as
-`rust <version> (no node runtime required)`.
+user services. Its first line is the `runtime` check, reporting
+`rust <version>`.
 
 It also appends one `✓ module-<name>` line for each module that is off,
 naming either the config key to edit or the Cargo feature to rebuild with —
@@ -424,9 +400,9 @@ no SQLite at all). An agent-only worker box still reports `sqlite`. Those
 absences are what the `module-*` lines are there to explain.
 
 ```sh
-./bin/stackhour doctor
-./bin/stackhour doctor --json
-./bin/stackhour status
+./target/release/stackhour doctor
+./target/release/stackhour doctor --json
+./target/release/stackhour status
 ```
 
 Linux service operations:
@@ -448,9 +424,9 @@ launchctl kickstart -k "gui/$(id -u)/com.stackhour.agent"
 Manual foreground mode, useful for debugging or containers:
 
 ```sh
-./bin/stackhour serve
-./bin/stackhour agent --once
-./bin/stackhour agent
+./target/release/stackhour serve
+./target/release/stackhour agent --once
+./target/release/stackhour agent
 ```
 
 ## Data management
@@ -458,15 +434,15 @@ Manual foreground mode, useful for debugging or containers:
 Inspect the database without changing it:
 
 ```sh
-./bin/stackhour data stats
-./bin/stackhour data stats --json
+./target/release/stackhour data stats
+./target/release/stackhour data stats --json
 ```
 
 Export deterministic, versioned JSONL. Output is mode `0600`, written
 atomically, and never replaced unless `--force` is supplied:
 
 ```sh
-./bin/stackhour data export \
+./target/release/stackhour data export \
   --output="$HOME/stackhour-export-2026.jsonl" \
   --from=2026-01-01 \
   --to=2026-12-31
@@ -477,8 +453,8 @@ strictly older than the cutoff and imported WakaTime days before its UTC date in
 one transaction:
 
 ```sh
-./bin/stackhour data prune --before=2025-01-01
-./bin/stackhour data prune --before=2025-01-01 --confirm
+./target/release/stackhour data prune --before=2025-01-01
+./target/release/stackhour data prune --before=2025-01-01 --confirm
 ```
 
 ## Backup and recovery
@@ -487,9 +463,9 @@ Create and verify a consistent, standalone SQLite snapshot while the server is
 running:
 
 ```sh
-./bin/stackhour backup create
-./bin/stackhour backup create --output="$HOME/backups/stackhour.db"
-./bin/stackhour backup verify "$HOME/backups/stackhour.db"
+./target/release/stackhour backup create
+./target/release/stackhour backup create --output="$HOME/backups/stackhour.db"
+./target/release/stackhour backup verify "$HOME/backups/stackhour.db"
 ```
 
 Restore is preview-only without `--confirm`. Stop the server for the confirmed
@@ -497,10 +473,10 @@ operation; agents can continue running and will queue activity until it returns.
 
 ```sh
 systemctl --user stop stackhour-server
-./bin/stackhour backup restore "$HOME/backups/stackhour.db"
-./bin/stackhour backup restore "$HOME/backups/stackhour.db" --confirm
+./target/release/stackhour backup restore "$HOME/backups/stackhour.db"
+./target/release/stackhour backup restore "$HOME/backups/stackhour.db" --confirm
 systemctl --user start stackhour-server
-./bin/stackhour doctor
+./target/release/stackhour doctor
 ```
 
 The input and replacement are integrity-checked. The previous database is kept
@@ -516,7 +492,7 @@ The server accepts official WakaTime heartbeat routes. Create a raw token for
 the editor's machine, then configure its plugin:
 
 ```sh
-./bin/stackhour token create nikita-macbook --raw
+./target/release/stackhour token create nikita-macbook --raw
 ```
 
 ```ini
@@ -533,7 +509,7 @@ Historical WakaTime summaries can be imported with an API key in
 `wakatime.apiKey` or `WAKATIME_API_KEY`:
 
 ```sh
-WAKATIME_API_KEY=waka_xxx ./bin/stackhour import-wakatime --days=365
+WAKATIME_API_KEY=waka_xxx ./target/release/stackhour import-wakatime --days=365
 ```
 
 Imported rows currently live in `wakatime_days`; they are exportable and
@@ -546,17 +522,34 @@ Codex: a coordinator on the always-on Linux machine owns the Telegram
 connection, and a Mac worker polls it over outbound SSH — no open ports on the
 Mac, jobs queue while it sleeps.
 
-**This feature is Node-only.** Use the `bin/stackhour` launcher for it; the
-Rust binary's `bridge` subcommand is a stub that exits 1.
-
 ```sh
-./bin/stackhour bridge install coordinator   # on the Linux machine (Node)
-./bin/stackhour bridge install worker        # on the Mac (Node)
-./bin/stackhour bridge doctor coordinator    # end-to-end health check
+./target/release/stackhour bridge install coordinator   # on the Linux machine
+./target/release/stackhour bridge install worker        # on the Mac
+./target/release/stackhour bridge doctor coordinator    # end-to-end health check
 ```
+
+`bridge install` copies the binary it was invoked with into the runtime
+directory, and a worker reaches its coordinator by running
+`<remoteDir>/stackhour bridge claim` over SSH. Neither side needs an
+interpreter installed. A worker enrolled before this change still has a
+`remoteNode` key in its `worker-config.json`; it is ignored, and re-running
+`bridge install worker` drops it.
 
 See [docs/bridge.md](docs/bridge.md) for the full guide and
 [SECURITY.md](SECURITY.md) for the security model.
+
+## Where this is going
+
+The bridge is a completion-oriented job queue: send a prompt, get an answer.
+The next phase turns it into a multi-client control plane for remotely
+executed coding agents — durable tasks and approvals shared across Telegram, a
+web/PWA client, and a desktop app, with execution nodes dialling out to a hub.
+
+[docs/architecture/remote-agent-control-plane.md](docs/architecture/remote-agent-control-plane.md)
+is the design: a source-level study of T3 Code, Zed, and Claude Code, the
+decision to use ACP as an engine adapter rather than a network protocol, the
+`Task → Run → ProviderSession` model, and a staged implementation order. It is
+a recommendation, not yet built.
 
 ## Updating and testing
 
@@ -564,16 +557,19 @@ See [docs/bridge.md](docs/bridge.md) for the full guide and
 cd ~/stackhour
 git pull --ff-only
 
-node --experimental-sqlite --no-warnings --test test/*.test.mjs   # Node suite
-cargo test --workspace                                            # Rust suite
+cargo build --release
+cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 
 systemctl --user restart stackhour-server stackhour-agent   # Linux server
 ```
 
-Both suites use temporary configs, databases, queues, watcher fixtures, and
-ephemeral loopback ports. Neither reads or writes the live Stackhour config or
-database.
+The suite uses temporary configs, databases, queues, watcher fixtures, and
+ephemeral loopback ports. It never reads or writes the live Stackhour config,
+database, or `~/.claude-remote/` bridge queue.
+
+Restarting the services picks up a rebuilt binary only if their units point at
+it; `stackhour install` writes units naming the binary that ran it.
 
 ## Limits
 
@@ -588,5 +584,3 @@ database.
   as `zed-agent`.
 - The dashboard and read APIs are unauthenticated. Keep the server behind
   Tailscale, a VPN, or an authenticated reverse proxy.
-- The Rust port does not implement the Telegram bridge; use the Node
-  implementation for it. See the implementation status table above.

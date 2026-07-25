@@ -4,7 +4,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=%h/stackhour/bin/stackhour serve
+ExecStart=%h/stackhour/target/release/stackhour serve
 Restart=always
 RestartSec=5
 

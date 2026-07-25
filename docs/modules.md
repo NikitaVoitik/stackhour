@@ -61,7 +61,8 @@ Only an explicitly present, JS-falsy value turns a module off: `false`, `0`,
 
 **`"bridge": "false"` ENABLES the bridge.** A non-empty string is truthy in
 JavaScript, and every other toggle in this config reads through the same
-`Boolean(v)` coercion the Node original used. No warning is emitted. Write
+`Boolean(v)` coercion inherited from the config's JavaScript origin. No
+warning is emitted. Write
 the bare `false` literal, not a quoted one.
 
 `modules` is deliberately **absent from the defaults table**, exactly like
@@ -189,7 +190,7 @@ every existing check:
 The status is always `✓`. A deliberate operator choice is not a fault, and an
 error here would make a healthy bridge-only leader start exiting 1. `--json`
 carries these as ordinary `checks[]` entries — the document keeps its exact
-`{ok, version, checks}` shape and `checks[0].name` is still `node`.
+`{ok, version, checks}` shape and `checks[0].name` is `runtime`.
 
 A build without the `tracker` feature also has **no `database` check**. The
 `sqlite` check goes away only when NEITHER `tracker` nor `agent` is compiled
@@ -251,7 +252,7 @@ can reach a `#[cfg]`, so these are edited by hand or they rot:
   must gain the new feature. This is the dangerous pair: miss it and Layer-1
   coverage for every build that omits the new module silently disappears
   instead of failing;
-* `check_order_matches_the_node_inventory` (`doctor_checks.rs`) and
+* `check_order_matches_the_documented_inventory` (`doctor_checks.rs`) and
   `a_default_build_compiles_in_every_module` (`main.rs`) — `#[cfg(all(...))]`
   pinned to a full build; they must gain the new feature or they start
   running, and failing, in a build that omits it;

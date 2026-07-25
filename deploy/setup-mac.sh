@@ -9,21 +9,22 @@ shift
 ROOTS=("$@")
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BIN="$REPO/target/release/stackhour"
 
-# --- node check -------------------------------------------------------------
-if ! command -v node >/dev/null; then
-  echo "node not found — install it first (brew install node)"; exit 1
-fi
-NODE_BIN=$(command -v node)
-NODE_MAJOR=$("$NODE_BIN" -e 'console.log(process.versions.node.split(".")[0])')
-if [ "$NODE_MAJOR" -lt 22 ]; then
-  echo "node >= 22 required (found $("$NODE_BIN" --version))"; exit 1
+# --- build ------------------------------------------------------------------
+# Stackhour is one Rust binary; there is no Node runtime to check for.
+if [ ! -x "$BIN" ]; then
+  if ! command -v cargo >/dev/null; then
+    echo "$BIN not found and cargo is not installed — install Rust from https://rustup.rs"; exit 1
+  fi
+  echo "building $BIN ..."
+  (cd "$REPO" && cargo build --release)
 fi
 
 INIT_ARGS=(init agent "--enrollment=$ENROLLMENT" --install)
 for project_root in "${ROOTS[@]}"; do INIT_ARGS+=("--project-root=$project_root"); done
-"$REPO/bin/stackhour" "${INIT_ARGS[@]}"
+"$BIN" "${INIT_ARGS[@]}"
 
 echo
-echo "done. check: $REPO/bin/stackhour doctor"
-echo "for window-title project detection, also grant Accessibility to node/terminal in System Settings > Privacy & Security."
+echo "done. check: $BIN doctor"
+echo "for window-title project detection, also grant Accessibility to your terminal in System Settings > Privacy & Security."

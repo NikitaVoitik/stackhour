@@ -197,10 +197,10 @@ mod tests {
     }
 
     #[test]
-    fn text_output_uses_the_node_icons_and_summary_line() {
+    fn text_output_uses_the_documented_icons_and_summary_line() {
         let r = Report {
             checks: vec![
-                Check::new("node", CheckStatus::Ok, "v22.0.0 (requires >=22)"),
+                Check::new("runtime", CheckStatus::Ok, "rust 0.1.0"),
                 Check::new("config", CheckStatus::Warn, "not found: /x"),
                 Check::new("database", CheckStatus::Error, "/db: broken"),
             ],
@@ -209,7 +209,7 @@ mod tests {
         write_doctor(&r, false, &mut out).unwrap();
         let text = String::from_utf8(out).unwrap();
         assert!(text.starts_with(&format!("Stackhour doctor {}\n", stackhour_core::VERSION)));
-        assert!(text.contains("✓ node: v22.0.0 (requires >=22)\n"));
+        assert!(text.contains("✓ runtime: rust 0.1.0\n"));
         assert!(text.contains("! config: not found: /x\n"));
         assert!(text.contains("✗ database: /db: broken\n"));
         assert!(text.ends_with("\n1 errors, 1 warnings\n"));

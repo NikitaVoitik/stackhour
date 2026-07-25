@@ -618,12 +618,9 @@ impl Wizard<'_> {
             "BRIDGE_REMOTE_DIR",
             &default_remote,
         )?;
-        let remote_node = self.ask_required(
-            "Remote Node.js executable",
-            "BRIDGE_REMOTE_NODE",
-            "/usr/local/bin/node",
-        )?;
-        // NEW: the name this worker claims under — `mac` on macOS (the
+        // No "Remote Node.js executable" prompt: claim/return are verbs on the
+        // leader's own `stackhour` binary now, not Node shims beside it.
+        // The name this worker claims under — `mac` on macOS (the
         // legacy worker), the machine's hostname elsewhere.
         let target_default = if cfg!(target_os = "macos") {
             "mac".to_string()
@@ -644,7 +641,6 @@ impl Wizard<'_> {
             "leaderSsh": leader_ssh,
             "leaderKey": leader_key,
             "remoteDir": remote_dir,
-            "remoteNode": remote_node,
             "target": target,
             "claudeBin": claude_bin,
             "codexBin": codex_bin,
@@ -794,29 +790,24 @@ pub fn save_config(path: &Path, config: &Value) -> Result<(), String> {
     fsutil::atomic_write_0600(path, body.as_bytes()).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// `copyRuntime` — the Rust runtime install.
+/// `copyRuntime` — the runtime install.
 ///
-/// PARITY (deliberate divergence): the Node installer copies
-/// coordinator.mjs/worker.mjs plus helpers into the runtime dir. The Rust
-/// runtime is ONE binary, so this installs the *running* stackhour binary,
-/// canonicalized — the same convention as `stackhour install`: whichever
-/// runtime the user invoked is the one that gets installed — plus
-/// node-runnable shims (claim/return/tg-send for the coordinator, tg-send
-/// for the worker) so a Node counterpart can keep calling
-/// `<remoteNode> <remoteDir>/claim.mjs` over SSH unchanged.
-pub fn copy_runtime(role: &str, runtime_dir: &Path) -> Result<(), String> {
+/// The runtime is ONE binary, so this installs the *running* stackhour
+/// binary, canonicalized — the same convention as `stackhour install`:
+/// whichever runtime the user invoked is the one that gets installed.
+///
+/// It used to also write node-runnable `claim.mjs`/`return.mjs`/`tg-send.mjs`
+/// shims so a Node counterpart could keep calling
+/// `<remoteNode> <remoteDir>/claim.mjs` over SSH. Node has been retired: a
+/// worker now execs `<remoteDir>/stackhour bridge claim` directly, so the
+/// shims are gone and nothing in the runtime dir needs a Node interpreter.
+///
+/// `role` no longer changes what is installed — both roles get exactly the
+/// binary — but it is kept in the signature because the callers are
+/// role-oriented and a future asymmetry is likely.
+pub fn copy_runtime(_role: &str, runtime_dir: &Path) -> Result<(), String> {
     ensure_dir(runtime_dir, 0o700)?;
     install_binary(runtime_dir)?;
-    let shims: &[&str] = if role == "coordinator" {
-        &["claim", "return", "tg-send"]
-    } else {
-        &["tg-send"]
-    };
-    for verb in shims {
-        let dest = runtime_dir.join(format!("{verb}.mjs"));
-        fsutil::atomic_write(&dest, node_shim(verb).as_bytes(), 0o755)
-            .map_err(|e| format!("{}: {e}", dest.display()))?;
-    }
     Ok(())
 }
 
@@ -844,39 +835,6 @@ fn install_binary(runtime_dir: &Path) -> Result<PathBuf, String> {
     Ok(dest)
 }
 
-/// One node-invokable shim body.
-///
-/// claim/return pin `--runtime-dir` to the shim's own directory (the Node
-/// scripts derive their dir from `import.meta.url` the same way); tg-send
-/// instead pins `CLAUDE_REMOTE_CONFIG` at the adjacent config.json, which is
-/// where tg-send.mjs read its credentials.
-pub fn node_shim(verb: &str) -> String {
-    let argv = match verb {
-        // claim forwards its argv (the optional target for `bridge claim
-        // <target>`); the ORIGINAL Node claim.mjs ignored argv, so this line
-        // is what lets a targeted worker actually filter.
-        "claim" => "['bridge', 'claim', ...process.argv.slice(2), '--runtime-dir', here]",
-        "return" => "['bridge', 'return', ...process.argv.slice(2), '--runtime-dir', here]",
-        _ => "['bridge', 'tg-send', ...process.argv.slice(2)]",
-    };
-    let env = if verb == "tg-send" {
-        "{ ...process.env, CLAUDE_REMOTE_CONFIG: process.env.CLAUDE_REMOTE_CONFIG || join(here, 'config.json') }"
-    } else {
-        "process.env"
-    };
-    format!(
-        "#!/usr/bin/env node\n\
-         // Written by `stackhour bridge install` — a node-invokable shim around the\n\
-         // adjacent stackhour binary, kept so a Node counterpart can keep running\n\
-         // `node {verb}.mjs` while this side runs the Rust port.\n\
-         import {{ spawnSync }} from 'node:child_process';\n\
-         import {{ dirname, join }} from 'node:path';\n\
-         import {{ fileURLToPath }} from 'node:url';\n\
-         const here = dirname(fileURLToPath(import.meta.url));\n\
-         const result = spawnSync(join(here, 'stackhour'), {argv}, {{ stdio: 'inherit', env: {env} }});\n\
-         process.exit(result.status ?? 1);\n"
-    )
-}
 
 // ---------------------------------------------------------------------------
 // Services
@@ -1506,7 +1464,8 @@ mod tests {
                 "leaderSsh",
                 "leaderKey",
                 "remoteDir",
-                "remoteNode",
+                // No "remoteNode": the wizard stopped asking for a remote Node
+                // interpreter when claim/return became verbs on the binary.
                 "target",
                 "claudeBin",
                 "codexBin",
@@ -1635,18 +1594,16 @@ mod tests {
     }
 
     #[test]
-    fn copy_runtime_installs_the_binary_and_the_role_shims() {
+    fn copy_runtime_installs_the_binary_for_both_roles() {
         let tmp = tempfile::tempdir().unwrap();
         copy_runtime("coordinator", tmp.path()).unwrap();
-        for f in ["stackhour", "claim.mjs", "return.mjs", "tg-send.mjs"] {
-            let p = tmp.path().join(f);
-            assert!(p.is_file(), "missing {f}");
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mode = std::fs::metadata(&p).unwrap().permissions().mode() & 0o777;
-                assert_eq!(mode, 0o755, "{f} must be executable");
-            }
+        let p = tmp.path().join("stackhour");
+        assert!(p.is_file(), "missing stackhour");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&p).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o755, "stackhour must be executable");
         }
         // Idempotent: re-running the installer is the documented upgrade path.
         copy_runtime("coordinator", tmp.path()).unwrap();
@@ -1654,32 +1611,22 @@ mod tests {
         let worker = tempfile::tempdir().unwrap();
         copy_runtime("worker", worker.path()).unwrap();
         assert!(worker.path().join("stackhour").is_file());
-        assert!(worker.path().join("tg-send.mjs").is_file());
-        assert!(
-            !worker.path().join("claim.mjs").exists(),
-            "claim/return are coordinator-side"
-        );
     }
 
-    /// Each shim must be a plausible ESM node script wrapping the right verb.
+    /// Node is retired: the runtime dir must contain no interpreter-dependent
+    /// shim. A worker reaches the leader through
+    /// `<remoteDir>/stackhour bridge claim`, not `node claim.mjs`.
     #[test]
-    fn the_shims_wrap_the_matching_hidden_verbs() {
-        for verb in ["claim", "return", "tg-send"] {
-            let shim = node_shim(verb);
-            assert!(shim.starts_with("#!/usr/bin/env node\n"), "{verb}");
-            assert!(shim.contains("spawnSync(join(here, 'stackhour')"), "{verb}");
-            assert!(shim.contains(&format!("'bridge', '{verb}'")), "{verb}");
-            assert!(shim.contains("process.exit(result.status ?? 1);"), "{verb}");
+    fn copy_runtime_writes_no_node_shims() {
+        for role in ["coordinator", "worker"] {
+            let tmp = tempfile::tempdir().unwrap();
+            copy_runtime(role, tmp.path()).unwrap();
+            let stray: Vec<String> = std::fs::read_dir(tmp.path())
+                .unwrap()
+                .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
+                .filter(|n| n != "stackhour")
+                .collect();
+            assert!(stray.is_empty(), "{role} installed extra files: {stray:?}");
         }
-        // claim/return pin the runtime dir; tg-send instead pins the adjacent
-        // config.json (and must NOT smuggle --runtime-dir into its message).
-        assert!(node_shim("claim").contains("'--runtime-dir', here"));
-        assert!(
-            node_shim("claim").contains("...process.argv.slice(2)"),
-            "the claim shim must forward argv so `claim.mjs <target>` reaches `bridge claim <target>`"
-        );
-        assert!(node_shim("return").contains("'--runtime-dir', here"));
-        assert!(!node_shim("tg-send").contains("--runtime-dir"));
-        assert!(node_shim("tg-send").contains("CLAUDE_REMOTE_CONFIG"));
     }
 }

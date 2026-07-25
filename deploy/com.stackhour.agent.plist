@@ -7,7 +7,7 @@
   <array>
     <string>/bin/sh</string>
     <string>-c</string>
-    <string>exec "$HOME/stackhour/bin/stackhour" agent</string>
+    <string>exec "$HOME/stackhour/target/release/stackhour" agent</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>

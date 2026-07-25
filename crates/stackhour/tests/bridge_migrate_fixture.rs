@@ -58,10 +58,21 @@ fn fixture(name: &str) -> PathBuf {
 /// `bridge_targeted_claim.rs` and `session_state_parity.rs`.
 fn run(args: &[&str]) -> Output {
     let home = TempDir::new().expect("throwaway HOME");
+    run_with_home(home.path(), args)
+}
+
+/// `run`, but with the caller choosing HOME.
+///
+/// Needed because a fresh HOME per invocation is not always safe: the migrate
+/// plan resolves relative engine binaries (`codexBin`) against `$HOME`, so a
+/// `--verify` run under a *different* HOME computes different expected
+/// contents and reports drift that does not exist. Any test that migrates and
+/// then inspects or re-verifies the result must hold one HOME across both.
+fn run_with_home(home: &std::path::Path, args: &[&str]) -> Output {
     Command::new(bin())
         .args(args)
         .env_clear()
-        .env("HOME", home.path())
+        .env("HOME", home)
         .env("PATH", std::env::var("PATH").unwrap_or_default())
         .output()
         .expect("spawn stackhour")
@@ -84,25 +95,38 @@ fn mode_of(path: &PathBuf) -> u32 {
 
 /// Migrate the fixture into a throwaway tree and hand back (config, runtime).
 fn migrate_fixture(name: &str) -> (TempDir, PathBuf, PathBuf) {
+    let (dir, cfg, rt, _home) = migrate_fixture_with_home(name);
+    (dir, cfg, rt)
+}
+
+/// `migrate_fixture`, also returning the HOME the migration ran under, so a
+/// follow-up invocation can reuse it. See [`run_with_home`] for why that
+/// matters.
+fn migrate_fixture_with_home(name: &str) -> (TempDir, PathBuf, PathBuf, PathBuf) {
     let dir = TempDir::new().unwrap();
     let cfg = dir.path().join("config");
     let rt = dir.path().join("run");
-    let out = run(&[
-        "bridge",
-        "migrate",
-        "--from",
-        fixture(name).to_str().unwrap(),
-        "--to",
-        cfg.to_str().unwrap(),
-        "--runtime-dir",
-        rt.to_str().unwrap(),
-    ]);
+    let home = dir.path().join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    let out = run_with_home(
+        &home,
+        &[
+            "bridge",
+            "migrate",
+            "--from",
+            fixture(name).to_str().unwrap(),
+            "--to",
+            cfg.to_str().unwrap(),
+            "--runtime-dir",
+            rt.to_str().unwrap(),
+        ],
+    );
     assert!(
         out.status.success(),
         "migrate failed: {}",
         String::from_utf8_lossy(&out.stderr)
     );
-    (dir, cfg, rt)
+    (dir, cfg, rt, home)
 }
 
 /// `--dry-run` must be inert: it prints a plan and creates not one directory.
@@ -397,18 +421,24 @@ fn a_second_migration_refuses_with_exit_2() {
 /// `--verify` is clean immediately after a real migration.
 #[test]
 fn verify_is_clean_right_after_migrating() {
-    let (_dir, cfg, rt) = migrate_fixture("legacy-config.json");
-    let out = run(&[
-        "bridge",
-        "migrate",
-        "--from",
-        fixture("legacy-config.json").to_str().unwrap(),
-        "--to",
-        cfg.to_str().unwrap(),
-        "--runtime-dir",
-        rt.to_str().unwrap(),
-        "--verify",
-    ]);
+    // The SAME home as the migration: `--verify` recomputes the plan, and a
+    // different HOME would resolve `codexBin` elsewhere and report phantom
+    // drift.
+    let (_dir, cfg, rt, home) = migrate_fixture_with_home("legacy-config.json");
+    let out = run_with_home(
+        &home,
+        &[
+            "bridge",
+            "migrate",
+            "--from",
+            fixture("legacy-config.json").to_str().unwrap(),
+            "--to",
+            cfg.to_str().unwrap(),
+            "--runtime-dir",
+            rt.to_str().unwrap(),
+            "--verify",
+        ],
+    );
 
     assert!(
         out.status.success(),

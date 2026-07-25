@@ -339,7 +339,7 @@ pub fn run_init_into(
                 // and `install server` can never disagree.
                 crate::install::install_roles_into("server", &install_context(config_path), out, installer)?;
             }
-            writeln!(out, "Next: ./bin/stackhour token create <machine>")?;
+            writeln!(out, "Next: ./target/release/stackhour token create <machine>")?;
             Ok(())
         }
         "agent" => {
@@ -373,7 +373,7 @@ pub fn run_init_into(
             if install {
                 crate::install::install_roles_into("agent", &install_context(config_path), out, installer)?;
             }
-            writeln!(out, "Next: ./bin/stackhour doctor")?;
+            writeln!(out, "Next: ./target/release/stackhour doctor")?;
             Ok(())
         }
         _ => Err(Error::msg("usage: stackhour init <server|agent> [options]")),
@@ -624,7 +624,7 @@ mod tests {
         assert_eq!(
             String::from_utf8(out).unwrap(),
             format!(
-                "Created server config at {}\nPublic URL: http://h.test:4040\nLocal agent enrolled as box\nNext: ./bin/stackhour token create <machine>\n",
+                "Created server config at {}\nPublic URL: http://h.test:4040\nLocal agent enrolled as box\nNext: ./target/release/stackhour token create <machine>\n",
                 cfg.display()
             )
         );

@@ -548,7 +548,7 @@ fn doctor_json_keeps_its_three_top_level_keys_with_a_module_disabled() {
     let keys: Vec<&str> = doc.as_object().unwrap().keys().map(String::as_str).collect();
     assert_eq!(keys, vec!["ok", "version", "checks"]);
     let checks = doc["checks"].as_array().unwrap();
-    assert_eq!(checks[0]["name"], "node");
+    assert_eq!(checks[0]["name"], "runtime");
     let module_lines: Vec<&serde_json::Value> = checks
         .iter()
         .filter(|c| c["name"].as_str().unwrap().starts_with("module-"))

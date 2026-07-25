@@ -15,7 +15,7 @@
 //! are expected to fail in the sandbox — the assertions stop at the files the
 //! installer writes before them.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output, Stdio};
 use tempfile::TempDir;
 
@@ -222,20 +222,23 @@ fn coordinator_install_writes_config_runtime_and_unit() {
         assert_eq!(mode, 0o600, "config holds the bot token");
     }
 
-    // Runtime: the copied binary plus the three coordinator shims, all 0755.
-    for f in ["stackhour", "claim.mjs", "return.mjs", "tg-send.mjs"] {
-        let p = rt.join(f);
-        assert!(p.is_file(), "missing {f}");
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            assert_eq!(
-                std::fs::metadata(&p).unwrap().permissions().mode() & 0o777,
-                0o755,
-                "{f}"
-            );
-        }
+    // Runtime: the copied binary, 0755, and nothing else. The install used to
+    // also drop claim/return/tg-send .mjs shims for a Node counterpart; Node
+    // is retired and the binary answers those verbs itself.
+    let p = rt.join("stackhour");
+    assert!(p.is_file(), "missing stackhour");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(&p).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
     }
+    assert!(
+        !rt.join("claim.mjs").exists() && !rt.join("tg-send.mjs").exists(),
+        "the runtime dir must need no Node interpreter"
+    );
 
     // Unit: written before the systemctl step, ExecStart = the INSTALLED
     // binary with the coordinator verb — never node, never a .mjs file.
@@ -286,12 +289,13 @@ fn coordinator_install_writes_config_runtime_and_unit() {
         "✓ Config validation\n",
         "✓ Config permissions exclude group/other access\n",
         "✓ Installed stackhour\n",
-        "✓ Installed claim.mjs\n",
-        "✓ Installed return.mjs\n",
     ] {
         assert!(text.contains(line), "missing {line:?} in:\n{text}");
     }
-    assert!(text.contains("Node.js >=22 ("), "{text}");
+    // Neither the .mjs shim checks nor the `Node.js >=22` interpreter probe
+    // survive: nothing the doctor inspects runs on Node.
+    assert!(!text.contains(".mjs"), "{text}");
+    assert!(!text.contains("Node.js"), "{text}");
 }
 
 /// A leader-only non-interactive install: no engine env at all, zero local
@@ -440,12 +444,11 @@ fn worker_install_on_linux_writes_config_and_a_systemd_unit() {
         "new configs use the leader spellings: {cfg}"
     );
 
-    // Runtime: the binary + the worker-side tg-send shim only.
+    // Runtime: the binary, and only the binary.
     assert!(rt.join("stackhour").is_file());
-    assert!(rt.join("tg-send.mjs").is_file());
     assert!(
-        !rt.join("claim.mjs").exists(),
-        "claim/return are coordinator-side"
+        !rt.join("tg-send.mjs").exists() && !rt.join("claim.mjs").exists(),
+        "the runtime dir must need no Node interpreter"
     );
 
     // The systemd user unit execs the installed binary with `bridge worker`.
@@ -464,16 +467,17 @@ fn worker_install_on_linux_writes_config_and_a_systemd_unit() {
     );
 }
 
-/// The claim/return shims the installer writes must be REAL node scripts that
-/// drive the installed binary — this is the wire contract the Node Mac worker
-/// depends on (`<remoteNode> <remoteDir>/claim.mjs` over SSH).
+/// The installed binary must speak the job protocol through the exact
+/// invocation a worker makes over SSH: `<remoteDir>/stackhour bridge claim`
+/// and `... bridge return <id> --runtime-dir <remoteDir>`, with the result on
+/// stdin.
+///
+/// This replaces a round trip that went through `node claim.mjs` shims. The
+/// contract under test is the same one — it simply no longer detours through
+/// an interpreter, so the test needs nothing on PATH.
 #[cfg(target_os = "linux")]
 #[test]
-fn the_installed_shims_speak_the_job_protocol_under_node() {
-    let Some(node) = find_node() else {
-        eprintln!("node not on PATH; skipping the shim round trip");
-        return;
-    };
+fn the_installed_binary_speaks_the_job_protocol_over_the_wire() {
     let sb = Sandbox::new();
     let rt = sb.home.path().join("rt");
     let rt_str = rt.display().to_string();
@@ -500,32 +504,33 @@ fn the_installed_shims_speak_the_job_protocol_under_node() {
         ],
     );
     assert!(
-        rt.join("claim.mjs").is_file(),
-        "install did not write shims: {}",
+        rt.join("stackhour").is_file(),
+        "install did not copy the binary: {}",
         stderr(&out)
     );
+    let installed = rt.join("stackhour");
+    let rt_arg = rt.display().to_string();
 
-    // A job in the exact dispatch shape, claimed through `node claim.mjs`.
+    // A job in the exact dispatch shape, claimed the way a worker claims it.
     const ID: &str = "45f2db13-ee19-4487-96e3-5a1467041246";
     std::fs::create_dir_all(rt.join("jobs")).unwrap();
     let body = format!("{{\"id\":\"{ID}\",\"prompt\":\"hi\",\"engine\":\"codex\",\"media\":null,\"sessionId\":null,\"ts\":1}}");
     std::fs::write(rt.join("jobs").join(format!("{ID}.json")), &body).unwrap();
 
-    let out = Command::new(&node)
-        .arg(rt.join("claim.mjs"))
+    let out = Command::new(&installed)
+        .args(["bridge", "claim", "--runtime-dir", &rt_arg])
         .env_clear()
         .env("HOME", sb.home.path())
         .env("PATH", std::env::var("PATH").unwrap_or_default())
         .output()
-        .expect("run node claim.mjs");
+        .expect("run bridge claim");
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert_eq!(stdout(&out), body, "claim must print the job verbatim");
     assert!(rt.join("inprogress").join(format!("{ID}.json")).exists());
 
-    // ...and returned through `node return.mjs <id>` with the result on stdin.
-    let mut child = Command::new(&node)
-        .arg(rt.join("return.mjs"))
-        .arg(ID)
+    // ...and returned through `bridge return <id>` with the result on stdin.
+    let mut child = Command::new(&installed)
+        .args(["bridge", "return", ID, "--runtime-dir", &rt_arg])
         .env_clear()
         .env("HOME", sb.home.path())
         .env("PATH", std::env::var("PATH").unwrap_or_default())
@@ -533,7 +538,7 @@ fn the_installed_shims_speak_the_job_protocol_under_node() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("run node return.mjs");
+        .expect("run bridge return");
     use std::io::Write as _;
     child
         .stdin
@@ -636,9 +641,3 @@ fn an_unknown_flag_is_a_clean_error() {
     );
 }
 
-fn find_node() -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path)
-        .map(|d| d.join("node"))
-        .find(|c| c.is_file())
-}

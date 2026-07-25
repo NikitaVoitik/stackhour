@@ -1,24 +1,24 @@
-//! Differential rendering parity against the Node coordinator.
+//! Differential rendering parity against the retired Node coordinator.
 //!
 //! SAFETY: every Telegram call here goes to the in-process mock in
-//! `common/mock_bot_api.rs`. The owner's Node coordinator holds the only
-//! legitimate poll on the live bot token; nothing in this file may ever be
-//! pointed at the real API, and no token is read.
+//! `common/mock_bot_api.rs`. Nothing in this file may ever be pointed at the
+//! real API, and no token is read.
 //!
-//! How the golden was produced: `test/render-parity/node-reference.mjs` reads
-//! `/home/nikita/.claude-remote/coordinator.mjs` as TEXT (it never imports it,
-//! which would start a second long-poller), slices out the transport wrappers
-//! and the "rendering + tables" section, and evaluates that real source with
-//! only `tg()` stubbed. The recorded payload sequence is
-//! `test/render-parity/golden.json`.
+//! How the golden was produced (historical): a Node harness read the live
+//! `coordinator.mjs` as TEXT — it never imported it, which would have started
+//! a second long-poller — sliced out the transport wrappers and the
+//! "rendering + tables" section, and evaluated that real source with only
+//! `tg()` stubbed. The recorded payload sequence is
+//! `tests-fixtures/render-parity/golden.json`, with its input corpus in
+//! `cases.json`.
 //!
-//! This test feeds `deliver_final` the same corpus and asserts the payload
-//! sequence matches call-for-call and byte-for-byte. Regenerate with:
-//!
-//! ```text
-//! node test/render-parity/gen-cases.mjs
-//! node test/render-parity/node-reference.mjs > test/render-parity/golden.json
-//! ```
+//! Node has since been removed from the repository, so the golden is now a
+//! FROZEN reference capture and cannot be regenerated. Treat it as the
+//! specification: if this test fails, the Rust renderer changed behaviour, and
+//! the golden is the evidence of what the behaviour used to be. Only edit the
+//! golden alongside a deliberate, documented rendering change.
+
+// Historical name kept so the git history of this parity work stays greppable.
 
 #[path = "common/mock_bot_api.rs"]
 mod mock;
@@ -91,7 +91,7 @@ fn tg(api: &MockApi) -> Tg {
 
 fn fixture(name: &str) -> Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test/render-parity")
+        .join("../../tests-fixtures/render-parity")
         .join(name);
     let raw = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
@@ -123,7 +123,7 @@ fn deliver_final_payloads_match_the_node_coordinator_for_every_case() {
     assert_eq!(
         cases.len(),
         golden.len(),
-        "golden.json is stale; regenerate it with node-reference.mjs"
+        "cases.json and golden.json disagree; they are frozen captures and must stay paired"
     );
     assert!(cases.len() >= 10, "corpus shrank unexpectedly");
 

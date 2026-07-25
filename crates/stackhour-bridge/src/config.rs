@@ -64,7 +64,6 @@ pub struct WorkerCfg {
     /// SSH key for the leader. JSON `leaderKey`, legacy `gcpKey` fallback.
     pub leader_key: Option<String>,
     pub remote_dir: String,
-    pub remote_node: String,
     pub claude_bin: Option<String>,
     /// Defaulted when absent (runtime default parity).
     pub codex_bin: String,
@@ -249,7 +248,6 @@ pub fn load_worker_cfg(path: &Path) -> Result<WorkerCfg> {
         leader_ssh: leader_ssh.expect("gated above"),
         leader_key,
         remote_dir: remote_dir.expect("gated above"),
-        remote_node: truthy_str(&raw, "remoteNode").unwrap_or_else(|| "node".into()),
         claude_bin,
         codex_bin: truthy_str(&raw, "codexBin").unwrap_or_else(|| "codex".into()),
         cwd,
@@ -327,7 +325,11 @@ pub fn validate_worker_config(v: &Value) -> Vec<String> {
             errors.push(format!("{preferred} (or {legacy}) is required"));
         }
     }
-    for key in ["remoteDir", "remoteNode", "claudeBin", "codexBin", "cwd"] {
+    // `remoteNode` was required while claim/return were Node shims on the
+    // leader. The worker now execs the leader's `stackhour` binary directly,
+    // so the key is obsolete: an existing config may still carry it (unknown
+    // keys are preserved, never rejected), but it is no longer read.
+    for key in ["remoteDir", "claudeBin", "codexBin", "cwd"] {
         if truthy_str(v, key).is_none() {
             errors.push(format!("{key} is required"));
         }
@@ -585,7 +587,12 @@ mod tests {
             ]
         );
         let w = validate_worker_config(&json!({}));
-        assert!(w.len() >= 7, "{w:?}");
+        // Six, not the historical seven: `remoteNode` is no longer required.
+        assert!(w.len() >= 6, "{w:?}");
+        assert!(
+            !w.iter().any(|e| e.contains("remoteNode")),
+            "remoteNode is a retired key and must not be demanded: {w:?}"
+        );
         assert_eq!(w[0], "leaderSsh (or gcpSsh) is required");
         assert_eq!(w[1], "leaderKey (or gcpKey) is required");
         assert_eq!(w.last().unwrap(), "cwd is required");
@@ -869,17 +876,26 @@ mod tests {
         assert!(validate_worker_config(&v).is_empty());
     }
 
+    /// `remoteNode` is a retired key: a config that still carries it loads
+    /// fine (unknown keys are preserved in `raw`, never rejected) and one that
+    /// has dropped it loads just the same, because nothing reads it any more.
     #[test]
-    fn the_worker_loader_defaults_remote_node_and_codex_bin() {
+    fn the_worker_loader_defaults_codex_bin_and_ignores_remote_node() {
         let tmp = tempfile::tempdir().unwrap();
         let mut v = worker_fixture();
         v.as_object_mut().unwrap().remove("remoteNode");
         v.as_object_mut().unwrap().remove("codexBin");
         let p = write(tmp.path(), "worker-config.json", &v);
         let cfg = load_worker_cfg(&p).unwrap();
-        assert_eq!(cfg.remote_node, "node");
         assert_eq!(cfg.codex_bin, "codex");
         assert_eq!(cfg.leader_ssh, "user@example.com");
+
+        // The legacy spelling still parses; it is simply inert.
+        let legacy = worker_fixture();
+        assert!(legacy.get("remoteNode").is_some(), "fixture keeps the old key");
+        let p = write(tmp.path(), "legacy-worker-config.json", &legacy);
+        let cfg = load_worker_cfg(&p).unwrap();
+        assert_eq!(cfg.raw.get("remoteNode").and_then(Value::as_str), Some("/usr/bin/node"));
     }
 
     /// worker.mjs gates on exactly these five keys — and NOT on codexBin or

@@ -115,7 +115,7 @@ fn init_server_creates_the_config_at_the_documented_path() {
     let text = stdout(&out);
     assert!(text.starts_with(&format!("Created server config at {}\n", cfg_path.display())));
     assert!(text.contains("Public URL: https://stack.example.com\n"));
-    assert!(text.ends_with("Next: ./bin/stackhour token create <machine>\n"));
+    assert!(text.ends_with("Next: ./target/release/stackhour token create <machine>\n"));
     // The generated secret is never echoed.
     let secret = cfg["server"]["tokens"]
         .as_object()
@@ -223,7 +223,7 @@ fn token_create_emits_an_enrollment_code_a_second_machine_can_consume() {
     assert_eq!(cfg["agent"]["machine"], "laptop");
     assert_eq!(cfg["agent"]["serverUrl"], "http://server.test:4040");
     assert!(cfg.get("server").is_none(), "an agent gets no server section");
-    assert!(stdout(&out).ends_with("Next: ./bin/stackhour doctor\n"));
+    assert!(stdout(&out).ends_with("Next: ./target/release/stackhour doctor\n"));
 
     // And can be revoked on the server.
     let out = server.run(&["token", "revoke", "laptop"]);
@@ -270,7 +270,7 @@ fn doctor_json_emits_a_parsable_report() {
     let report: Value = serde_json::from_str(&stdout(&out)).expect("--json must emit valid JSON");
     assert!(report["checks"].is_array());
     assert!(report["ok"].is_boolean());
-    assert_eq!(report["checks"][0]["name"], "node");
+    assert_eq!(report["checks"][0]["name"], "runtime");
     // The exit code follows `ok`.
     assert_eq!(out.status.success(), report["ok"].as_bool().unwrap());
 }

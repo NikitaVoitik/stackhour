@@ -75,7 +75,7 @@ pub fn run_token_into(args: &[String], cfg_path: &Path, out: &mut dyn Write) -> 
                     writeln!(out, "Enrolled {name}. On that machine run:\n")?;
                     writeln!(
                         out,
-                        "  ./bin/stackhour init agent --enrollment={code} --install\n"
+                        "  ./target/release/stackhour init agent --enrollment={code} --install\n"
                     )?;
                     writeln!(
                         out,
@@ -138,7 +138,7 @@ mod tests {
         let (_tmp, cfg) = seeded(Some("http://server.test:4040"));
         let out = run(&["create", "laptop", "--token=sekrit"], &cfg).unwrap();
         assert!(out.starts_with("Enrolled laptop. On that machine run:\n\n"));
-        assert!(out.contains("  ./bin/stackhour init agent --enrollment="));
+        assert!(out.contains("  ./target/release/stackhour init agent --enrollment="));
         assert!(out.ends_with("Add one or more --project-root=/path options before --install if needed.\n"));
         // The raw secret is never printed on this path.
         assert!(!out.contains("sekrit"));

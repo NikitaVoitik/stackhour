@@ -3,11 +3,11 @@
 //!
 //! Resolution order: $STACKHOUR_ASSETS/dashboard.html ->
 //! <exe_dir>/../assets/dashboard.html -> <cwd>/assets/dashboard.html ->
-//! <cwd>/src/dashboard.html (dev checkout) -> include_str! fallback. The
-//! assets file started as a copy of src/dashboard.html but has since
-//! diverged: it adds the `API_KEY`/`withKey()` wrapper that forwards
-//! `?api_key=` to every fetch, pairing with the Rust-only read-API auth
-//! gate. Its inline JS must never be templated or minified.
+//! include_str! fallback. `assets/dashboard.html` began as a copy of the
+//! retired Node `src/dashboard.html` but diverged before that tree was
+//! removed: it adds the `API_KEY`/`withKey()` wrapper that forwards
+//! `?api_key=` to every fetch, pairing with the read-API auth gate. Its
+//! inline JS must never be templated or minified.
 
 use crate::App;
 use axum::body::Body;
@@ -53,8 +53,6 @@ impl DashboardLocator {
         }
         if let Ok(cwd) = std::env::current_dir() {
             candidates.push(cwd.join("assets/dashboard.html"));
-            // Dev checkout: the Node original still lives beside the JS.
-            candidates.push(cwd.join("src/dashboard.html"));
         }
         Self { candidates }
     }

@@ -1,9 +1,8 @@
 //! Bridge doctor / status / restart, split from installer.rs (line budget).
 //!
-//! Per-role checks with ✓/✗ output and exit code: the runtime analogue of
-//! the node>=22 check (check name kept), config validity + mode, binaries
-//! executable, runtime files present, systemd is-active / launchctl print,
-//! ssh remote-helper probe using shell_quote. restart = the exact
+//! Per-role checks with ✓/✗ output and exit code: config validity + mode,
+//! binaries executable, runtime files present, systemd is-active / launchctl
+//! print, ssh remote-binary probe using shell_quote. restart = the exact
 //! systemctl/launchctl sequences. NEW: registry validation errors surfaced
 //! as additional ✗/! lines AFTER the existing checks.
 
@@ -42,18 +41,11 @@ pub fn doctor_checks(
 ) -> Result<i32, String> {
     let mut failures: Vec<String> = Vec::new();
 
-    // PARITY: the JS doctor checks its own interpreter (`Node.js >=22
-    // (${process.version})`). The Rust binary carries no Node, but the
-    // claim.mjs/return.mjs shims in the runtime dir are node scripts (a Node
-    // Mac worker runs them over SSH), so the check survives as a PATH probe,
-    // name kept.
-    let (node_ok, node_version) = node_version_probe();
-    check(
-        out,
-        &mut failures,
-        node_ok,
-        format!("Node.js >=22 ({node_version})"),
-    );
+    // The JS doctor opened with a `Node.js >=22 (${process.version})` check on
+    // its own interpreter, and the port kept it as a PATH probe while the
+    // runtime dir still held .mjs shims. Nothing in the bridge runs on Node
+    // any more, so a missing `node` is no longer a diagnosis — the check is
+    // gone rather than reported as passing vacuously.
 
     let name = if role == "coordinator" {
         "config.json"
@@ -133,24 +125,15 @@ pub fn doctor_checks(
         local_engine_checks(out, &mut failures, &config, "");
     }
 
-    // PARITY (deliberate divergence): the JS checks coordinator.mjs /
-    // claim.mjs / return.mjs and worker.mjs. The Rust install replaces
-    // coordinator.mjs/worker.mjs with the copied binary, so `stackhour`
-    // stands in for the daemon file; the claim/return shims keep their names
-    // because the Node worker still calls them by name over SSH.
-    let files: &[&str] = if role == "coordinator" {
-        &["stackhour", "claim.mjs", "return.mjs"]
-    } else {
-        &["stackhour"]
-    };
-    for file in files {
-        check(
-            out,
-            &mut failures,
-            is_executable(&runtime_dir.join(file)),
-            format!("Installed {file}"),
-        );
-    }
+    // The install is one binary for both roles. It used to also check the
+    // claim.mjs/return.mjs Node shims on the coordinator; those are gone, and
+    // `stackhour` now stands in for every file the runtime dir needs.
+    check(
+        out,
+        &mut failures,
+        is_executable(&runtime_dir.join("stackhour")),
+        "Installed stackhour".to_string(),
+    );
 
     if role == "coordinator" && cfg!(target_os = "linux") {
         let active = std::process::Command::new("systemctl")
@@ -208,11 +191,12 @@ pub fn doctor_checks(
         );
         let leader_ssh = aliased_display(&config, "leaderSsh", "gcpSsh");
         let remote_dir = display_str(&config, "remoteDir");
+        // The worker's whole dependency on the leader is one executable: it
+        // runs `<remoteDir>/stackhour bridge claim|return` over SSH. There is
+        // no remote Node interpreter and no .mjs shim left to probe.
         let remote_check = format!(
-            "test -x {} && test -f {} && test -f {}",
-            shell_quote(&display_str(&config, "remoteNode")),
-            shell_quote(&posix_join(&remote_dir, "claim.mjs")),
-            shell_quote(&posix_join(&remote_dir, "return.mjs")),
+            "test -x {}",
+            shell_quote(&posix_join(&remote_dir, "stackhour")),
         );
         let ssh_ok = std::process::Command::new("ssh")
             .args([
@@ -373,23 +357,6 @@ fn aliased_display(v: &Value, preferred: &str, legacy: &str) -> String {
     config::leader_aliased(v, preferred, legacy).unwrap_or_else(|| "undefined".to_string())
 }
 
-/// `node --version` → (major >= 22, "v22.x.y" | "not found").
-fn node_version_probe() -> (bool, String) {
-    let Ok(out) = std::process::Command::new("node").arg("--version").output() else {
-        return (false, "not found".into());
-    };
-    if !out.status.success() {
-        return (false, "not found".into());
-    }
-    let version = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    let major = version
-        .trim_start_matches('v')
-        .split('.')
-        .next()
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(0);
-    (major >= 22, version)
-}
 
 /// A string field for display — `undefined` when absent, as JS interpolates.
 fn display_str(v: &Value, key: &str) -> String {
@@ -502,7 +469,9 @@ mod tests {
         let (code, text) = run("coordinator", rt.path(), cfg.path());
         assert_eq!(code, 1);
         assert!(text.contains("✗ Config exists: "), "{text}");
-        assert!(text.contains("Node.js >=22 ("), "{text}");
+        // The Node interpreter check is gone with Node itself; the config
+        // line is now the doctor's first output.
+        assert!(!text.contains("Node.js"), "{text}");
         assert!(!text.contains("check(s) failed."), "{text}");
         assert!(!text.contains("Ready."), "{text}");
     }
@@ -522,9 +491,7 @@ mod tests {
         let rt = tempfile::tempdir().unwrap();
         let cfg = tempfile::tempdir().unwrap();
         write_config(rt.path(), "config.json", &coordinator_config(rt.path()), 0o600);
-        for f in ["stackhour", "claim.mjs", "return.mjs"] {
-            installed_file(rt.path(), f);
-        }
+        installed_file(rt.path(), "stackhour");
         let (_, text) = run("coordinator", rt.path(), cfg.path());
         assert!(text.contains("✓ Config validation\n"), "{text}");
         assert!(
@@ -537,8 +504,8 @@ mod tests {
         );
         assert!(text.contains("✓ Claude Code executable: /bin/sh\n"), "{text}");
         assert!(text.contains("✓ Installed stackhour\n"), "{text}");
-        assert!(text.contains("✓ Installed claim.mjs\n"), "{text}");
-        assert!(text.contains("✓ Installed return.mjs\n"), "{text}");
+        // The binary is the whole install now — no .mjs shims to check.
+        assert!(!text.contains(".mjs"), "{text}");
         // The summary is always the last line, in one of its two exact forms.
         let last = text.trim_end().lines().last().unwrap();
         assert!(last == "✓ Ready." || last.ends_with("check(s) failed."), "{last}");

@@ -43,6 +43,7 @@
 //!   no stored session, or ANY captured text all suppress it, and it runs at
 //!   most once.
 
+use crate::config;
 use crate::engines::{self, RunResult};
 use crate::jobs;
 use crate::media;
@@ -138,16 +139,9 @@ pub struct Worker {
     media_dir: PathBuf,
     /// The coordinator's runtime dir, as seen from the leader box.
     remote_dir: String,
-    /// The node binary on the leader box (the claim/return shims are node).
-    remote_node: String,
     /// The target name this worker claims for (`worker-config.json`'s
-    /// `target`). `None` = the legacy claim-anything mode.
-    ///
-    /// CAVEAT: the target only reaches the coordinator if the remote
-    /// claim.mjs forwards its argv to `stackhour bridge claim` (the
-    /// Rust-installed shim does). A targeted worker pointed at the ORIGINAL
-    /// Node claim.mjs — which ignores argv — silently claims EVERYTHING,
-    /// exactly like a legacy worker. Phase 3 documents this rollout hazard.
+    /// `target`). `None` = the legacy claim-anything mode: take the oldest
+    /// job regardless of which target dispatched it.
     target: Option<String>,
     log_path: PathBuf,
 }
@@ -160,7 +154,6 @@ impl Worker {
         registry: Arc<Registry>,
         media_dir: PathBuf,
         remote_dir: String,
-        remote_node: String,
         target: Option<String>,
         log_path: PathBuf,
     ) -> Worker {
@@ -170,7 +163,6 @@ impl Worker {
             registry,
             media_dir,
             remote_dir,
-            remote_node,
             target,
             log_path,
         }
@@ -180,14 +172,37 @@ impl Worker {
         log_line(&self.log_path, msg);
     }
 
+    /// One `bridge` invocation of the leader's own `stackhour` binary, as a
+    /// shell command for SSH.
+    ///
+    /// `bridge install coordinator` copies the binary to `<remoteDir>/
+    /// stackhour`, so the worker execs it directly. Every component is
+    /// shell-quoted: `remote_dir` and `target` come from config, and `id`
+    /// from a coordinator payload.
+    ///
+    /// `--runtime-dir` is passed explicitly because an SSH command carries no
+    /// environment, so `$STACKHOUR_BRIDGE_HOME` would not survive the hop.
+    /// It trails the positional argument, which `positional_after` skips.
+    fn remote_cmd(&self, verb: &str, arg: Option<&str>) -> String {
+        let dir = self.remote_dir.trim_end_matches('/');
+        let mut cmd = format!(
+            "{} bridge {verb}",
+            config::shell_quote(&format!("{dir}/stackhour"))
+        );
+        if let Some(arg) = arg {
+            cmd.push(' ');
+            cmd.push_str(&config::shell_quote(arg));
+        }
+        cmd.push_str(" --runtime-dir ");
+        cmd.push_str(&config::shell_quote(dir));
+        cmd
+    }
+
     /// One iteration of the claim loop, without the sleep.
     pub fn poll_once(&self) -> Poll {
-        // A configured target rides along as claim.mjs's argv, which the
-        // shim forwards to `stackhour bridge claim <target>`.
-        let cmd = match &self.target {
-            Some(target) => format!("{} {}/claim.mjs {target}", self.remote_node, self.remote_dir),
-            None => format!("{} {}/claim.mjs", self.remote_node, self.remote_dir),
-        };
+        // A configured target rides along as `bridge claim <target>`; no
+        // target is the legacy claim-anything mode.
+        let cmd = self.remote_cmd("claim", self.target.as_deref());
         let res = self.remote.ssh(&cmd, None);
         if res.code != 0 {
             self.log(&format!(
@@ -316,7 +331,7 @@ impl Worker {
     /// behaviour, preserved, and logged loudly enough to diagnose.
     fn return_result(&self, id: &str, engine: &str, r: &RunResult) {
         let payload = result_payload(id, engine, r);
-        let cmd = format!("{} {}/return.mjs {id}", self.remote_node, self.remote_dir);
+        let cmd = self.remote_cmd("return", Some(id));
         let out = self.remote.ssh(&cmd, Some(&payload));
         if out.code == 0 {
             self.log(&format!("returned {id}"));
@@ -513,7 +528,6 @@ pub fn run_worker(runtime_dir: &Path) -> ! {
         registry,
         paths.media_dir.clone(),
         cfg.remote_dir.clone(),
-        cfg.remote_node.clone(),
         cfg.target.clone(),
         log_path,
     );
@@ -591,7 +605,7 @@ mod tests {
             let calls = self.calls.lock().unwrap();
             let body = calls
                 .iter()
-                .find(|(c, _)| c.contains("return.mjs"))
+                .find(|(c, _)| c.contains("bridge return"))
                 .unwrap_or_else(|| panic!("no return call; saw {calls:?}"))
                 .1
                 .clone()
@@ -603,7 +617,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .iter()
-                .any(|(c, _)| c.contains("return.mjs"))
+                .any(|(c, _)| c.contains("bridge return"))
         }
     }
 
@@ -613,7 +627,7 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push((cmd.to_string(), stdin.map(str::to_string)));
-            if cmd.contains("claim.mjs") {
+            if cmd.contains("bridge claim") {
                 self.claim.lock().unwrap().clone()
             } else {
                 self.ret.lock().unwrap().clone()
@@ -686,7 +700,6 @@ mod tests {
             registry,
             dir.path().join("media"),
             "/remote/bridge".to_string(),
-            "node".to_string(),
             None,
             dir.path().join("worker.log"),
         );
@@ -1040,7 +1053,6 @@ mod tests {
             Arc::new(stackhour_core::registry::load(Path::new("/nonexistent-cfg"))),
             dir.path().join("media"),
             "/remote/bridge".into(),
-            "node".into(),
             None,
             log.clone(),
         );
@@ -1067,22 +1079,53 @@ mod tests {
         assert_eq!(truncate_tail_utf16("ab", 3), "ab");
     }
 
+    /// The SSH wire contract with the leader. This used to be
+    /// `node <remoteDir>/claim.mjs`; Node is retired, so the worker execs the
+    /// leader's own binary and names the runtime dir explicitly, because an
+    /// SSH command inherits no environment.
     #[test]
     fn the_claim_and_return_commands_are_built_from_the_remote_config() {
         let h = harness(FakeRemote::claiming(&job(json!({}))), FakeRunner::with(vec![]));
         h.worker.poll_once();
         let calls = h.remote.calls.lock().unwrap().clone();
-        assert_eq!(calls[0].0, "node /remote/bridge/claim.mjs");
+        assert_eq!(
+            calls[0].0,
+            "'/remote/bridge/stackhour' bridge claim --runtime-dir '/remote/bridge'"
+        );
         assert_eq!(calls[0].1, None, "claim takes no stdin");
         assert_eq!(
             calls[1].0,
-            "node /remote/bridge/return.mjs 3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+            "'/remote/bridge/stackhour' bridge return '3f2504e0-4f89-41d3-9a0c-0305e82c3301' \
+             --runtime-dir '/remote/bridge'"
         );
         assert!(calls[1].1.is_some(), "return takes the payload on stdin");
     }
 
-    /// A worker with a configured target passes it as claim.mjs's argument;
-    /// the return path is unchanged.
+    /// Every interpolated component is shell-quoted: `remoteDir` and `target`
+    /// come from a config file and the job id from a coordinator payload, so
+    /// none of them may reach the remote shell as bare words.
+    #[test]
+    fn the_remote_command_shell_quotes_every_component() {
+        let dir = tempfile::tempdir().unwrap();
+        let worker = Worker::new(
+            Arc::new(FakeRemote::default()) as Arc<dyn Remote>,
+            FakeRunner::with(vec![]) as Arc<dyn EngineRunner>,
+            Arc::new(stackhour_core::registry::load(Path::new("/nonexistent-cfg"))),
+            dir.path().join("media"),
+            "/srv/it's here/".into(),
+            Some("; rm -rf /".into()),
+            dir.path().join("worker.log"),
+        );
+        assert_eq!(
+            worker.remote_cmd("claim", worker.target.as_deref()),
+            "'/srv/it'\"'\"'s here/stackhour' bridge claim '; rm -rf /' \
+             --runtime-dir '/srv/it'\"'\"'s here'",
+            "a trailing slash is trimmed and the quote is closed/escaped/reopened"
+        );
+    }
+
+    /// A worker with a configured target passes it as `bridge claim`'s
+    /// argument; the return path is unchanged.
     #[test]
     fn a_configured_target_rides_the_remote_claim_invocation() {
         let dir = tempfile::tempdir().unwrap();
@@ -1093,15 +1136,19 @@ mod tests {
             Arc::new(stackhour_core::registry::load(Path::new("/nonexistent-cfg"))),
             dir.path().join("media"),
             "/remote/bridge".into(),
-            "node".into(),
             Some("attic".into()),
             dir.path().join("worker.log"),
         );
         assert_eq!(worker.poll_once(), Poll::Handled);
         let calls = remote.calls.lock().unwrap().clone();
-        assert_eq!(calls[0].0, "node /remote/bridge/claim.mjs attic");
         assert_eq!(
-            calls[1].0, "node /remote/bridge/return.mjs 3f2504e0-4f89-41d3-9a0c-0305e82c3301",
+            calls[0].0,
+            "'/remote/bridge/stackhour' bridge claim 'attic' --runtime-dir '/remote/bridge'"
+        );
+        assert_eq!(
+            calls[1].0,
+            "'/remote/bridge/stackhour' bridge return '3f2504e0-4f89-41d3-9a0c-0305e82c3301' \
+             --runtime-dir '/remote/bridge'",
             "the return path carries no target"
         );
     }
@@ -1125,7 +1172,6 @@ mod tests {
             Arc::new(stackhour_core::registry::load(Path::new("/nonexistent-cfg"))),
             dir.path().join("media"),
             "/remote/bridge".into(),
-            "node".into(),
             None,
             log.clone(),
         );
@@ -1136,7 +1182,7 @@ mod tests {
             .lock()
             .unwrap()
             .iter()
-            .filter(|(c, _)| c.contains("return.mjs"))
+            .filter(|(c, _)| c.contains("bridge return"))
             .count();
         assert_eq!(returns, 1, "no retry — the result is simply lost");
         let body = std::fs::read_to_string(&log).unwrap();

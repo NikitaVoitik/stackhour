@@ -1,29 +1,24 @@
 # Telegram bridge for Claude Code and Codex
 
-> **Implementation status.** Everything in this document describes the **Node.js**
-> bridge (`src/bridge/*.mjs`), reached through the `bin/stackhour` launcher.
-> That is the working implementation — use it.
+> **Implementation status.** This document describes the bridge as shipped in
+> the `stackhour` binary (`crates/stackhour-bridge`): `bridge migrate`,
+> `bridge claim`, `bridge return`, `bridge coordinator`, `bridge worker`,
+> `bridge tg-send`, and the operator CLI — `bridge install`, `bridge doctor`,
+> `bridge status`, `bridge restart`.
 >
-> The Rust port of the bridge (`crates/stackhour-bridge`) implements the full
-> verb surface: `bridge migrate`, `bridge claim`, `bridge return`,
-> `bridge coordinator`, `bridge worker`, `bridge tg-send`, and the operator
-> CLI — `bridge install`, `bridge doctor`, `bridge status`,
-> `bridge restart`. The install instructions below therefore work with the
-> Rust binary too, with one deliberate difference: instead of copying the
-> `.mjs` files, the Rust installer copies the running `stackhour` binary into
-> the runtime dir (the service units exec it directly — no Node needed for
-> the daemons) plus node-runnable `claim.mjs`/`return.mjs`/`tg-send.mjs`
-> shims so a Node counterpart on the other machine keeps working unchanged.
+> The Node bridge it was ported from has been removed. Nothing on either side
+> needs a Node runtime: `bridge install` copies the running binary into the
+> runtime dir, the service units exec it directly, and a worker claims by
+> running `<remoteDir>/stackhour bridge claim` over SSH rather than a
+> `claim.mjs` shim through a remote interpreter.
 >
-> The Rust coordinator has not yet been run against the real bot token. See
-> [docs/bridge-migration.md](bridge-migration.md) for the cutover runbook, the
-> verification order, the rollback, and an honest parity table (what is proven
+> See [docs/bridge-migration.md](bridge-migration.md) for the cutover runbook,
+> the verification order, the rollback, and a parity table (what is proven
 > equivalent, what is unproven, and what is known to differ).
 >
-> The Rust side additionally gains a config registry that the Node bridge does
-> not have: custom engines, agents, skills, commands, and prompt overrides
-> loaded from the config directory. See "Config registry" in the
-> [README](../README.md) — it is likewise not yet reachable at runtime.
+> The bridge also has a config registry: custom engines, agents, skills,
+> commands, and prompt overrides loaded from the config directory. See
+> "Config registry" in the [README](../README.md).
 
 A private Telegram control plane for Claude Code and Codex across an always-on Linux machine and a Mac, built into stackhour as the `stackhour bridge` subcommand.
 
@@ -39,21 +34,21 @@ The Linux coordinator owns the Telegram connection and can run either agent loca
 - A single authorized Telegram chat ID
 - Automatic systemd and launchd installation
 - Configuration backups, upgrades, and a built-in health check
-- No runtime npm dependencies
+- No interpreter or package-manager dependencies
 
 ## Topologies
 
-The Node bridge is fixed to the layout above: one Linux coordinator that also
-runs engines, plus one Mac worker. The Rust bridge generalizes this to a
-roster of named targets in `config.json` — any number of `type: "local"`
-targets (engines run on the coordinator box) and `type: "remote"` targets
-(one pull-worker each, claiming jobs under its own name).
+The original layout was fixed: one Linux coordinator that also runs engines,
+plus one Mac worker. The bridge now generalizes this to a roster of named
+targets in `config.json` — any number of `type: "local"` targets (engines run
+on the coordinator box) and `type: "remote"` targets (one pull-worker each,
+claiming jobs under its own name).
 
 ### All-in-one (the default)
 
 What `stackhour bridge install coordinator` writes when you press Enter
 through the wizard: one local `gcp` target and one `mac` worker target —
-identical to the Node layout, byte for byte.
+identical to the original layout, byte for byte.
 
 ### Leader-only (a cheap VPS owns the bot; workers run every engine)
 
@@ -68,9 +63,9 @@ The leader needs:
 
 - sshd reachable by every worker (workers dial in; the leader dials nowhere)
 - outbound HTTPS to `api.telegram.org`
-- Node.js 22+ — every worker, Node or Rust, claims by running the leader's
-  `claim.mjs`/`return.mjs` shims through the configured `remoteNode`
-  interpreter over SSH; only the daemons themselves are Node-free
+- nothing else installed — a worker claims by running the leader's own
+  `<remoteDir>/stackhour` binary over SSH, which `bridge install coordinator`
+  put there
 
 Enroll each worker machine with `stackhour bridge install worker`, pointing
 `leaderSsh` at the leader and giving every worker a **unique** target name
@@ -129,7 +124,7 @@ flowchart LR
 
 ## Prerequisites
 
-Install Node.js 22 or newer, Claude Code, and Codex on both machines. Authenticate both coding agents before installing the bridge.
+Install Claude Code and Codex on both machines, and authenticate both coding agents before installing the bridge. The bridge itself is the `stackhour` binary and needs no interpreter.
 
 You also need:
 
@@ -145,7 +140,7 @@ Install the coordinator first, on the always-on Linux machine:
 ```sh
 git clone https://github.com/NikitaVoitik/stackhour.git ~/stackhour
 cd ~/stackhour
-./bin/stackhour bridge install coordinator
+./target/release/stackhour bridge install coordinator
 ```
 
 The setup wizard masks secrets, detects the installed agent binaries, writes a mode-`600` config, installs the runtime under `~/.local/share/stackhour/bridge`, generates a user-level systemd service, enables it, and starts it.
@@ -155,7 +150,7 @@ Then install the worker on the Mac:
 ```sh
 git clone https://github.com/NikitaVoitik/stackhour.git ~/stackhour
 cd ~/stackhour
-./bin/stackhour bridge install worker
+./target/release/stackhour bridge install worker
 ```
 
 The Mac wizard verifies the SSH key and local agent paths, installs the runtime, generates and validates a LaunchAgent, and starts it. With the Rust binary the worker installer also runs on Linux, writing a systemd user unit (`stackhour-bridge-worker.service`) instead of a LaunchAgent — see [Topologies](#topologies).
@@ -184,8 +179,8 @@ Re-running the installer upgrades the runtime and keeps the existing config. Use
 
 ```sh
 git pull
-./bin/stackhour bridge install coordinator
-./bin/stackhour bridge install worker
+./target/release/stackhour bridge install coordinator
+./target/release/stackhour bridge install worker
 ```
 
 Use another runtime location with `--runtime-dir` or `STACKHOUR_BRIDGE_HOME`.
@@ -218,8 +213,7 @@ Worker variables:
 | `BRIDGE_LEADER_SSH` | yes | Leader (coordinator) destination in `user@host` form; legacy `BRIDGE_GCP_SSH` still accepted |
 | `BRIDGE_LEADER_KEY` | yes | SSH private key; legacy `BRIDGE_GCP_KEY` still accepted |
 | `BRIDGE_REMOTE_DIR` | yes | Coordinator runtime directory |
-| `BRIDGE_REMOTE_NODE` | yes | Node.js executable on the leader |
-| `BRIDGE_TARGET` | no | Rust installer only: this worker's target name (default `mac` on macOS, the hostname elsewhere) |
+| `BRIDGE_TARGET` | no | This worker's target name (default `mac` on macOS, the hostname elsewhere) |
 | `BRIDGE_WORKDIR` | yes | Worker agent working directory |
 | `CLAUDE_BIN` | yes | Claude Code executable |
 | `CODEX_BIN` | yes | Codex executable |
@@ -234,7 +228,7 @@ TELEGRAM_CHAT_ID="123456789" \
 BRIDGE_WORKDIR="$HOME/workspace" \
 CLAUDE_BIN="$(command -v claude)" \
 CODEX_BIN="$(command -v codex)" \
-./bin/stackhour bridge install coordinator --non-interactive
+./target/release/stackhour bridge install coordinator --non-interactive
 ```
 
 ## Operations
@@ -258,7 +252,7 @@ Telegram commands:
 Send a one-off notification through the installed coordinator:
 
 ```sh
-node ~/.local/share/stackhour/bridge/tg-send.mjs --from "GCP" "deployment finished"
+~/.local/share/stackhour/bridge/stackhour bridge tg-send --from "GCP" "deployment finished"
 ```
 
 ## Configuration directory
@@ -310,8 +304,7 @@ Four layers, lowest precedence first:
 1. **Embedded defaults** compiled into the binary — the shipped commands, the
    `claude` and `codex` engines, and the shipped prompt templates.
 2. **`config.json`**, specifically its optional `"bridge"` object. Scalar
-   defaults only; it never defines entities. The Node implementation ignores
-   the key, so adding it does not break a mixed deployment.
+   defaults only; it never defines entities.
 3. **The configuration directory** described above.
 4. **Environment variables**, highest precedence.
 
