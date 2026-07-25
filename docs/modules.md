@@ -242,7 +242,9 @@ The registry itself lives in `crates/stackhour-core/src/modules.rs`:
    `service_roles_for`;
 5. add the feature to `crates/stackhour/Cargo.toml`, wire it into
    `compiled_modules()` in `main.rs`, and `#[cfg]` its dispatch arms;
-6. add the reduced-feature build to `.github/workflows/rust.yml`.
+6. add the reduced-feature build to the by-hand list in `CLAUDE.md`. There is
+   no CI to add it to — if it is not in that list, nobody will ever build the
+   combination that omits your module.
 
 Then widen the hand-written feature predicates in the test tree. No registry
 can reach a `#[cfg]`, so these are edited by hand or they rot:

@@ -50,9 +50,10 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-CI additionally runs each reduced feature combination — a build missing a
-module fails at COMPILE time, long before any assertion, so
-`cargo test --workspace` alone will not catch it:
+**There is no CI.** The GitHub Actions workflow was removed; nothing runs these
+for you. Before pushing anything that touches module wiring, run the reduced
+feature combinations by hand — a build missing a module fails at COMPILE time,
+long before any assertion, so `cargo test --workspace` alone will not catch it:
 
 ```sh
 cargo test -p stackhour --no-default-features --features bridge
@@ -61,6 +62,24 @@ cargo test -p stackhour --no-default-features --features agent
 cargo test -p stackhour --no-default-features --features tracker,agent
 cargo build -p stackhour --no-default-features
 ```
+
+The dependency-tree claims in `README.md` and `docs/modules.md` — that a
+bridge-only build links no SQLite and no HTTP server, but *does* still link
+tokio via `reqwest::blocking` — were also only ever checked by that workflow.
+If you change the feature graph, re-check them:
+
+```sh
+! cargo tree -p stackhour --no-default-features --features bridge -i libsqlite3-sys
+! cargo tree -p stackhour --no-default-features --features bridge -i rusqlite
+! cargo tree -p stackhour --no-default-features --features bridge -i axum
+  cargo tree -p stackhour --no-default-features --features bridge -i tokio
+```
+
+The last one is the honest non-claim and is expected to *succeed*. If it ever
+stops finding tokio, update the docs rather than quietly dropping the check.
+
+macOS matters here and no machine covers it automatically any more: the agent's
+frontmost-window watcher and its launchd installer only build and run there.
 
 ### Known environment failure
 
