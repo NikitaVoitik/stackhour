@@ -513,6 +513,13 @@ mod tests {
     }
 
     /// An unreadable directory must not abort the scan of its siblings.
+    ///
+    /// `chmod 000` does not make a directory unreadable for every user: root
+    /// bypasses the permission check entirely, so under `sudo`, in most CI
+    /// containers, and in any root shell the "locked" directory reads fine and
+    /// this test would fail claiming a regression that is not there. The
+    /// precondition is therefore verified rather than assumed, and the test
+    /// skips when the environment cannot express it.
     #[test]
     fn an_unreadable_directory_is_skipped_not_fatal() {
         use std::os::unix::fs::PermissionsExt;
@@ -523,6 +530,18 @@ mod tests {
         std::fs::create_dir_all(&locked).unwrap();
         touch(&locked.join("hidden.rs"));
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+
+        // Does 0o000 actually deny US? If not, there is nothing to skip and
+        // nothing to assert.
+        let denied = std::fs::read_dir(&locked).is_err();
+        if !denied {
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+            eprintln!(
+                "SKIPPED an_unreadable_directory_is_skipped_not_fatal: this user can read a \
+                 0o000 directory (running as root?), so the unreadable case cannot be set up"
+            );
+            return;
+        }
 
         let cfg = config_with_roots(&tmp, &[&root]);
         let mut state = json!({ "filesLastScan": now() - 60.0 });

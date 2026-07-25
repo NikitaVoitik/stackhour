@@ -46,6 +46,7 @@ do not expose port 4040 directly to the public internet.
 ```sh
 git clone https://github.com/NikitaVoitik/stackhour.git ~/stackhour
 cd ~/stackhour
+cargo build --release
 mkdir -p "$HOME/dev"
 
 ./target/release/stackhour init server \
@@ -103,6 +104,7 @@ On the MacBook:
 ```sh
 git clone https://github.com/NikitaVoitik/stackhour.git ~/stackhour
 cd ~/stackhour
+cargo build --release
 
 # Paste the generated command and add roots before --install, for example:
 ./target/release/stackhour init agent \

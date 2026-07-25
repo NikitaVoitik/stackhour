@@ -42,12 +42,10 @@ pub fn zed_db_paths(home: &Path) -> Vec<PathBuf> {
 ///
 /// The Node doctor reported its interpreter's major version and errored below
 /// 22. The port kept the check keyed `node` — reporting "no node runtime
-/// required" — so scripts grepping that key kept working during the
-/// migration. Node is now gone from the project entirely, and a check named
-/// after it is exactly the stale artifact that misleads a reader about what
-/// the program needs, so the key is `runtime`.
-///
-/// BREAKING (`doctor --json`): `checks[0].name` is `runtime`, was `node`.
+/// required" — while the migration was in flight. Node is now gone from the
+/// project entirely, and a check named after it is exactly the stale artifact
+/// that misleads a reader about what the program needs, so the key is
+/// `runtime`.
 fn runtime_check() -> Check {
     Check::new(
         "runtime",
