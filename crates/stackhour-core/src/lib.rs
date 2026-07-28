@@ -22,19 +22,17 @@ pub mod tokens;
 
 pub use jsnum::*;
 
-/// The user-facing stackhour version. Deliberately decoupled from the Cargo
-/// package version: doctor's agent-version check compares reports against it,
-/// and the JS implementation currently reports "0.1.0".
-pub const VERSION: &str = "0.1.0";
+/// The user-facing Stackhour version. The release workflow reads the same
+/// workspace package version, so binaries, release tags, doctor output, and
+/// agent reports cannot drift.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Build-info string carried in the agent health report's `nodeVersion` key
 /// (JSON key name kept for parity; dashboard only displays it). The JS agent
 /// reported `process.version` here; the Rust agent reports a fixed
 /// `stackhour-rust/<VERSION>` string instead.
 pub fn build_info() -> &'static str {
-    // Kept as a single literal so the function stays `&'static str`;
-    // a unit test asserts it never drifts from VERSION.
-    "stackhour-rust/0.1.0"
+    concat!("stackhour-rust/", env!("CARGO_PKG_VERSION"))
 }
 
 /// Workspace-wide error type.
@@ -122,16 +120,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn version_is_parity_pinned() {
-        // Must match src/version.js (`VERSION = '0.1.0'`); doctor's
-        // agent-version check and /api/health both depend on this string.
-        assert_eq!(VERSION, "0.1.0");
+    fn version_tracks_the_cargo_package() {
+        assert_eq!(VERSION, env!("CARGO_PKG_VERSION"));
     }
 
     #[test]
     fn build_info_is_prefixed_and_tracks_version() {
         assert_eq!(build_info(), format!("stackhour-rust/{VERSION}"));
-        assert_eq!(build_info(), "stackhour-rust/0.1.0");
     }
 
     #[test]

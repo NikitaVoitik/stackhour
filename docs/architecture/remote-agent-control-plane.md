@@ -1,11 +1,11 @@
 # Remote agent control plane
 
-- Status: architecture recommendation
+- Status: Phase 1 transport and CLI-adapter slice implemented
 - Reviewed: 2026-07-25
 - Supersedes: `t3code-ui-functionality-study.md` and
   `remote-agent-control-plane-and-acp.md`, both folded into this document
 
-This is the single architecture reference for Stackhour's next phase: turning
+This is the single architecture reference for Stackhour's control plane: turning
 the existing tracker and Telegram bridge into a multi-client control plane for
 remotely executed coding agents.
 
@@ -1041,6 +1041,18 @@ they have multiple consumers, an independent lifecycle, or dependencies worth
 isolating.
 
 ## Implementation sequence
+
+Implemented on 2026-07-28:
+
+- durable tasks, runs, events, command receipts, nodes, and approvals;
+- authenticated client and outbound node WebSocket links;
+- durable offline node command delivery and reconnect replay;
+- a small web operator client and Telegram projection;
+- native Claude and Codex CLI adapters;
+- interrupt, heartbeat, event resume, and command/event deduplication.
+
+The current adapter uses the Claude and Codex command-line programs. ACP and
+durable tool approval handling remain future work.
 
 ### Phase 1 — prove one ACP task end to end
 

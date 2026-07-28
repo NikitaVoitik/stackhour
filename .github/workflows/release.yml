@@ -1,0 +1,146 @@
+name: Release installers
+
+on:
+  push:
+    branches: [master]
+    paths: [Cargo.toml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Read version
+    runs-on: ubuntu-24.04
+    outputs:
+      release: ${{ steps.version.outputs.release }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          version=$(awk '
+            $0 == "[workspace.package]" { section = 1; next }
+            section && /^version = / {
+              gsub(/^version = "|".*$/, "")
+              print
+              exit
+            }
+            section && /^\[/ { exit }
+          ' Cargo.toml)
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+            echo "Invalid workspace version: $version" >&2
+            exit 1
+          fi
+          tag="v$version"
+          release=true
+          if [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE_SHA" ]; then
+            previous=$(git show "$BEFORE_SHA:Cargo.toml" 2>/dev/null | awk '
+              $0 == "[workspace.package]" { section = 1; next }
+              section && /^version = / {
+                gsub(/^version = "|".*$/, "")
+                print
+                exit
+              }
+              section && /^\[/ { exit }
+            ')
+            if [ "$previous" = "$version" ]; then
+              release=false
+            fi
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            release=false
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: [version, test]
+    if: needs.version.outputs.release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add "${{ matrix.target }}"
+      - run: cargo build --locked --release -p stackhour --target "${{ matrix.target }}"
+      - name: Package installer
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p "package/stackhour-$TARGET" dist
+          cp "target/$TARGET/release/stackhour" "package/stackhour-$TARGET/stackhour"
+          cp deploy/install.sh "package/stackhour-$TARGET/install.sh"
+          cp LICENSE README.md "package/stackhour-$TARGET/"
+          chmod 0755 "package/stackhour-$TARGET/stackhour" "package/stackhour-$TARGET/install.sh"
+          tar -C package -czf "dist/stackhour-$TARGET.tar.gz" "stackhour-$TARGET"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stackhour-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  test:
+    name: Test ${{ matrix.runner }}
+    needs: version
+    if: needs.version.outputs.release == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --workspace --all-features
+
+  publish:
+    name: Publish release
+    needs: [version, build]
+    if: needs.version.outputs.release == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.version.outputs.tag }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: stackhour-*
+          path: dist
+          merge-multiple: true
+      - name: Create checksums
+        run: |
+          cp deploy/install.sh dist/install-stackhour.sh
+          cd dist
+          sha256sum stackhour-*.tar.gz > SHA256SUMS
+      - name: Create GitHub release
+        run: |
+          gh release create "$TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "Stackhour $VERSION" \
+            --generate-notes

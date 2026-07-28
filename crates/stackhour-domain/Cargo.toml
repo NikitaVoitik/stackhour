@@ -1,0 +1,22 @@
+[package]
+name = "stackhour-domain"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "stackhour remote-agent control plane domain: the durable core entities (Node, Task, Run, Event, Approval), the stable event vocabulary, and the append-only SQLite hub event log with one hub-assigned sequence, idempotent command receipts, node-event UUID de-duplication, and after_sequence catch-up. Pure rusqlite, no async, no network."
+
+[lib]
+name = "stackhour_domain"
+path = "src/lib.rs"
+
+[dependencies]
+stackhour-core.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono = { workspace = true, features = ["serde"] }
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

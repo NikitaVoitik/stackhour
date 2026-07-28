@@ -23,13 +23,14 @@ still fine — just say so plainly in the PR so the migration step is known.
 
 ## What this is
 
-One Rust binary, three products sharing it:
+One Rust binary, four products sharing it:
 
 | Module | Verbs |
 |---|---|
 | `tracker` | `serve`, `status`, `token`, `data`, `backup`, `import-wakatime`, `init server`, `install server` |
 | `agent` | `agent`, `init agent`, `install agent` |
 | `bridge` | `bridge *` (Telegram control plane for Claude Code and Codex) |
+| `control` | `control hub`, `control node` (durable multi-client control plane) |
 
 Each module can be compiled out (Cargo features) *and* switched off at runtime
 (the `modules` block in config.json). `doctor` is never gated. See
@@ -50,23 +51,22 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-**There is no CI.** The GitHub Actions workflow was removed; nothing runs these
-for you. Before pushing anything that touches module wiring, run the reduced
-feature combinations by hand — a build missing a module fails at COMPILE time,
-long before any assertion, so `cargo test --workspace` alone will not catch it:
+CI runs the workspace suite on Linux and macOS. It also runs strict Clippy,
+the reduced feature matrix, dependency-tree assertions, and installer syntax
+checks. Before pushing anything that touches module wiring, run the same
+reduced combinations locally:
 
 ```sh
 cargo test -p stackhour --no-default-features --features bridge
 cargo test -p stackhour --no-default-features --features tracker
 cargo test -p stackhour --no-default-features --features agent
 cargo test -p stackhour --no-default-features --features tracker,agent
+cargo test -p stackhour --no-default-features --features control
 cargo build -p stackhour --no-default-features
 ```
 
-The dependency-tree claims in `README.md` and `docs/modules.md` — that a
-bridge-only build links no SQLite and no HTTP server, but *does* still link
-tokio via `reqwest::blocking` — were also only ever checked by that workflow.
-If you change the feature graph, re-check them:
+The dependency-tree claims in `README.md` and `docs/modules.md` are checked by
+CI. If you change the feature graph, re-check them locally:
 
 ```sh
 ! cargo tree -p stackhour --no-default-features --features bridge -i libsqlite3-sys
@@ -78,8 +78,8 @@ If you change the feature graph, re-check them:
 The last one is the honest non-claim and is expected to *succeed*. If it ever
 stops finding tokio, update the docs rather than quietly dropping the check.
 
-macOS matters here and no machine covers it automatically any more: the agent's
-frontmost-window watcher and its launchd installer only build and run there.
+macOS matters here. CI runs the workspace suite on an Apple Silicon macOS
+runner. The release workflow also builds Intel and Apple Silicon binaries.
 
 ### Known environment failure
 
@@ -115,8 +115,9 @@ the same commit. Distinguish `implemented`, `tested`, `exposed`, and
 
 ## Where this is heading
 
-`docs/architecture/remote-agent-control-plane.md` is the design for the next
-phase: a multi-client control plane (Telegram + web/PWA + desktop) over durable
-tasks and approvals, with execution nodes dialling out to a hub and ACP as an
-engine adapter rather than a network protocol. It is a recommendation, not yet
-built — do not treat its entity names as existing code.
+`docs/architecture/remote-agent-control-plane.md` is the staged design for the
+multi-client control plane. The first slice now exists in `stackhour-domain`,
+`stackhour-hub`, and `stackhour-node`. It includes durable tasks, runs, events,
+outbound nodes, a small web client, Telegram projection, and native Claude and
+Codex CLI adapters. Durable engine approvals, ACP, the PWA, Git tools, and
+desktop clients remain later phases.

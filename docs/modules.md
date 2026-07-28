@@ -1,8 +1,9 @@
 # Modules: compile-time and runtime
 
-Stackhour is three products sharing one binary and one config file: a **time
-tracker**, a **local agent**, and a **Telegram bridge**. Not every machine
-wants all three. A cheap leader VPS runs the bridge and nothing else; a
+Stackhour is four products sharing one binary and one config file: a **time
+tracker**, a **local agent**, a legacy **Telegram bridge**, and a multi-client
+**control plane**. Not every machine wants all four. A cheap leader VPS runs
+the bridge or control hub and nothing else; a
 laptop runs the agent and talks to a server elsewhere.
 
 Modules make that explicit at two layers:
@@ -15,13 +16,14 @@ Modules make that explicit at two layers:
 Both layers resolve through one registry, `stackhour_core::modules`, so help
 text, `doctor`, and dispatch can never disagree about what is on.
 
-## The three modules
+## The four modules
 
 | Module | Crates | Verbs |
 |---|---|---|
 | `tracker` | `stackhour-server`, `stackhour-store` | `serve`, `status`, `token`, `data`, `backup`, `import-wakatime`, `init server`, `install server` |
 | `agent` | `stackhour-agent` | `agent`, `init agent`, `install agent` |
 | `bridge` | `stackhour-bridge` | `bridge *`, plus the hidden `coordinator` / `worker` / `claim` / `return` / `tg-send` wire routes |
+| `control` | `stackhour-domain`, `stackhour-hub`, `stackhour-node` | `control hub`, `control node` |
 
 `stackhour-core` is the shared spine and is **never** optional: config load
 and merge, storage paths, JS-semantics helpers, tokens, the config-directory
@@ -44,7 +46,8 @@ unknown role, is not gated at all — the verb owns that error and still prints
   "modules": {
     "tracker": true,
     "agent": true,
-    "bridge": false
+    "bridge": false,
+    "control": true
   }
 }
 ```
@@ -92,20 +95,20 @@ the defaults.
 cargo build -p stackhour --no-default-features --features bridge   # cheap leader VPS
 cargo build -p stackhour --no-default-features --features agent    # worker box
 cargo build -p stackhour --no-default-features --features tracker,agent
+cargo build -p stackhour --no-default-features --features control
 ```
 
-`default = ["tracker", "agent", "bridge"]`, so a plain `cargo build` is
-unchanged in every respect.
+`default = ["tracker", "agent", "bridge", "control"]`, so a plain
+`cargo build` includes all four products.
 
-The feature names and the config sub-keys are deliberately the **same three
+The feature names and the config sub-keys are deliberately the **same four
 strings**, so one identifier names both layers.
 
 ### What a bridge-only build actually drops
 
-20 crates leave the dependency closure (134 → 114 unique packages on normal
-dependency edges), including `axum`, `axum-core`, `matchit`, `rusqlite`,
-`libsqlite3-sys` and the bundled SQLite C amalgamation, `hashlink`,
-`fallible-iterator`, and the three Stackhour crates themselves.
+A bridge-only build drops the tracker, agent, and control crates. It also
+drops `axum`, `rusqlite`, `libsqlite3-sys`, and the bundled SQLite C
+amalgamation.
 
 **tokio is still linked.** The bridge needs `reqwest::blocking` for Telegram
 long-polling, and that pulls tokio and hyper. Do not claim otherwise.
@@ -121,6 +124,7 @@ Only a bridge-only build has no SQLite in it.
 | `tracker` | `stackhour-server`, `stackhour-store` | `rusqlite`, `axum` |
 | `agent` | `stackhour-agent` | `rusqlite` |
 | `bridge` | `stackhour-bridge` | `reqwest::blocking` → tokio, hyper |
+| `control` | `stackhour-domain`, `stackhour-hub`, `stackhour-node` | `rusqlite`, `axum`, tokio |
 | (always) | `stackhour-core` | `serde_json`, `reqwest` |
 
 `reqwest` is **not** optional in the `stackhour` binary: `status` and
