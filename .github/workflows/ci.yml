@@ -23,6 +23,7 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: sudo apt-get update && sudo apt-get install --yes ripgrep
       - run: pnpm --dir frontend install --frozen-lockfile
       - run: dev/verify
 

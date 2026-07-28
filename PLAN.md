@@ -17,6 +17,7 @@ Affected areas:
 - GitHub CI dependency installation
 - Platform-gated Rust test helpers
 - Unsafe-scan tool validation
+- Linux CI tool setup
 - macOS CI tool setup
 
 Additional focused checks:
@@ -41,6 +42,7 @@ Commands run:
 - `dev/verify-fast`
 - `git diff --check`
 - `dev/verify-full` with loopback socket access
+- `dev/verify-full` after Linux CI tool setup
 
 Checks not run:
 
