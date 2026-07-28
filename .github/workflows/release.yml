@@ -22,7 +22,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: version
@@ -79,13 +79,11 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-          - runner: macos-15-intel
-            target: x86_64-apple-darwin
           - runner: macos-15
             target: aarch64-apple-darwin
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup target add "${{ matrix.target }}"
       - run: cargo build --locked --release -p stackhour --target "${{ matrix.target }}"
       - name: Package installer
@@ -98,7 +96,7 @@ jobs:
           cp LICENSE README.md "package/stackhour-$TARGET/"
           chmod 0755 "package/stackhour-$TARGET/stackhour" "package/stackhour-$TARGET/install.sh"
           tar -C package -czf "dist/stackhour-$TARGET.tar.gz" "stackhour-$TARGET"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: stackhour-${{ matrix.target }}
           path: dist/*.tar.gz
@@ -114,7 +112,7 @@ jobs:
         runner: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cargo test --workspace --all-features
 
   publish:
@@ -127,8 +125,8 @@ jobs:
       TAG: ${{ needs.version.outputs.tag }}
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           pattern: stackhour-*
           path: dist

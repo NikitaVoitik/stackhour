@@ -15,7 +15,7 @@ an SSH connection when it runs a task. It uses SSH only during setup.
 
 Use a small Linux machine for the coordinator. This is the recommended setup.
 The installer uses a systemd user service on Linux and a launchd user service
-on macOS.
+on Apple Silicon macOS. Intel macOS is not supported.
 
 Install these tools before you start:
 

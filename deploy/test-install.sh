@@ -89,8 +89,27 @@ run_download_case() {
 
 run_download_case Linux x86_64 x86_64-unknown-linux-gnu
 run_download_case Linux aarch64 aarch64-unknown-linux-gnu
-run_download_case Darwin x86_64 x86_64-apple-darwin
 run_download_case Darwin arm64 aarch64-apple-darwin
+
+unsupported_dir="$test_dir/unsupported-intel-macos"
+mkdir -p "$unsupported_dir/bin"
+cp "$root/deploy/install.sh" "$unsupported_dir/install.sh"
+printf '%s\n' \
+  '#!/bin/sh' \
+  'case "$1" in' \
+  '  -s) printf "Darwin\n" ;;' \
+  '  -m) printf "x86_64\n" ;;' \
+  '  *) exit 1 ;;' \
+  'esac' >"$unsupported_dir/bin/uname"
+chmod 0755 "$unsupported_dir/bin/uname"
+if STACKHOUR_INSTALL_DIR="$unsupported_dir/install" \
+  PATH="$unsupported_dir/bin:/usr/bin:/bin" \
+  sh "$unsupported_dir/install.sh" >"$unsupported_dir/output" 2>"$unsupported_dir/error"
+then
+  fail "Intel macOS was accepted"
+fi
+grep -q "does not support Intel macOS" "$unsupported_dir/error" ||
+  fail "Intel macOS did not report the support limit"
 
 package_dir="$test_dir/package"
 package_install_dir="$test_dir/package-install"

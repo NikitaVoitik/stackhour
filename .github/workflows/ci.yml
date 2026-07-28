@@ -17,14 +17,14 @@ jobs:
         os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cargo test --workspace --all-features
 
   checks:
     name: Features and Clippy
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup component add clippy
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo test -p stackhour --no-default-features --features bridge
@@ -42,7 +42,7 @@ jobs:
     name: Installer syntax
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sh -n deploy/install.sh
       - run: sh -n deploy/install-control.sh
       - run: sh deploy/test-install.sh
