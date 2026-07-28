@@ -90,15 +90,32 @@ fn hub_install_writes_private_config_stable_binary_and_service() {
     assert_eq!(config["control"]["hub"]["nodeToken"], "node-test");
     assert_eq!(config["control"]["publicUrl"], "https://control.example.com");
     let binary = sandbox.home.path().join(".local/bin/stackhour");
-    let service = sandbox
-        .home
-        .path()
-        .join(".config/systemd/user/stackhour-control-hub.service");
+    let service = if cfg!(target_os = "macos") {
+        sandbox
+            .home
+            .path()
+            .join("Library/LaunchAgents/com.stackhour.control-hub.plist")
+    } else {
+        sandbox
+            .home
+            .path()
+            .join(".config/systemd/user/stackhour-control-hub.service")
+    };
     assert!(binary.is_file());
     assert!(service.is_file());
     let unit = std::fs::read_to_string(service).unwrap();
-    assert!(unit.contains(&format!("ExecStart=\"{}\" control hub", binary.display())));
-    assert!(unit.contains("Environment=\"PATH="));
+    #[cfg(target_os = "linux")]
+    {
+        assert!(unit.contains(&format!("ExecStart=\"{}\" control hub", binary.display())));
+        assert!(unit.contains("Environment=\"PATH="));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        assert!(unit.contains("<string>com.stackhour.control-hub</string>"));
+        assert!(unit.contains(&format!("<string>{}</string>", binary.display())));
+        assert!(unit.contains("<string>hub</string></array>"));
+        assert!(unit.contains("<key>PATH</key>"));
+    }
 
     #[cfg(unix)]
     {
