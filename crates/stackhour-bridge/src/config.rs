@@ -895,7 +895,10 @@ mod tests {
         assert!(legacy.get("remoteNode").is_some(), "fixture keeps the old key");
         let p = write(tmp.path(), "legacy-worker-config.json", &legacy);
         let cfg = load_worker_cfg(&p).unwrap();
-        assert_eq!(cfg.raw.get("remoteNode").and_then(Value::as_str), Some("/usr/bin/node"));
+        assert_eq!(
+            cfg.raw.get("remoteNode").and_then(Value::as_str),
+            Some("/usr/bin/node")
+        );
     }
 
     /// worker.mjs gates on exactly these five keys — and NOT on codexBin or
@@ -907,7 +910,7 @@ mod tests {
             let mut v = worker_fixture();
             v.as_object_mut().unwrap().remove(key);
             let p = write(tmp.path(), "worker-config.json", &v);
-            let err = load_worker_cfg(&p).expect_err("must reject a missing {key}");
+            let err = load_worker_cfg(&p).expect_err("must reject a missing key");
             assert_eq!(
                 err.message(),
                 "worker-config.json must define gcpKey, gcpSsh, remoteDir, claudeBin, and cwd."

@@ -230,10 +230,7 @@ fn coordinator_install_writes_config_runtime_and_unit() {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        assert_eq!(
-            std::fs::metadata(&p).unwrap().permissions().mode() & 0o777,
-            0o755
-        );
+        assert_eq!(std::fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o755);
     }
     assert!(
         !rt.join("claim.mjs").exists() && !rt.join("tg-send.mjs").exists(),
@@ -640,4 +637,3 @@ fn an_unknown_flag_is_a_clean_error() {
         stderr(&out)
     );
 }
-

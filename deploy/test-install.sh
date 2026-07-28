@@ -1,7 +1,8 @@
 #!/bin/sh
+# shellcheck disable=SC2016 # Single-quoted lines build literal fixture scripts.
 set -eu
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/stackhour-installer-test.XXXXXX")
 
 cleanup() {

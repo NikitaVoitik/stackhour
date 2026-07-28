@@ -116,7 +116,7 @@ async fn next_text(socket: &mut WebSocket) -> Option<String> {
 }
 
 /// Send one JSON protocol value as a text frame.
-async fn send_json<T: serde::Serialize>(socket: &mut WebSocket, value: &T) {
+async fn send_json<T: serde::Serialize + Sync>(socket: &mut WebSocket, value: &T) {
     let text = serde_json::to_string(value).expect("serialize");
     let _ = socket.send(AxMsg::Text(text.into())).await;
 }

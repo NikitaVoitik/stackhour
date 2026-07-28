@@ -1,0 +1,71 @@
+{
+  "name": "@stackhour/control-panel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.15.0",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=11.15.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b --pretty false && vite build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -b --pretty false",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "dead-code": "knip",
+    "dependency-graph": "depcruise --config dependency-cruiser.cjs src",
+    "size": "size-limit",
+    "audit": "pnpm audit --audit-level high",
+    "quality:fast": "pnpm run format:check && pnpm run typecheck",
+    "quality:standard": "pnpm run lint && pnpm run test",
+    "quality:full": "pnpm run test:coverage && pnpm run build && pnpm run dead-code && pnpm run dependency-graph && pnpm run size && pnpm run audit",
+    "verify": "pnpm run quality:fast && pnpm run quality:standard && pnpm run quality:full"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@size-limit/file": "13.0.1",
+    "@testing-library/jest-dom": "7.0.0",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "26.1.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.4",
+    "@vitest/coverage-v8": "4.1.10",
+    "dependency-cruiser": "18.1.0",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.8.0",
+    "jsdom": "30.0.0",
+    "knip": "6.29.0",
+    "prettier": "3.9.6",
+    "size-limit": "13.0.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
+  },
+  "size-limit": [
+    {
+      "name": "JavaScript",
+      "path": "dist/assets/*.js",
+      "limit": "160 kB"
+    },
+    {
+      "name": "CSS",
+      "path": "dist/assets/*.css",
+      "limit": "25 kB"
+    }
+  ]
+}

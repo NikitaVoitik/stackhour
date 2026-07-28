@@ -5,8 +5,12 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.79"
+rust-version = "1.87"
 license = "MIT"
+repository = "https://github.com/NikitaVoitik/stackhour"
+readme = "README.md"
+keywords = ["coding-time", "productivity", "self-hosted", "sqlite"]
+categories = ["command-line-utilities", "development-tools"]
 
 [workspace.dependencies]
 # Async runtime — the HTTP server crate ONLY. Nothing else in the workspace is async.
@@ -34,28 +38,95 @@ getrandom = "0.2"
 uuid = { version = "1", features = ["v4"] }
 constant_time_eq = "0.3"
 hostname = "0.4"
-libc = "0.2"
+rustix = { version = "1", features = ["process", "termios"] }
 anyhow = "1"
 
 # Test-only.
 tempfile = "3"
+proptest = "1"
+filetime = "0.2"
 
 # WebSocket transport for the control-plane node link (node client + hub/node
 # integration tests). The hub server uses axum's own `extract::ws`; the node
-# dials out with tokio-tungstenite. Frames are one JSON protocol message each,
-# so the two tungstenite versions never share types.
-tokio-tungstenite = "0.24"
+# dials out with tokio-tungstenite. Keep this aligned with Axum's WebSocket
+# stack so the lock file does not carry a second protocol implementation.
+tokio-tungstenite = "0.29"
 futures-util = "0.3"
 
 # Workspace-internal crates.
-stackhour-domain = { path = "crates/stackhour-domain" }
-stackhour-core = { path = "crates/stackhour-core" }
-stackhour-store = { path = "crates/stackhour-store" }
-stackhour-server = { path = "crates/stackhour-server" }
-stackhour-agent = { path = "crates/stackhour-agent" }
-stackhour-bridge = { path = "crates/stackhour-bridge" }
-stackhour-hub = { path = "crates/stackhour-hub" }
-stackhour-node = { path = "crates/stackhour-node" }
+stackhour-domain = { path = "crates/stackhour-domain", version = "0.2.0" }
+stackhour-core = { path = "crates/stackhour-core", version = "0.2.0" }
+stackhour-store = { path = "crates/stackhour-store", version = "0.2.0" }
+stackhour-server = { path = "crates/stackhour-server", version = "0.2.0" }
+stackhour-agent = { path = "crates/stackhour-agent", version = "0.2.0" }
+stackhour-bridge = { path = "crates/stackhour-bridge", version = "0.2.0" }
+stackhour-hub = { path = "crates/stackhour-hub", version = "0.2.0" }
+stackhour-node = { path = "crates/stackhour-node", version = "0.2.0" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+warnings = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+# These are documentation or naming preferences. They do not find defects and
+# would add noise to the current public API.
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+doc_markdown = "allow"
+too_long_first_doc_paragraph = "allow"
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+missing_const_for_fn = "allow"
+use_self = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+struct_excessive_bools = "allow"
+option_if_let_else = "allow"
+map_unwrap_or = "allow"
+manual_let_else = "allow"
+single_match_else = "allow"
+redundant_closure_for_method_calls = "allow"
+assigning_clones = "allow"
+needless_pass_by_value = "allow"
+explicit_iter_loop = "allow"
+items_after_statements = "allow"
+format_collect = "allow"
+# Exact numeric conversions are load-bearing in the JavaScript parity layer.
+# Changing their representation would hide the intent of those tests.
+float_cmp = "allow"
+unreadable_literal = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+cast_lossless = "allow"
+suboptimal_flops = "allow"
+# These lints enforce local expression style or public-API preferences. The
+# repository keeps them explicit so all defect-oriented lints in the four
+# strict groups remain fatal.
+format_push_string = "allow"
+derive_partial_eq_without_eq = "allow"
+duration_suboptimal_units = "allow"
+if_not_else = "allow"
+useless_let_if_seq = "allow"
+while_float = "allow"
+verbose_bit_mask = "allow"
+unnecessary_trailing_comma = "allow"
+ref_option = "allow"
+needless_raw_string_hashes = "allow"
+needless_pass_by_ref_mut = "allow"
+needless_continue = "allow"
+manual_midpoint = "allow"
+default_trait_access = "allow"
+bool_to_int_with_if = "allow"
+# Cargo can require duplicate transitive versions even when this workspace
+# declares one version. `cargo deny` owns that dependency-policy decision.
+multiple_crate_versions = "allow"
 
 [profile.release]
 lto = "thin"

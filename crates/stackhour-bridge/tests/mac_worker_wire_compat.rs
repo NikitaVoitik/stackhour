@@ -181,10 +181,7 @@ fn a_rust_dispatched_job_is_claimed_intact() {
     assert_eq!(job["engine"], "codex");
     assert_eq!(job["media"], Value::Null, "an explicit null, not a missing key");
     assert_eq!(job["sessionId"], Value::Null);
-    assert_eq!(
-        job["target"], "mac",
-        "the roster stamp"
-    );
+    assert_eq!(job["target"], "mac", "the roster stamp");
     assert!(job["ts"].is_number());
 
     // The rename IS the claim: gone from jobs/, present in inprogress/.

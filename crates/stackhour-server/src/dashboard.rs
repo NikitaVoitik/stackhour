@@ -33,9 +33,7 @@ impl DashboardLocator {
     /// `override_path` (tests) short-circuits to a single candidate.
     pub fn locate(override_path: Option<PathBuf>) -> Self {
         if let Some(p) = override_path {
-            return Self {
-                candidates: vec![p],
-            };
+            return Self { candidates: vec![p] };
         }
         let mut candidates = Vec::new();
         // $STACKHOUR_ASSETS/dashboard.html. An empty value is falsy in JS and
@@ -94,9 +92,7 @@ pub fn routes() -> Router<App> {
     Router::new()
         .route("/", get(dashboard))
         .route("/index.html", get(dashboard))
-        .method_not_allowed_fallback(|| async {
-            crate::json_error(StatusCode::NOT_FOUND, "not found")
-        })
+        .method_not_allowed_fallback(|| async { crate::json_error(StatusCode::NOT_FOUND, "not found") })
 }
 
 #[cfg(test)]

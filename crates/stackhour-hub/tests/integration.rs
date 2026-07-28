@@ -53,9 +53,9 @@ async fn node(addr: SocketAddr) -> Ws {
     connect(addr, "/v1/node/connect").await
 }
 
-async fn send_json<T: Serialize>(ws: &mut Ws, value: &T) {
+async fn send_json<T: Serialize + Sync>(ws: &mut Ws, value: &T) {
     let text = serde_json::to_string(value).expect("serialize");
-    ws.send(TMessage::Text(text)).await.expect("send");
+    ws.send(TMessage::Text(text.into())).await.expect("send");
 }
 
 /// Next text frame, skipping control frames; `None` on close/error/timeout.
@@ -63,10 +63,8 @@ async fn recv_text(ws: &mut Ws) -> Option<String> {
     loop {
         match tokio::time::timeout(RECV_TIMEOUT, ws.next()).await {
             Ok(Some(Ok(TMessage::Text(t)))) => return Some(t.as_str().to_string()),
-            Ok(Some(Ok(TMessage::Ping(_)))) | Ok(Some(Ok(TMessage::Pong(_)))) => continue,
-            Ok(Some(Ok(TMessage::Close(_)))) | Ok(None) => return None,
+            Ok(Some(Ok(TMessage::Close(_)) | Err(_)) | None) => return None,
             Ok(Some(Ok(_))) => continue,
-            Ok(Some(Err(_))) => return None,
             Err(_elapsed) => return None,
         }
     }

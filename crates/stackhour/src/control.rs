@@ -124,7 +124,7 @@ fn start_telegram(cfg: &stackhour_core::config::Config, state: Arc<HubState>) ->
     let output_tg = make_tg();
     let input_state = state.clone();
     let input_tracked = tracked.clone();
-    let input_last_run = last_run.clone();
+    let input_last_run = last_run;
 
     std::thread::spawn(move || {
         let mut offset = 0;
@@ -144,7 +144,8 @@ fn start_telegram(cfg: &stackhour_core::config::Config, state: Arc<HubState>) ->
                     continue;
                 };
                 if text == "/stop" {
-                    if let Some(run_id) = *input_last_run.lock().unwrap() {
+                    let run_id = *input_last_run.lock().unwrap();
+                    if let Some(run_id) = run_id {
                         input_state.submit_command(ClientCommand::InterruptRun {
                             command_id: CommandId::new(),
                             run_id,

@@ -127,7 +127,7 @@ fn quote_ident(name: &str) -> String {
 }
 
 impl Watcher for ZedWatcher {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "zed"
     }
 
@@ -174,19 +174,13 @@ impl Watcher for ZedWatcher {
         // live file when we cannot, so the watcher degrades rather than dies.
         let (db, copied) = match snapshot_db(&db_path, &data_dir) {
             Ok(copy) => (
-                Connection::open_with_flags(
-                    &copy,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-                )
-                .map_err(|e| Error::msg(format!("cannot open threads.db: {e}")))?,
+                Connection::open_with_flags(&copy, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                    .map_err(|e| Error::msg(format!("cannot open threads.db: {e}")))?,
                 Some(copy),
             ),
             Err(_) => (
-                Connection::open_with_flags(
-                    &db_path,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-                )
-                .map_err(|e| Error::msg(format!("cannot open threads.db: {e}")))?,
+                Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                    .map_err(|e| Error::msg(format!("cannot open threads.db: {e}")))?,
                 None,
             ),
         };
@@ -275,16 +269,8 @@ fn read_threads(db: &Connection, state: &mut Value, now: f64, signature: &str) -
         .map_err(fail)?;
     let mut query = stmt.query([]).map_err(fail)?;
     while let Some(row) = query.next().map_err(fail)? {
-        let key = row
-            .get_ref(0)
-            .ok()
-            .map(sql_to_string)
-            .unwrap_or_default();
-        let updated = row
-            .get_ref(1)
-            .ok()
-            .map(sql_to_string)
-            .unwrap_or_default();
+        let key = row.get_ref(0).ok().map(sql_to_string).unwrap_or_default();
+        let updated = row.get_ref(1).ok().map(sql_to_string).unwrap_or_default();
         if previous.get(&key).and_then(Value::as_str) == Some(updated.as_str()) {
             next.insert(key, json!(updated));
             continue;
@@ -509,8 +495,7 @@ mod tests {
             Gate::Run
         );
         assert_eq!(
-            ZedWatcher::default()
-                .gate(&crate::test_config(json!({"agent": {"watch": {"zed": false}}}))),
+            ZedWatcher::default().gate(&crate::test_config(json!({"agent": {"watch": {"zed": false}}}))),
             Gate::Skipped {
                 enabled: false,
                 available: false,

@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "stackhour local activity agent — fully synchronous watcher loop (files, claude, codex, macApps, ssh, zed)."
 
 [lib]
@@ -20,7 +24,11 @@ indexmap.workspace = true
 reqwest.workspace = true
 regex.workspace = true
 chrono.workspace = true
-libc.workspace = true
+rustix.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+filetime.workspace = true
+
+[lints]
+workspace = true

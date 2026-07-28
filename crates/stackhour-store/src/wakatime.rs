@@ -377,17 +377,14 @@ mod tests {
     fn empty_body_imports_nothing() {
         let db = open_mem();
         assert_eq!(apply_summaries(&db, &json!({})).expect("apply"), 0);
-        assert_eq!(
-            apply_summaries(&db, &json!({"data": null})).expect("apply"),
-            0
-        );
+        assert_eq!(apply_summaries(&db, &json!({"data": null})).expect("apply"), 0);
     }
 
     /// The Authorization header is base64 of the raw key with NO trailing
     /// colon (WakaTime accepts `base64(api_key)`).
     #[test]
     fn auth_header_is_basic_base64_of_the_key() {
-        let auth = format!("Basic {}", B64.encode("waka_secret".as_bytes()));
+        let auth = format!("Basic {}", B64.encode(b"waka_secret"));
         assert_eq!(auth, "Basic d2FrYV9zZWNyZXQ=");
     }
 }

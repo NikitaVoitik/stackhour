@@ -111,7 +111,7 @@ fn a_photo_round_trips_through_getfile_and_the_file_api() {
     assert_eq!(std::fs::read(&saved.path).unwrap(), bytes);
     assert_eq!(saved.size, 24, "the getFile file_size is carried through");
     assert_eq!(saved.kind, "image");
-    assert!(saved.path.extension().unwrap() == "jpg");
+    assert_eq!(saved.path.extension().unwrap(), "jpg");
 
     let requests = server.join().unwrap();
     assert_eq!(

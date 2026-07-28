@@ -133,7 +133,7 @@ mod tests {
     #[test]
     fn every_toml_asset_parses_as_toml() {
         for (rel, contents) in STARTER_FILES {
-            if !rel.ends_with(".toml") {
+            if Path::new(rel).extension() != Some(std::ffi::OsStr::new("toml")) {
                 continue;
             }
             contents

@@ -38,48 +38,47 @@ Each module can be compiled out (Cargo features) *and* switched off at runtime
 
 The project was ported from Node behaviour-for-behaviour, including
 JavaScript's number and rounding semantics. **The Node implementation has been
-removed** — nothing needs a Node runtime, including bridge workers, which run
-`<remoteDir>/stackhour bridge claim` over SSH. Comments referencing
-`src/*.js` or `coordinator.mjs` are provenance pointing at git history; they
-are accurate and worth keeping.
+removed**. Shipped services do not need a Node runtime. Frontend development
+uses Node and pnpm as build tools. Bridge workers run
+`<remoteDir>/stackhour bridge claim` over SSH. Comments referencing `src/*.js`
+or `coordinator.mjs` are provenance pointing at git history; they are accurate
+and worth keeping.
 
-## Build and test
+The future control-panel shell is in `frontend/`. Its provisional stack is
+Tauri 2, React, and strict TypeScript. The current benchmark does not compare
+Tauri: it contains incomplete Electron experiments only. Do not state that the
+benchmark selected a desktop stack.
 
-```sh
-cargo build --release                                    # -> target/release/stackhour
-cargo test --workspace
-cargo clippy --workspace --all-targets -- -D warnings
-```
+## Verification
 
-CI runs the workspace suite on Linux and macOS. It also runs strict Clippy,
-the reduced feature matrix, dependency-tree assertions, and installer syntax
-checks. Before pushing anything that touches module wiring, run the same
-reduced combinations locally:
+Select and run one repository verification profile for every change:
 
 ```sh
-cargo test -p stackhour --no-default-features --features bridge
-cargo test -p stackhour --no-default-features --features tracker
-cargo test -p stackhour --no-default-features --features agent
-cargo test -p stackhour --no-default-features --features tracker,agent
-cargo test -p stackhour --no-default-features --features control
-cargo build -p stackhour --no-default-features
+dev/verify-fast       # documentation, comments, and formatting
+dev/verify            # normal isolated code changes
+dev/verify-full       # cross-service and operational changes
+dev/verify-deep       # security boundaries and deep audits
+dev/verify-release    # release preparation
 ```
 
-The dependency-tree claims in `README.md` and `docs/modules.md` are checked by
-CI. If you change the feature graph, re-check them locally:
+`AGENTS.md` defines the minimum profile for each affected area. Record the
+selected profile and reason in `PLAN.md` before the change. Before reporting
+completion, state the selected profile, commands, result, and omitted checks.
+Do not silently skip a check because a local tool is missing.
 
-```sh
-! cargo tree -p stackhour --no-default-features --features bridge -i libsqlite3-sys
-! cargo tree -p stackhour --no-default-features --features bridge -i rusqlite
-! cargo tree -p stackhour --no-default-features --features bridge -i axum
-  cargo tree -p stackhour --no-default-features --features bridge -i tokio
-```
+GitHub CI runs only the fast and standard profiles. Full, deep, and release
+verification run in the agent loop. The full profile owns the feature matrix,
+dependency-tree assertions, dependency policy, installer tests, workflow
+analysis, ShellCheck, and the minimum Rust version. The deep profile adds
+coverage, Miri, protocol fuzzing, and mutation tests.
 
-The last one is the honest non-claim and is expected to *succeed*. If it ever
-stops finding tokio, update the docs rather than quietly dropping the check.
+Frontend checks use the same levels. Fast runs Prettier and TypeScript.
+Standard adds zero-warning ESLint and Vitest. Full adds 100% coverage for the
+initial shell, a production build, Knip, dependency-cruiser, size limits, and a
+high-severity package audit. Tauri capabilities and permissions require Deep.
 
 macOS matters here. CI runs the workspace suite on an Apple Silicon macOS
-runner. The release workflow also builds Intel and Apple Silicon binaries.
+runner. The release workflow builds Apple Silicon binaries only.
 
 ### Known environment failure
 

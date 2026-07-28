@@ -38,8 +38,7 @@ const MAX_VERBATIM_SECONDS: f64 = 8.64e12;
 ///   date`.
 pub fn parse_time(v: Option<&str>, name: &str) -> Result<Option<f64>, String> {
     let s = match v {
-        None => return Ok(None),
-        Some("") => return Ok(None),
+        None | Some("") => return Ok(None),
         Some(s) => s,
     };
     let numeric = js_number(&Value::String(s.to_string()));

@@ -102,8 +102,10 @@ impl RunningJob {
         let pid = self.pid.lock().ok().and_then(|g| *g);
         let Some(pid) = pid else { return };
         #[cfg(unix)]
-        unsafe {
-            libc::kill(pid as libc::pid_t, libc::SIGTERM);
+        if let Ok(raw_pid) = i32::try_from(pid) {
+            if let Some(pid) = rustix::process::Pid::from_raw(raw_pid) {
+                let _ = rustix::process::kill_process(pid, rustix::process::Signal::TERM);
+            }
         }
         #[cfg(not(unix))]
         let _ = pid;

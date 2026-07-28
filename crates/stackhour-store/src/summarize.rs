@@ -375,7 +375,10 @@ mod tests {
             hb(3, 1000.0, "mac", "zed", "a", "human"),
         ];
         let out = credited(rows);
-        assert_eq!(out.iter().map(|c| c.credit).collect::<Vec<_>>(), vec![30.0, 120.0, 60.0]);
+        assert_eq!(
+            out.iter().map(|c| c.credit).collect::<Vec<_>>(),
+            vec![30.0, 120.0, 60.0]
+        );
     }
 
     /// A human bouncing between projects in one editor is ONE stream (no
@@ -404,7 +407,10 @@ mod tests {
         let out = credited(rows);
         // stream a: 20-0=20 then tail 60; stream b: single row -> tail 60.
         assert_eq!(out.iter().map(|c| c.row.id).collect::<Vec<_>>(), vec![1, 3, 2]);
-        assert_eq!(out.iter().map(|c| c.credit).collect::<Vec<_>>(), vec![20.0, 60.0, 60.0]);
+        assert_eq!(
+            out.iter().map(|c| c.credit).collect::<Vec<_>>(),
+            vec![20.0, 60.0, 60.0]
+        );
     }
 
     /// The composite key must not collide the way a naive string join would:
@@ -430,7 +436,10 @@ mod tests {
         ];
         let out = credited(rows);
         assert_eq!(out.iter().map(|c| c.row.id).collect::<Vec<_>>(), vec![1, 2, 3]);
-        assert_eq!(out.iter().map(|c| c.credit).collect::<Vec<_>>(), vec![10.0, 40.0, 60.0]);
+        assert_eq!(
+            out.iter().map(|c| c.credit).collect::<Vec<_>>(),
+            vec![10.0, 40.0, 60.0]
+        );
     }
 
     #[test]

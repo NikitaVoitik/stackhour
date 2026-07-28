@@ -1,0 +1,160 @@
+#!/bin/sh
+set -eu
+
+EVENT=${1:-}
+PAYLOAD=$(cat)
+ROOT=${STACKHOUR_AGENT_HOOK_ROOT:-}
+
+if [ -z "$ROOT" ]; then
+    ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
+fi
+if [ -z "$ROOT" ] || [ ! -x "$ROOT/dev/verify-fast" ]; then
+    exit 0
+fi
+
+cd "$ROOT"
+
+rank() {
+    case "$1" in
+        fast) echo 1 ;;
+        standard) echo 2 ;;
+        full) echo 3 ;;
+        deep) echo 4 ;;
+        release) echo 5 ;;
+        *) echo 0 ;;
+    esac
+}
+
+select_profile() {
+    changed=$(
+        {
+            git diff --name-only HEAD 2>/dev/null || true
+            git ls-files --others --exclude-standard 2>/dev/null || true
+        } | sed '/^PLAN\.md$/d' | sort -u
+    )
+
+    inferred=fast
+    if git diff -U0 HEAD -- Cargo.toml 2>/dev/null |
+        grep -qE '^[+-]version[[:space:]]*='; then
+        inferred=release
+    else
+        old_ifs=$IFS
+        IFS='
+'
+        for path in $changed; do
+            case "$path" in
+                */protocol.rs | */auth.rs | *parser* | frontend/src-tauri/capabilities/* | \
+                    frontend/src-tauri/permissions/*)
+                    inferred=deep
+                    ;;
+                .claude/settings.json | .codex/hooks.json | .github/* | dev/* | deploy/* | \
+                    Cargo.toml | Cargo.lock | deny.toml | */db.rs | */store.rs | *migration* | \
+                    *installer* | frontend/package.json | frontend/pnpm-lock.yaml | \
+                    frontend/pnpm-workspace.yaml | \
+                    frontend/eslint.config.* | frontend/tsconfig*.json | \
+                    frontend/vite.config.* | frontend/vitest.config.* | \
+                    frontend/dependency-cruiser.* | frontend/knip.json)
+                    if [ "$(rank "$inferred")" -lt "$(rank full)" ]; then
+                        inferred=full
+                    fi
+                    ;;
+                *.rs | *.toml | *.json | *.sh | *.ts | *.tsx | *.js | *.jsx | *.mjs | *.cjs | \
+                    *.css | *.html)
+                    if [ "$(rank "$inferred")" -lt "$(rank standard)" ]; then
+                        inferred=standard
+                    fi
+                    ;;
+            esac
+        done
+        IFS=$old_ifs
+    fi
+
+    planned=$(
+        sed -n 's/^Profile:[[:space:]]*//p' PLAN.md 2>/dev/null |
+            sed -n '1p' |
+            tr '[:upper:]' '[:lower:]'
+    )
+    if [ "$(rank "$planned")" -gt "$(rank "$inferred")" ]; then
+        echo "$planned"
+    else
+        echo "$inferred"
+    fi
+}
+
+verify_command() {
+    case "$1" in
+        fast) echo "dev/verify-fast" ;;
+        standard) echo "dev/verify" ;;
+        full) echo "dev/verify-full" ;;
+        deep) echo "dev/verify-deep" ;;
+        release) echo "dev/verify-release" ;;
+        *) return 1 ;;
+    esac
+}
+
+stop_hook_active() {
+    compact=$(printf '%s' "$PAYLOAD" | tr -d '[:space:]')
+    case "$compact" in
+        *'"stop_hook_active":true'*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+run_verification() {
+    profile=$1
+    command=$(verify_command "$profile")
+
+    if [ "${STACKHOUR_AGENT_HOOK_DRY_RUN:-0}" = "1" ]; then
+        printf 'stackhour-agent-hook event=%s profile=%s command=%s\n' \
+            "$EVENT" "$profile" "$command"
+        return 0
+    fi
+
+    session=$(
+        printf '%s' "$PAYLOAD" |
+            sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
+            tr -cd 'A-Za-z0-9._-'
+    )
+    if [ -z "$session" ]; then
+        session="unknown-$$"
+    fi
+
+    log_dir=target/verification/agent-hooks
+    log="$log_dir/$session-$EVENT.log"
+    mkdir -p "$log_dir"
+
+    if "$ROOT/$command" >"$log" 2>&1; then
+        return 0
+    fi
+
+    if [ "$EVENT" = "stop" ] && stop_hook_active; then
+        printf '%s\n' \
+            '{"continue":false,"stopReason":"Required repository verification failed twice. The agent may not claim completion. See target/verification/agent-hooks for the failure log."}'
+        return 0
+    fi
+
+    printf 'Required repository verification failed: %s\n' "$command" >&2
+    printf 'Failure log: %s\n\n' "$log" >&2
+    tail -80 "$log" >&2
+    return 2
+}
+
+case "$EVENT" in
+    session-start)
+        printf '%s\n' \
+            '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"Repository verification hooks are active. Read AGENTS.md, select a verification profile in PLAN.md before editing, run focused tests during work, and do not claim completion unless the required Stop verification passes."}}'
+        ;;
+    post-edit)
+        run_verification fast
+        ;;
+    stop)
+        run_verification "$(select_profile)"
+        ;;
+    select-profile)
+        select_profile
+        ;;
+    *)
+        echo "usage: dev/agent-verify-hook <session-start|post-edit|stop|select-profile>" >&2
+        exit 2
+        ;;
+esac

@@ -10,7 +10,7 @@
 //! the queue drains. Unit tests cannot cover it — it needs two real
 //! processes and a real socket.
 
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
@@ -58,6 +58,18 @@ impl Env {
             &format!("--project-root={}", env.project_root().display()),
         ]);
         assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        let config_path = env.config_path();
+        let mut config: Value =
+            serde_json::from_str(&std::fs::read_to_string(&config_path).unwrap()).unwrap();
+        config["agent"]["watch"] = json!({
+            "files": true,
+            "claude": false,
+            "codex": false,
+            "macApps": false,
+            "ssh": false,
+            "zed": false
+        });
+        std::fs::write(config_path, serde_json::to_vec_pretty(&config).unwrap()).unwrap();
         env
     }
 
@@ -67,6 +79,14 @@ impl Env {
 
     fn data_dir(&self) -> PathBuf {
         self.home.path().join(".local").join("share").join("stackhour")
+    }
+
+    fn config_path(&self) -> PathBuf {
+        self.home
+            .path()
+            .join(".config")
+            .join("stackhour")
+            .join("config.json")
     }
 
     fn queue_path(&self) -> PathBuf {
@@ -93,17 +113,7 @@ impl Env {
     /// The token `init server` wrote for this machine. Read APIs are gated
     /// once tokens exist, so every assertion below must present it.
     fn token(&self) -> String {
-        let cfg: Value = serde_json::from_str(
-            &std::fs::read_to_string(
-                self.home
-                    .path()
-                    .join(".config")
-                    .join("stackhour")
-                    .join("config.json"),
-            )
-            .unwrap(),
-        )
-        .unwrap();
+        let cfg: Value = serde_json::from_str(&std::fs::read_to_string(self.config_path()).unwrap()).unwrap();
         cfg["server"]["tokens"]["box"].as_str().unwrap().to_string()
     }
 

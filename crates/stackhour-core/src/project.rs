@@ -485,7 +485,7 @@ mod tests {
 
         assert_eq!(repository_root(&root.to_string_lossy()), Some(root.clone()));
         assert_eq!(repository_root(&nested.to_string_lossy()), Some(root.clone()));
-        assert_eq!(repository_root(&file.to_string_lossy()), Some(root.clone()));
+        assert_eq!(repository_root(&file.to_string_lossy()), Some(root));
         assert_eq!(
             resolve_project(&file.to_string_lossy(), &IndexMap::new(), None),
             "acme/widget"

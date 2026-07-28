@@ -901,7 +901,9 @@ fn scan_toml_files(dir: &Path, errors: &mut Vec<RegistryError>) -> Vec<(String, 
     };
     for entry in rd.flatten() {
         let file_name = entry.file_name().to_string_lossy().into_owned();
-        if file_name.starts_with('.') || !file_name.ends_with(".toml") {
+        if file_name.starts_with('.')
+            || std::path::Path::new(&file_name).extension() != Some(std::ffi::OsStr::new("toml"))
+        {
             continue;
         }
         let stem = file_name[..file_name.len() - ".toml".len()].to_string();

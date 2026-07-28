@@ -291,7 +291,7 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
 
     // ---- config.json (MERGED: the tracker owns this file) --------------
     let (existing_cfg, cfg_existed) = read_json_object(&cfg.join("config.json"));
-    let mut merged_cfg = existing_cfg.clone();
+    let mut merged_cfg = existing_cfg;
     let mut bridge_obj = merged_cfg
         .get("bridge")
         .and_then(Value::as_object)
@@ -336,7 +336,6 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
     for c in &collisions {
         warnings.push(format!("config.json: {c} (existing value is replaced)"));
     }
-
 
     // ---- engines/ -------------------------------------------------------
     if opts.engines {
@@ -472,7 +471,11 @@ pub fn build_plan(legacy: &LegacyConfig, opts: &MigrateOptions) -> Plan {
         mode: 0o600,
         contents: pretty_json(&rt_doc),
         disposition: Disposition::Create,
-        summary: format!("{} target{} + secrets", legacy.targets.len(), plural(legacy.targets.len())),
+        summary: format!(
+            "{} target{} + secrets",
+            legacy.targets.len(),
+            plural(legacy.targets.len())
+        ),
         detail: rt_detail,
         merged_existing: false,
     });
@@ -1074,7 +1077,11 @@ mod tests {
         let plan = plan_of(FIXTURE, dir.path());
         let legacy = LegacyConfig::parse(FIXTURE).unwrap();
         assert!(plan.files.iter().all(|f| f.label != ".gitignore"));
-        for f in plan.files.iter().filter(|f| f.path.starts_with(dir.path().join("config"))) {
+        for f in plan
+            .files
+            .iter()
+            .filter(|f| f.path.starts_with(dir.path().join("config")))
+        {
             let text = String::from_utf8_lossy(&f.contents);
             assert!(!text.contains(&legacy.token), "{} leaked the bot token", f.label);
         }

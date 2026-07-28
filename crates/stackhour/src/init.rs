@@ -170,7 +170,7 @@ pub fn init_server(opts: InitServerOpts) -> Result<InitResult> {
         "port": clean_port,
         "publicUrl": clean_public_url,
         "db": storage.db_path.to_string_lossy(),
-        "tokens": { clean_machine.clone(): clean_token.clone() },
+        "tokens": { clean_machine.clone(): clean_token },
     });
 
     let mut config = match existing {
@@ -452,7 +452,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let cfg = tmp.path().join("config.json");
         let opts = InitServerOpts {
-            config_path: cfg.clone(),
+            config_path: cfg,
             ..Default::default()
         };
         init_server(opts.clone()).unwrap();
@@ -600,7 +600,7 @@ mod tests {
         .unwrap_err();
         assert_eq!(err.message(), "--server-url is required");
         let err = init_agent(InitAgentOpts {
-            config_path: cfg.clone(),
+            config_path: cfg,
             server_url: Some("http://s.test".into()),
             ..Default::default()
         })

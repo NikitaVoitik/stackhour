@@ -227,11 +227,7 @@ fn handle(stream: TcpStream, shared: &Shared) -> std::io::Result<()> {
     // keeps the whole path.
     let method = path.rsplit('/').next().unwrap_or_default().to_string();
     let method_name = method.clone();
-    shared.seen.lock().unwrap().push(Recorded {
-        method,
-        path: path.clone(),
-        body,
-    });
+    shared.seen.lock().unwrap().push(Recorded { method, path, body });
 
     let scripted = shared.script.lock().unwrap().pop_front();
     let reply = scripted

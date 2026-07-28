@@ -119,8 +119,7 @@ impl From<Error> for ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        let status =
-            StatusCode::from_u16(self.0.status_code()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let status = StatusCode::from_u16(self.0.status_code()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         json_error(status, self.0.message())
     }
 }
@@ -139,10 +138,7 @@ async fn not_found() -> Response {
 /// `MethodRouter` retries HEAD against its GET handler by design), so without
 /// this layer every read endpoint would answer HEAD with a 200 that Node never
 /// sends. Rejecting ahead of the router is the only place the two agree.
-async fn reject_head(
-    req: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> Response {
+async fn reject_head(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     if req.method() == axum::http::Method::HEAD {
         return not_found().await;
     }
@@ -381,18 +377,14 @@ mod tests {
                 .and_then(|v| v.to_str().ok()),
             Some("application/json")
         );
-        let bytes = axum::body::to_bytes(res.into_body(), 1024)
-            .await
-            .expect("body");
+        let bytes = axum::body::to_bytes(res.into_body(), 1024).await.expect("body");
         assert_eq!(&bytes[..], br#"{"error":"not found"}"#);
     }
 
     #[tokio::test]
     async fn error_body_carries_the_message_verbatim() {
         let res = ApiError(Error::with_status("body too large", 413)).into_response();
-        let bytes = axum::body::to_bytes(res.into_body(), 1024)
-            .await
-            .expect("body");
+        let bytes = axum::body::to_bytes(res.into_body(), 1024).await.expect("body");
         assert_eq!(&bytes[..], br#"{"error":"body too large"}"#);
     }
 
@@ -400,9 +392,7 @@ mod tests {
     async fn fallback_is_a_json_404() {
         let res = not_found().await;
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
-        let bytes = axum::body::to_bytes(res.into_body(), 1024)
-            .await
-            .expect("body");
+        let bytes = axum::body::to_bytes(res.into_body(), 1024).await.expect("body");
         assert_eq!(&bytes[..], br#"{"error":"not found"}"#);
     }
 
@@ -411,10 +401,7 @@ mod tests {
     async fn with_db_serialises_access_and_survives_panics() {
         let dir = tempfile::tempdir().expect("tempdir");
         let db_path = dir.path().join("stackhour.db");
-        let cfg = config_with(
-            &json!({ "server": { "db": db_path } }).to_string(),
-            dir.path(),
-        );
+        let cfg = config_with(&json!({ "server": { "db": db_path } }).to_string(), dir.path());
         let db = stackhour_store::open_db(&db_path).expect("open db");
         let app = make_app(cfg, db, None);
 
@@ -436,10 +423,7 @@ mod tests {
 
         // A panic becomes an error instead of poisoning the connection for
         // good: the next call still succeeds.
-        assert!(app
-            .with_db(|_| -> Result<()> { panic!("boom") })
-            .await
-            .is_err());
+        assert!(app.with_db(|_| -> Result<()> { panic!("boom") }).await.is_err());
         assert_eq!(count(app.clone()).await.expect("query after panic"), 0);
     }
 
@@ -466,10 +450,7 @@ mod tests {
             fn new() -> Self {
                 let dir = tempfile::tempdir().expect("tempdir");
                 let db_path = dir.path().join("stackhour.db");
-                let cfg = config_with(
-                    &json!({ "server": { "db": db_path } }).to_string(),
-                    dir.path(),
-                );
+                let cfg = config_with(&json!({ "server": { "db": db_path } }).to_string(), dir.path());
                 let db = stackhour_store::open_db(&db_path).expect("open db");
                 // A dashboard override that does not exist on disk, so the
                 // embedded copy is served and the test is HOME-independent.

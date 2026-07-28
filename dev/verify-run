@@ -1,0 +1,92 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
+LEVEL=${1:-standard}
+DRY_RUN=${STACKHOUR_VERIFY_DRY_RUN:-0}
+
+cd "$ROOT"
+PATH="$ROOT/target/verification-tools/bin:$PATH"
+# Strict profiles build several feature sets. Disable incremental compilation
+# by default so these short-lived variants do not fill small coordinator disks.
+CARGO_INCREMENTAL=${CARGO_INCREMENTAL:-0}
+export PATH CARGO_INCREMENTAL
+
+step() {
+    name=$1
+    shift
+    printf 'stackhour-verify level=%s step=%s status=start\n' "$LEVEL" "$name"
+    if [ "$DRY_RUN" = "1" ]; then
+        printf 'stackhour-verify level=%s step=%s status=pass mode=dry-run\n' "$LEVEL" "$name"
+        return 0
+    fi
+    if "$@"; then
+        printf 'stackhour-verify level=%s step=%s status=pass\n' "$LEVEL" "$name"
+    else
+        status=$?
+        printf 'stackhour-verify level=%s step=%s status=fail exit=%s\n' "$LEVEL" "$name" "$status" >&2
+        return "$status"
+    fi
+}
+
+run_fast() {
+    step rust-format cargo fmt --all -- --check
+    step unsafe-rust-scan dev/check-unsafe.sh
+    step rust-check cargo check --workspace --all-targets --all-features --locked
+    step frontend-fast dev/verify-frontend fast
+    step shell-syntax sh -n deploy/install.sh
+    step control-installer-syntax sh -n deploy/install-control.sh
+}
+
+run_standard() {
+    run_fast
+    step rust-clippy cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+    step workspace-tests cargo test --workspace --all-features --locked
+    step frontend-standard dev/verify-frontend standard
+}
+
+run_full() {
+    run_standard
+    step verification-contract dev/test-verify.sh
+    step frontend-contract node dev/check-frontend-contract.mjs
+    step frontend-full dev/verify-frontend full
+    step agent-hook-contract dev/test-agent-hooks.sh
+    step feature-matrix dev/check-features.sh
+    step fuzz-clippy cargo clippy --manifest-path fuzz/Cargo.toml --all-targets --locked -- -D warnings
+    step minimum-rust-version dev/check-msrv.sh
+    step dependency-policy dev/check-dependencies.sh
+    step shell-analysis dev/check-shell.sh
+    step workflow-analysis dev/check-workflows.sh
+    step secret-patterns dev/check-secrets.sh
+    step installer-tests sh deploy/test-install.sh
+}
+
+run_deep() {
+    run_full
+    step deep-space dev/reclaim-deep-space.sh
+    step coverage dev/test-coverage.sh
+    step miri dev/test-miri.sh
+    step protocol-fuzz dev/test-fuzz.sh
+    step mutations dev/test-mutations.sh
+}
+
+run_release() {
+    run_deep
+    step release-build cargo build --workspace --all-features --release --locked
+    step release-tests cargo test --workspace --all-features --release --locked
+    step release-package dev/test-release-package.sh
+}
+
+case "$LEVEL" in
+    fast) run_fast ;;
+    standard) run_standard ;;
+    full) run_full ;;
+    deep) run_deep ;;
+    release) run_release ;;
+    *)
+        printf 'usage: dev/verify-run <fast|standard|full|deep|release>\n' >&2
+        exit 2
+        ;;
+esac
+
+printf 'stackhour-verify level=%s status=pass\n' "$LEVEL"

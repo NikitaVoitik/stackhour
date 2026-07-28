@@ -541,7 +541,7 @@ impl StatusMessage {
 /// code change.
 pub fn deliver_final(tg: &Tg, ctx: &dyn LaneContext, text: &str, status_id: Option<i64>) {
     let kb = ctx.control_keyboard();
-    let sent = tg.send_rich(text, Some(serde_json::json!({ "reply_markup": kb.clone() })));
+    let sent = tg.send_rich(text, Some(serde_json::json!({ "reply_markup": kb })));
 
     if let Some(id) = status_id {
         tg.delete(id);

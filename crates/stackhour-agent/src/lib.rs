@@ -50,7 +50,7 @@ pub enum Gate {
 pub trait Watcher {
     /// Watcher name as it appears in config, health report and doctor
     /// (`files`, `claude`, `codex`, `macApps`, `ssh`, `zed`).
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     /// Config + platform gating with exact reason strings.
     fn gate(&self, cfg: &Config) -> Gate;
@@ -287,9 +287,7 @@ pub fn tick(cfg: &Config, data_dir: &Path, watchers: &mut [Box<dyn Watcher>]) ->
                 } else {
                     format!(", {} queued", remaining.len())
                 };
-                println!(
-                    "[stackhour] sent {take} heartbeats ({inserted} new{tail})"
-                );
+                println!("[stackhour] sent {take} heartbeats ({inserted} new{tail})");
             }
             Err(e) => {
                 server_failed = true;
@@ -445,4 +443,3 @@ mod tests {
         assert_eq!(tick_interval(1.5), Duration::from_secs_f64(1.5));
     }
 }
-

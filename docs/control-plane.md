@@ -20,7 +20,7 @@ on Apple Silicon macOS. Intel macOS is not supported.
 Install these tools before you start:
 
 - Git
-- Rust 1.79 or later
+- Rust 1.87 or later
 - Claude Code or Codex on each execution machine
 - OpenSSH client on the coordinator if you add SSH machines
 - curl and tar on each SSH machine

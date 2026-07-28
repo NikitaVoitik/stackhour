@@ -114,7 +114,7 @@ where
     seen.insert(node.to_string());
     while !frontier.is_empty() && depth <= MAX_DEPTH {
         let mut next: Vec<String> = Vec::new();
-        for n in frontier.drain(..) {
+        for n in std::mem::take(&mut frontier) {
             for e in edges_of(&n) {
                 if known.contains(&e) && seen.insert(e.clone()) {
                     next.push(e);
