@@ -50,7 +50,7 @@ filetime = "0.2"
 # integration tests). The hub server uses axum's own `extract::ws`; the node
 # dials out with tokio-tungstenite. Keep this aligned with Axum's WebSocket
 # stack so the lock file does not carry a second protocol implementation.
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
 futures-util = "0.3"
 
 # Workspace-internal crates.
