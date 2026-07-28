@@ -15,6 +15,10 @@ use std::process::ExitCode;
 mod args;
 #[cfg(feature = "bridge")]
 mod bridge_migrate;
+#[cfg(feature = "control")]
+mod control;
+#[cfg(feature = "control")]
+mod control_install;
 mod doctor;
 mod doctor_checks;
 mod init;
@@ -58,6 +62,8 @@ const HELP: &str = concat!(
     "                                   set up the Telegram Claude/Codex bridge\n",
     "  bridge doctor|status|restart <coordinator|worker>\n",
     "                                   operate the bridge service\n",
+    "  control <hub|node>               run the control plane\n",
+    "  control install <hub|node|ssh>   configure and install a control service\n",
     "\n",
 );
 
@@ -87,6 +93,7 @@ fn compiled_modules() -> stackhour_core::modules::ModuleSet {
         cfg!(feature = "agent"),
         cfg!(feature = "bridge"),
     )
+    .with_control(cfg!(feature = "control"))
 }
 
 /// Both gate layers plus the config file the runtime one came from, resolved
@@ -344,14 +351,22 @@ fn main() -> ExitCode {
             // The one-shot notifier (fully ported + tested in tgsend.rs).
             // Node ran it as a standalone script, so its args are everything
             // after the verb.
-            Some("tg-send") => {
-                ExitCode::from(stackhour_bridge::tgsend::run_tg_send(&tail[1..]) as u8)
-            }
+            Some("tg-send") => ExitCode::from(stackhour_bridge::tgsend::run_tg_send(&tail[1..]) as u8),
             // install | doctor | status | restart, plus -h/--help and the
             // usage-on-stderr exit(1) for anything unknown — exactly what
             // cli.js hands to `runBridgeCli(process.argv.slice(3))`.
             _ => ExitCode::from(stackhour_bridge::installer::run_bridge_cli(&tail) as u8),
         },
+        #[cfg(feature = "control")]
+        "control" => {
+            if tail.first().map(String::as_str) == Some("install") {
+                return deferred("control install", control_install::run(&tail[1..]));
+            }
+            let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+            let result = stackhour_core::config::load_config(&paths.config_path)
+                .and_then(|cfg| control::run(&tail, &cfg));
+            deferred("control", result)
+        }
         // Node's `default:` case — an unknown verb (or none) prints usage and
         // exits 0. `loadConfig()` runs BEFORE the switch in cli.js, so a
         // corrupt config.json must fail here rather than print help.
@@ -491,17 +506,20 @@ mod tests {
         assert_eq!(set.tracker, cfg!(feature = "tracker"));
         assert_eq!(set.agent, cfg!(feature = "agent"));
         assert_eq!(set.bridge, cfg!(feature = "bridge"));
+        assert_eq!(set.control, cfg!(feature = "control"));
     }
 
     /// The prime constraint, stated as a test: a default build has every
     /// module compiled in, so Layer 1 never refuses anything and the binary
     /// behaves exactly as it did before features existed.
-    #[cfg(all(feature = "tracker", feature = "agent", feature = "bridge"))]
+    #[cfg(all(
+        feature = "tracker",
+        feature = "agent",
+        feature = "bridge",
+        feature = "control"
+    ))]
     #[test]
     fn a_default_build_compiles_in_every_module() {
-        assert_eq!(
-            super::compiled_modules(),
-            stackhour_core::modules::ModuleSet::ALL
-        );
+        assert_eq!(super::compiled_modules(), stackhour_core::modules::ModuleSet::ALL);
     }
 }

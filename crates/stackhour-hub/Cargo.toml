@@ -1,0 +1,35 @@
+[package]
+name = "stackhour-hub"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "stackhour control-plane hub: the axum WebSocket server that is the single durable authority over task history. Clients and nodes both dial IN; commands and node events flow through stackhour_domain::Hub (the SQLite event log — the only sequence authority) and newly-appended events are live-broadcast to subscribed clients."
+
+[lib]
+name = "stackhour_hub"
+path = "src/lib.rs"
+
+[dependencies]
+# The workspace comment on `tokio`/`axum` says "async = server crate only". That
+# predates this crate: the hub is a second server crate and is legitimately
+# async, exactly like `stackhour-server`. Nothing else in the workspace changed.
+stackhour-domain.workspace = true
+stackhour-core.workspace = true
+tokio = { workspace = true, features = ["sync", "time"] }
+axum = { workspace = true, features = ["ws"] }
+futures-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# Timestamps for the durable Task/Run/Approval rows the hub mints alongside
+# events (`Utc::now()`); the durable entities carry `DateTime<Utc>` fields.
+chrono.workspace = true
+# Timing-safe bearer-token compare for the node handshake, exactly as
+# `stackhour-server` uses it for ingest auth.
+constant_time_eq.workspace = true
+
+[dev-dependencies]
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+tempfile.workspace = true
+tower.workspace = true

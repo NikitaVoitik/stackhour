@@ -1,0 +1,34 @@
+[package]
+name = "stackhour-node"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "stackhour execution node: an outbound WebSocket client that dials the hub, authenticates with NodeHello, and starts local Claude or Codex CLI processes behind a supervised Engine trait."
+
+[lib]
+name = "stackhour_node"
+path = "src/lib.rs"
+
+# This crate is async on purpose. The workspace note that pins async to the HTTP
+# server crate predates the control-plane node link; the node dials OUT over a
+# WebSocket and supervises concurrent receive/heartbeat/engine paths, so it needs
+# tokio + tokio-tungstenite here. Frames are one JSON protocol message each, so
+# the node's tungstenite and the hub's axum-ws never share a type.
+[dependencies]
+stackhour-domain.workspace = true
+stackhour-core.workspace = true
+stackhour-bridge.workspace = true
+tokio = { workspace = true, features = ["sync", "time", "rt"] }
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+# A FAKE hub stood up in-process for the integration tests: axum serves the
+# ws upgrade, the node dials it with tokio-tungstenite.
+axum = { workspace = true, features = ["ws"] }
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+tempfile.workspace = true

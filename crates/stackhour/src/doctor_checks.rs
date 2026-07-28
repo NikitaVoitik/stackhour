@@ -47,11 +47,7 @@ pub fn zed_db_paths(home: &Path) -> Vec<PathBuf> {
 /// that misleads a reader about what the program needs, so the key is
 /// `runtime`.
 fn runtime_check() -> Check {
-    Check::new(
-        "runtime",
-        StatusOk,
-        format!("rust {}", stackhour_core::VERSION),
-    )
+    Check::new("runtime", StatusOk, format!("rust {}", stackhour_core::VERSION))
 }
 
 /// The 'sqlite' check — the Rust build links SQLite statically, so this is
@@ -487,12 +483,7 @@ fn services_check(out: &mut Vec<Check>) {
 ///
 /// Split out as `pub` (like `agent_report_checks`) so tests can drive both
 /// layers hermetically without a `DoctorOpts` change.
-pub fn module_checks(
-    runtime: ModuleSet,
-    compiled: ModuleSet,
-    config_path: &Path,
-    out: &mut Vec<Check>,
-) {
+pub fn module_checks(runtime: ModuleSet, compiled: ModuleSet, config_path: &Path, out: &mut Vec<Check>) {
     for m in Module::ALL {
         if !compiled.contains(m) {
             out.push(Check::new(
@@ -535,7 +526,12 @@ pub fn all_checks(cfg: Result<&Config, &str>, opts: &DoctorOpts) -> Vec<Check> {
         // A config we could not load resolves the RUNTIME layer to all-enabled
         // (the gate fails open), so a corrupt config still reports the
         // compile-time layer rather than guessing at the user's block.
-        module_checks(ModuleSet::ALL, crate::compiled_modules(), &opts.config_path, &mut out);
+        module_checks(
+            ModuleSet::ALL,
+            crate::compiled_modules(),
+            &opts.config_path,
+            &mut out,
+        );
         return out;
     };
     out.push(token_check(cfg));
@@ -552,7 +548,12 @@ pub fn all_checks(cfg: Result<&Config, &str>, opts: &DoctorOpts) -> Vec<Check> {
     // Appended LAST, after `services`, so every existing check keeps its
     // pinned index. `crate::compiled_modules()` rather than a second copy of
     // the `cfg!` triple: Layer 1 has exactly one source of truth.
-    module_checks(cfg.modules, crate::compiled_modules(), &opts.config_path, &mut out);
+    module_checks(
+        cfg.modules,
+        crate::compiled_modules(),
+        &opts.config_path,
+        &mut out,
+    );
     out
 }
 
@@ -1100,19 +1101,33 @@ mod tests {
         let with = all_checks(Result::Ok(&cfg), &opts);
         let plain = config_at(&opts.config_path, "{}");
         let without = all_checks(Result::Ok(&plain), &opts);
-        // Everything the plain config reports is a PREFIX of the disabled
-        // one: module lines are appended, never interleaved, so no existing
-        // check changes index.
-        assert_eq!(&with[..without.len()], &without[..]);
+        // Every non-module check stays byte-identical and in the same order.
+        // Reduced builds can already have module lines, so compare only the
+        // common non-module prefix.
+        let real_with: Vec<_> = with
+            .iter()
+            .take_while(|c| !c.name.starts_with("module-"))
+            .collect();
+        let real_without: Vec<_> = without
+            .iter()
+            .take_while(|c| !c.name.starts_with("module-"))
+            .collect();
+        assert_eq!(real_with, real_without);
         // Every module line sits at the very tail, below every real check.
         let first = with.iter().position(|c| c.name.starts_with("module-")).unwrap();
         assert!(with[first..].iter().all(|c| c.name.starts_with("module-")));
         // Turning bridge off in the CONFIG is what put a bridge line there —
         // unless this build has no bridge compiled in, in which case Layer 1
         // had already claimed the line and wins.
-        let bridge = with.iter().find(|c| c.name == "module-bridge").expect("bridge is off");
+        let bridge = with
+            .iter()
+            .find(|c| c.name == "module-bridge")
+            .expect("bridge is off");
         if crate::compiled_modules().bridge {
-            assert!(bridge.message.starts_with("disabled by \"modules.bridge\""), "{bridge:?}");
+            assert!(
+                bridge.message.starts_with("disabled by \"modules.bridge\""),
+                "{bridge:?}"
+            );
             assert!(!without.iter().any(|c| c.name == "module-bridge"));
         } else {
             assert!(bridge.message.starts_with("not compiled"), "{bridge:?}");
@@ -1150,8 +1165,7 @@ mod tests {
         for c in out.iter().filter(|c| c.name.starts_with("module-")) {
             assert!(c.message.starts_with("not compiled into this binary"), "{c:?}");
         }
-        let expected = ModuleSet::ALL.disabled().len()
-            + crate::compiled_modules().disabled().len();
+        let expected = ModuleSet::ALL.disabled().len() + crate::compiled_modules().disabled().len();
         assert_eq!(module_line_names(&out).len(), expected);
     }
 

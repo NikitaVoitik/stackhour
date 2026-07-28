@@ -322,8 +322,9 @@ own `✗ registry: …` line after the standard checks.
 
 ## Modules (compile-time and runtime)
 
-Stackhour is three products sharing one binary: a time **tracker**, a local
-**agent**, and the Telegram **bridge**. Not every machine wants all three, so
+Stackhour is four products sharing one binary: a time **tracker**, a local
+**agent**, the legacy Telegram **bridge**, and the multi-client **control**
+plane. Not every machine wants all four, so
 each can be switched off at either of two layers.
 
 | Module | Verbs |
@@ -331,6 +332,7 @@ each can be switched off at either of two layers.
 | `tracker` | `serve`, `status`, `token`, `data`, `backup`, `import-wakatime`, `init server`, `install server` |
 | `agent` | `agent`, `init agent`, `install agent` |
 | `bridge` | `bridge *` |
+| `control` | `control hub`, `control node` |
 
 `doctor` belongs to no module and is never gated — it is the diagnostic of
 last resort. `stackhour-core` (config, paths, tokens, the registries) is the
@@ -339,7 +341,7 @@ shared spine and is never optional.
 ### Runtime: the `modules` block
 
 ```json
-{ "modules": { "tracker": true, "agent": true, "bridge": false } }
+{ "modules": { "tracker": true, "agent": true, "bridge": false, "control": true } }
 ```
 
 The gate fails open. An absent `modules` key, an absent sub-key, `null`, or a
@@ -540,18 +542,31 @@ interpreter installed. A worker enrolled before this change still has a
 See [docs/bridge.md](docs/bridge.md) for the full guide and
 [SECURITY.md](SECURITY.md) for the security model.
 
-## Where this is going
+## Multi-client control plane
 
-The bridge is a completion-oriented job queue: send a prompt, get an answer.
-The next phase turns it into a multi-client control plane for remotely
-executed coding agents — durable tasks and approvals shared across Telegram, a
-web/PWA client, and a desktop app, with execution nodes dialling out to a hub.
+The control plane has a durable coordinator, outbound execution nodes, a web
+control panel, an optional Telegram client, and real Claude and Codex
+command-line adapters. Commands for an offline node stay in SQLite and run
+after the node reconnects.
+
+```sh
+curl -fsSL https://github.com/NikitaVoitik/stackhour/releases/latest/download/install-stackhour.sh |
+  sh -s -- control install hub \
+  --bind=127.0.0.1:4050 \
+  --public-url=https://control.example.com
+```
+
+Open the coordinator URL. Enter the client token. Use **Add machine** to install
+a node on the coordinator or on an SSH machine. The SSH connection is used only
+for setup. Normal node traffic uses an outbound WebSocket connection.
+
+See [docs/control-plane.md](docs/control-plane.md) for installation, TLS, node
+setup, updates, security, Telegram migration, recovery, and current limits.
 
 [docs/architecture/remote-agent-control-plane.md](docs/architecture/remote-agent-control-plane.md)
 is the design: a source-level study of T3 Code, Zed, and Claude Code, the
 decision to use ACP as an engine adapter rather than a network protocol, the
-`Task → Run → ProviderSession` model, and a staged implementation order. It is
-a recommendation, not yet built.
+`Task → Run → ProviderSession` model, and the remaining implementation phases.
 
 ## Updating and testing
 
@@ -565,6 +580,20 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 systemctl --user restart stackhour-server stackhour-agent   # Linux server
 ```
+
+## Releases
+
+Change `[workspace.package].version` in `Cargo.toml` to publish a release.
+After that change reaches `master`, GitHub Actions builds checksum-verified
+installers for:
+
+- Linux x86-64
+- Linux ARM64
+- macOS Intel
+- macOS Apple Silicon
+
+The workflow creates the matching `v<version>` tag and GitHub release. It does
+not create a second release when the version already exists.
 
 The suite uses temporary configs, databases, queues, watcher fixtures, and
 ephemeral loopback ports. It never reads or writes the live Stackhour config,

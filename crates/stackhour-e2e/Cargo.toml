@@ -1,0 +1,28 @@
+[package]
+name = "stackhour-e2e"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "stackhour control-plane end-to-end tests: stand up a REAL stackhour-hub server and a REAL stackhour-node client together over a loopback WebSocket and assert the Phase-1 transport acceptance criteria from docs/architecture/remote-agent-control-plane.md. Test-only — it exists solely to host cross-crate integration tests without a hub<->node dependency cycle, so it has no runtime deps and its library is an empty doc-only shell."
+publish = false
+
+[lib]
+name = "stackhour_e2e"
+path = "src/lib.rs"
+
+# No runtime dependencies: this crate ships no code, only tests. Everything is a
+# dev-dependency so the hub and node are linked ONLY when the integration tests
+# are built — the two production crates never depend on each other, and neither
+# depends on this one.
+[dev-dependencies]
+stackhour-hub = { path = "../stackhour-hub" }
+stackhour-node = { path = "../stackhour-node" }
+stackhour-domain.workspace = true
+# The workspace tokio feature set omits `time`; the tests need `tokio::time::timeout`
+# to bound every await, so add it here (Cargo unions it with the workspace features).
+tokio = { workspace = true, features = ["time"] }
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true

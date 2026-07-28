@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stackhour Control</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d0c;
+      --panel: #121513;
+      --panel-2: #191d1a;
+      --line: #2a302c;
+      --text: #f2f5f2;
+      --muted: #9ca79f;
+      --green: #a8f5bd;
+      --green-strong: #36d66b;
+      --amber: #f5d98a;
+      --red: #ff9d9d;
+      --shadow: 0 20px 70px rgba(0, 0, 0, .35);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 15% 0, rgba(54, 214, 107, .09), transparent 30rem),
+        var(--bg);
+      color: var(--text);
+    }
+    button, input, select, textarea { font: inherit; }
+    button, input, select, textarea {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0e110f;
+      color: var(--text);
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 11px 12px;
+    }
+    textarea { resize: vertical; min-height: 132px; line-height: 1.5; }
+    button {
+      min-height: 42px;
+      padding: 0 15px;
+      cursor: pointer;
+      font-weight: 650;
+    }
+    button:hover { border-color: #59645c; background: #171b18; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 3px solid rgba(168, 245, 189, .35);
+      outline-offset: 2px;
+    }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    .primary {
+      border-color: var(--green-strong);
+      background: var(--green);
+      color: #071109;
+    }
+    .primary:hover { background: #c4fad2; border-color: #c4fad2; }
+    .danger { color: var(--red); }
+    .shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr; }
+    header {
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(11, 13, 12, .84);
+      backdrop-filter: blur(18px);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; font-weight: 750; letter-spacing: -.02em; }
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      background: var(--green);
+      color: #071109;
+      font-weight: 900;
+    }
+    .connection { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #667068; }
+    .dot.online { background: var(--green-strong); box-shadow: 0 0 0 4px rgba(54, 214, 107, .12); }
+    main { display: grid; grid-template-columns: 290px minmax(0, 1fr); min-height: 0; }
+    aside {
+      padding: 22px 16px;
+      border-right: 1px solid var(--line);
+      background: rgba(14, 17, 15, .6);
+    }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 5px 14px; }
+    .section-head h2 { margin: 0; font-size: 13px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+    .small-button { min-height: 34px; padding: 0 11px; font-size: 13px; }
+    .node-list { display: grid; gap: 8px; }
+    .node {
+      width: 100%;
+      min-height: 72px;
+      padding: 12px;
+      text-align: left;
+      background: transparent;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 11px;
+      align-items: start;
+    }
+    .node.selected { border-color: #68816f; background: var(--panel-2); }
+    .node-status { margin-top: 5px; }
+    .node strong { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .node-meta { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .empty {
+      padding: 26px 14px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      text-align: center;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .workspace { padding: 30px clamp(20px, 4vw, 58px) 60px; overflow: auto; }
+    .content { width: min(920px, 100%); margin: 0 auto; }
+    .eyebrow { margin: 0 0 7px; color: var(--green); font-size: 12px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(28px, 4vw, 44px); line-height: 1.06; letter-spacing: -.04em; }
+    .lead { margin: 12px 0 26px; max-width: 620px; color: var(--muted); line-height: 1.55; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .auth { padding: 18px; margin-bottom: 18px; display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    .auth label { grid-column: 1 / -1; }
+    label { display: grid; gap: 7px; color: #c7cec9; font-size: 13px; font-weight: 650; }
+    .composer { padding: 20px; }
+    .composer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+    .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .actions-right { display: flex; gap: 9px; }
+    .selected-label { color: var(--muted); font-size: 13px; }
+    .selected-label strong { color: var(--text); }
+    .timeline-head { margin: 34px 0 12px; display: flex; justify-content: space-between; align-items: end; }
+    .timeline-head h2 { margin: 0; font-size: 18px; }
+    .timeline { display: grid; gap: 9px; }
+    .event {
+      display: grid;
+      grid-template-columns: 48px 1fr;
+      gap: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(18, 21, 19, .75);
+    }
+    .sequence { color: #6f7a72; font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; padding-top: 2px; }
+    .event-kind { font-size: 13px; font-weight: 750; }
+    .event-text { margin-top: 5px; color: var(--muted); font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .notice { min-height: 22px; margin: 9px 0 0; color: var(--amber); font-size: 13px; }
+    dialog {
+      width: min(650px, calc(100% - 28px));
+      max-height: calc(100vh - 40px);
+      padding: 0;
+      border: 1px solid #3a433d;
+      border-radius: 18px;
+      background: var(--panel);
+      color: var(--text);
+      box-shadow: 0 30px 100px rgba(0, 0, 0, .7);
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, .72); backdrop-filter: blur(4px); }
+    .dialog-head, .dialog-body, .dialog-foot { padding: 20px 22px; }
+    .dialog-head { display: flex; justify-content: space-between; align-items: start; border-bottom: 1px solid var(--line); }
+    .dialog-head h2 { margin: 0; font-size: 21px; }
+    .dialog-head p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .close { min-height: 34px; padding: 0 10px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 18px; }
+    .tab[aria-selected="true"] { border-color: var(--green-strong); color: var(--green); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .full { grid-column: 1 / -1; }
+    .ssh-only[hidden] { display: none; }
+    .dialog-foot { display: flex; justify-content: flex-end; gap: 9px; border-top: 1px solid var(--line); }
+    code { color: var(--green); }
+    @media (max-width: 760px) {
+      header { padding: 0 16px; }
+      main { grid-template-columns: 1fr; }
+      aside { border-right: 0; border-bottom: 1px solid var(--line); }
+      .node-list { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+      .workspace { padding: 25px 16px 48px; }
+    }
+    @media (max-width: 520px) {
+      .auth, .composer-grid, .form-grid { grid-template-columns: 1fr; }
+      .auth label, .full { grid-column: auto; }
+      .actions { align-items: stretch; flex-direction: column; }
+      .actions-right { display: grid; grid-template-columns: 1fr 1fr; }
+      .connection span:last-child { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><span class="mark">S</span><span>Stackhour Control</span></div>
+      <div class="connection" aria-live="polite"><span id="connection-dot" class="dot"></span><span id="connection">Not connected</span></div>
+    </header>
+    <main>
+      <aside>
+        <div class="section-head">
+          <h2>Machines</h2>
+          <button id="add-node" class="small-button" type="button">Add machine</button>
+        </div>
+        <div id="nodes" class="node-list">
+          <div class="empty">Connect to load machines.</div>
+        </div>
+      </aside>
+      <section class="workspace">
+        <div class="content">
+          <p class="eyebrow">Coordinator</p>
+          <h1>Run agents where the work lives.</h1>
+          <p class="lead">Select a connected machine. Then start Claude or Codex in its local workspace.</p>
+
+          <section class="card auth" aria-labelledby="auth-title">
+            <label id="auth-title" for="token">Client token</label>
+            <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the token from hub setup">
+            <button id="connect" class="primary" type="button">Connect</button>
+          </section>
+
+          <section class="card composer" aria-labelledby="task-title">
+            <label id="task-title" for="prompt">Task</label>
+            <textarea id="prompt" placeholder="Describe the work for the agent."></textarea>
+            <div class="composer-grid">
+              <label for="engine">Agent
+                <select id="engine">
+                  <option value="claude">Claude</option>
+                  <option value="codex">Codex</option>
+                </select>
+              </label>
+              <label for="workspace">Workspace override
+                <input id="workspace" placeholder="Use the machine default">
+              </label>
+            </div>
+            <div class="actions">
+              <div class="selected-label">Machine: <strong id="selected-node">None</strong></div>
+              <div class="actions-right">
+                <button id="stop" class="danger" type="button" disabled>Stop run</button>
+                <button id="run" class="primary" type="button" disabled>Start task</button>
+              </div>
+            </div>
+            <p id="task-notice" class="notice" aria-live="polite"></p>
+          </section>
+
+          <div class="timeline-head">
+            <h2>Activity</h2>
+            <button id="clear-events" class="small-button" type="button">Clear view</button>
+          </div>
+          <div id="timeline" class="timeline" aria-live="polite">
+            <div class="empty">Task events will appear here.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="setup">
+    <form id="setup-form">
+      <div class="dialog-head">
+        <div>
+          <h2>Add a machine</h2>
+          <p>The coordinator installs the same Stackhour binary and starts a user service.</p>
+        </div>
+        <button id="close-setup" class="close" type="button" aria-label="Close">Close</button>
+      </div>
+      <div class="dialog-body">
+        <div class="tabs" role="tablist" aria-label="Connection type">
+          <button class="tab" type="button" role="tab" data-mode="local" aria-selected="true">This machine</button>
+          <button class="tab" type="button" role="tab" data-mode="ssh" aria-selected="false">SSH machine</button>
+        </div>
+        <input id="install-mode" type="hidden" value="local">
+        <div class="form-grid">
+          <label for="setup-node-id">Machine ID
+            <input id="setup-node-id" required placeholder="coordinator">
+          </label>
+          <label for="setup-hub-url">Hub WebSocket URL
+            <input id="setup-hub-url" required>
+          </label>
+          <label class="full" for="setup-workspace">Default workspace
+            <input id="setup-workspace" placeholder="Use the remote home directory">
+          </label>
+          <label for="setup-claude">Claude command
+            <input id="setup-claude" value="claude">
+          </label>
+          <label for="setup-codex">Codex command
+            <input id="setup-codex" value="codex">
+          </label>
+          <label class="ssh-only" hidden for="setup-host">SSH host
+            <input id="setup-host" placeholder="devbox or 192.0.2.10">
+          </label>
+          <label class="ssh-only" hidden for="setup-user">SSH user
+            <input id="setup-user" placeholder="nikita">
+          </label>
+          <label class="ssh-only" hidden for="setup-port">SSH port
+            <input id="setup-port" type="number" min="1" max="65535" value="22">
+          </label>
+          <label class="ssh-only" hidden for="setup-identity">Identity file on coordinator
+            <input id="setup-identity" placeholder="/home/user/.ssh/id_ed25519">
+          </label>
+        </div>
+        <p class="ssh-only" hidden>The SSH machine must use the same operating system and CPU architecture as the coordinator.</p>
+        <p id="setup-notice" class="notice" aria-live="polite"></p>
+      </div>
+      <div class="dialog-foot">
+        <button id="cancel-setup" type="button">Cancel</button>
+        <button id="install-node" class="primary" type="submit">Install machine</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const byId = id => document.getElementById(id);
+    const state = {
+      ws: null,
+      token: "",
+      cursor: 0,
+      selectedNode: null,
+      taskId: null,
+      runId: null,
+      pending: new Map(),
+      events: new Map(),
+      eventWaiters: new Map(),
+      reconnectTimer: null
+    };
+
+    function setConnection(text, online) {
+      byId("connection").textContent = text;
+      byId("connection-dot").classList.toggle("online", online);
+    }
+
+    function wsUrl(path) {
+      return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${path}`;
+    }
+
+    function setNotice(id, text, error = false) {
+      const element = byId(id);
+      element.textContent = text;
+      element.style.color = error ? "var(--red)" : "var(--amber)";
+    }
+
+    function connect() {
+      const token = byId("token").value.trim();
+      if (!token) {
+        setNotice("task-notice", "Enter the client token.", true);
+        return;
+      }
+      state.token = token;
+      clearTimeout(state.reconnectTimer);
+      if (state.ws) state.ws.close();
+      setConnection("Connecting", false);
+      const socket = new WebSocket(wsUrl("/v1/client/connect"));
+      state.ws = socket;
+      socket.onopen = () => socket.send(JSON.stringify({
+        token: state.token,
+        after_sequence: state.cursor || undefined
+      }));
+      socket.onmessage = event => handleMessage(JSON.parse(event.data));
+      socket.onerror = () => setConnection("Connection error", false);
+      socket.onclose = () => {
+        if (state.ws !== socket) return;
+        setConnection("Disconnected", false);
+        byId("run").disabled = true;
+        state.reconnectTimer = setTimeout(connect, 1500);
+      };
+    }
+
+    function handleMessage(message) {
+      if (message.type === "subscribe_ack") {
+        setConnection("Connected", true);
+        setNotice("task-notice", "");
+        refreshNodes();
+        updateRunButton();
+      }
+      if (message.type === "command_receipt") {
+        const resolve = state.pending.get(message.command_id);
+        if (resolve) {
+          state.pending.delete(message.command_id);
+          resolve(message);
+        }
+      }
+      if (message.type === "event_delivery") {
+        const event = message.event;
+        state.cursor = Math.max(state.cursor, event.sequence);
+        state.events.set(event.sequence, event);
+        const resolve = state.eventWaiters.get(event.sequence);
+        if (resolve) {
+          state.eventWaiters.delete(event.sequence);
+          resolve(event);
+        }
+        addEvent(event);
+        if (event.kind === "node.connected" || event.kind === "node.disconnected") refreshNodes();
+      }
+    }
+
+    function sendCommand(command) {
+      return new Promise((resolve, reject) => {
+        if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+          reject(new Error("The coordinator is not connected."));
+          return;
+        }
+        state.pending.set(command.command_id, resolve);
+        state.ws.send(JSON.stringify(command));
+        setTimeout(() => {
+          if (state.pending.delete(command.command_id)) reject(new Error("The coordinator did not accept the command."));
+        }, 10000);
+      });
+    }
+
+    function waitForEvent(sequence) {
+      const found = state.events.get(sequence);
+      if (found) return Promise.resolve(found);
+      return new Promise((resolve, reject) => {
+        state.eventWaiters.set(sequence, resolve);
+        setTimeout(() => {
+          if (state.eventWaiters.delete(sequence)) reject(new Error("The task event did not arrive."));
+        }, 10000);
+      });
+    }
+
+    async function applyCommand(command) {
+      const receipt = await sendCommand(command);
+      if (!receipt.accepted || !receipt.assigned_sequence) {
+        throw new Error(receipt.error ? JSON.stringify(receipt.error) : "The command was rejected.");
+      }
+      return waitForEvent(receipt.assigned_sequence);
+    }
+
+    function uuid() {
+      return crypto.randomUUID();
+    }
+
+    async function startTask() {
+      const prompt = byId("prompt").value.trim();
+      if (!prompt) return setNotice("task-notice", "Enter a task.", true);
+      if (!state.selectedNode) return setNotice("task-notice", "Select a connected machine.", true);
+      byId("run").disabled = true;
+      setNotice("task-notice", "Starting the task.");
+      try {
+        const task = await applyCommand({
+          type: "create_task",
+          command_id: uuid(),
+          title: prompt.slice(0, 120)
+        });
+        state.taskId = task.task_id;
+        const run = await applyCommand({
+          type: "start_run",
+          command_id: uuid(),
+          task_id: state.taskId,
+          node_id: state.selectedNode,
+          engine: byId("engine").value,
+          access_policy: "automatic",
+          workspace_path: byId("workspace").value.trim() || undefined
+        });
+        state.runId = run.run_id;
+        byId("stop").disabled = false;
+        await applyCommand({
+          type: "send_user_message",
+          command_id: uuid(),
+          task_id: state.taskId,
+          run_id: state.runId,
+          text: prompt,
+          client_message_id: uuid()
+        });
+        setNotice("task-notice", "Task started.");
+      } catch (error) {
+        setNotice("task-notice", error.message, true);
+      } finally {
+        updateRunButton();
+      }
+    }
+
+    async function stopRun() {
+      if (!state.runId) return;
+      byId("stop").disabled = true;
+      try {
+        await applyCommand({type: "interrupt_run", command_id: uuid(), run_id: state.runId});
+        setNotice("task-notice", "Stop request sent.");
+        state.runId = null;
+      } catch (error) {
+        setNotice("task-notice", error.message, true);
+        byId("stop").disabled = false;
+      }
+    }
+
+    function eventSummary(event) {
+      const payload = event.payload || {};
+      if (typeof payload.text === "string") return payload.text;
+      if (event.kind === "run.started") return `${payload.engine || "agent"} started`;
+      if (event.kind === "node.connected") return `${event.node_id} connected`;
+      if (event.kind === "node.disconnected") return `${event.node_id} disconnected`;
+      if (event.kind === "task.created") return payload.title || "Task created";
+      const keys = Object.keys(payload);
+      return keys.length ? JSON.stringify(payload) : event.kind.replaceAll(".", " ");
+    }
+
+    function addEvent(event) {
+      const timeline = byId("timeline");
+      if (timeline.querySelector(".empty")) timeline.textContent = "";
+      const item = document.createElement("article");
+      item.className = "event";
+      const sequence = document.createElement("div");
+      sequence.className = "sequence";
+      sequence.textContent = `#${event.sequence}`;
+      const body = document.createElement("div");
+      const kind = document.createElement("div");
+      kind.className = "event-kind";
+      kind.textContent = event.kind;
+      const text = document.createElement("div");
+      text.className = "event-text";
+      text.textContent = eventSummary(event);
+      body.append(kind, text);
+      item.append(sequence, body);
+      timeline.prepend(item);
+    }
+
+    async function api(path, options = {}) {
+      const headers = new Headers(options.headers || {});
+      headers.set("Authorization", `Bearer ${state.token}`);
+      if (options.body) headers.set("Content-Type", "application/json");
+      const response = await fetch(path, {...options, headers});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `Request failed with ${response.status}.`);
+      return data;
+    }
+
+    async function refreshNodes() {
+      if (!state.token) return;
+      try {
+        const data = await api("/v1/nodes");
+        renderNodes(data.nodes || []);
+      } catch (error) {
+        renderNodes([]);
+        setNotice("task-notice", error.message, true);
+      }
+    }
+
+    function renderNodes(nodes) {
+      const list = byId("nodes");
+      list.textContent = "";
+      if (!nodes.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No machines are enrolled.";
+        list.append(empty);
+      }
+      if (state.selectedNode && !nodes.some(node => node.id === state.selectedNode && node.status === "connected")) {
+        state.selectedNode = null;
+      }
+      for (const node of nodes) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `node${state.selectedNode === node.id ? " selected" : ""}`;
+        button.disabled = node.status !== "connected";
+        const status = document.createElement("span");
+        status.className = `dot node-status${node.status === "connected" ? " online" : ""}`;
+        const body = document.createElement("span");
+        const name = document.createElement("strong");
+        name.textContent = node.label || node.id;
+        const meta = document.createElement("span");
+        meta.className = "node-meta";
+        const engines = node.capabilities && Array.isArray(node.capabilities.engines)
+          ? node.capabilities.engines.join(", ")
+          : "No agent report";
+        meta.textContent = `${node.status} · ${engines}`;
+        body.append(name, meta);
+        button.append(status, body);
+        button.onclick = () => {
+          state.selectedNode = node.id;
+          renderNodes(nodes);
+          updateRunButton();
+        };
+        list.append(button);
+      }
+      byId("selected-node").textContent = state.selectedNode || "None";
+      updateRunButton();
+    }
+
+    function updateRunButton() {
+      byId("run").disabled = !state.selectedNode || !state.ws || state.ws.readyState !== WebSocket.OPEN;
+    }
+
+    function setInstallMode(mode) {
+      byId("install-mode").value = mode;
+      document.querySelectorAll(".tab").forEach(tab => {
+        tab.setAttribute("aria-selected", String(tab.dataset.mode === mode));
+      });
+      document.querySelectorAll(".ssh-only").forEach(field => {
+        field.hidden = mode !== "ssh";
+      });
+      byId("setup-host").required = mode === "ssh";
+      byId("setup-node-id").placeholder = mode === "ssh" ? "devbox" : "coordinator";
+    }
+
+    function openSetup() {
+      setInstallMode("local");
+      byId("setup-hub-url").value = wsUrl("/v1/node/connect");
+      byId("setup-node-id").value = location.hostname || "coordinator";
+      setNotice("setup-notice", "");
+      byId("setup").showModal();
+    }
+
+    async function installMachine(event) {
+      event.preventDefault();
+      if (!state.token) {
+        setNotice("setup-notice", "Connect with the client token first.", true);
+        return;
+      }
+      const mode = byId("install-mode").value;
+      const payload = {
+        mode,
+        node_id: byId("setup-node-id").value.trim(),
+        hub_url: byId("setup-hub-url").value.trim(),
+        workspace: byId("setup-workspace").value.trim() || null,
+        claude_bin: byId("setup-claude").value.trim() || null,
+        codex_bin: byId("setup-codex").value.trim() || null
+      };
+      if (mode === "ssh") {
+        payload.host = byId("setup-host").value.trim();
+        payload.user = byId("setup-user").value.trim() || null;
+        payload.port = Number(byId("setup-port").value) || 22;
+        payload.identity = byId("setup-identity").value.trim() || null;
+      }
+      const submit = byId("install-node");
+      submit.disabled = true;
+      setNotice("setup-notice", "Installing the machine. This can take one minute.");
+      try {
+        const result = await api("/v1/admin/install", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        setNotice("setup-notice", result.message || "Machine installed.");
+        setTimeout(refreshNodes, 1500);
+      } catch (error) {
+        setNotice("setup-notice", error.message, true);
+      } finally {
+        submit.disabled = false;
+      }
+    }
+
+    byId("connect").onclick = connect;
+    byId("token").addEventListener("keydown", event => {
+      if (event.key === "Enter") connect();
+    });
+    byId("run").onclick = startTask;
+    byId("stop").onclick = stopRun;
+    byId("add-node").onclick = openSetup;
+    byId("close-setup").onclick = () => byId("setup").close();
+    byId("cancel-setup").onclick = () => byId("setup").close();
+    byId("setup-form").onsubmit = installMachine;
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.onclick = () => setInstallMode(tab.dataset.mode);
+    });
+    byId("clear-events").onclick = () => {
+      byId("timeline").innerHTML = '<div class="empty">Task events will appear here.</div>';
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --workspace --all-features
+
+  checks:
+    name: Features and Clippy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add clippy
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test -p stackhour --no-default-features --features bridge
+      - run: cargo test -p stackhour --no-default-features --features tracker
+      - run: cargo test -p stackhour --no-default-features --features agent
+      - run: cargo test -p stackhour --no-default-features --features control
+      - run: cargo test -p stackhour --no-default-features --features tracker,agent
+      - run: cargo build -p stackhour --no-default-features
+      - run: "! cargo tree -p stackhour --no-default-features --features bridge -i libsqlite3-sys 2>/dev/null"
+      - run: "! cargo tree -p stackhour --no-default-features --features bridge -i rusqlite 2>/dev/null"
+      - run: "! cargo tree -p stackhour --no-default-features --features bridge -i axum 2>/dev/null"
+      - run: cargo tree -p stackhour --no-default-features --features bridge -i tokio
+
+  installer:
+    name: Installer syntax
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh -n deploy/install.sh
+      - run: sh -n deploy/install-control.sh

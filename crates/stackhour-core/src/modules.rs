@@ -1,5 +1,5 @@
-//! The module gate: which of the three optional feature modules
-//! (tracker / agent / bridge) are compiled into this binary and which are
+//! The module gate: which optional feature modules are compiled into this
+//! binary and which are
 //! enabled by the user's `modules` config block.
 //!
 //! DELIBERATE DIVERGENCE (no Node original): the Node CLI has no notion of
@@ -16,17 +16,18 @@ use crate::jsnum::js_truthy;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-/// One of the three optional feature modules.
+/// One optional feature module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Module {
     Tracker,
     Agent,
     Bridge,
+    Control,
 }
 
 impl Module {
     /// Iteration order for every user-visible list.
-    pub const ALL: [Module; 3] = [Module::Tracker, Module::Agent, Module::Bridge];
+    pub const ALL: [Module; 4] = [Module::Tracker, Module::Agent, Module::Bridge, Module::Control];
 
     /// The config sub-key AND the Cargo feature name — deliberately the
     /// same string, so one identifier names both layers.
@@ -35,6 +36,7 @@ impl Module {
             Module::Tracker => "tracker",
             Module::Agent => "agent",
             Module::Bridge => "bridge",
+            Module::Control => "control",
         }
     }
 
@@ -44,6 +46,7 @@ impl Module {
             Module::Tracker => "modules.tracker",
             Module::Agent => "modules.agent",
             Module::Bridge => "modules.bridge",
+            Module::Control => "modules.control",
         }
     }
 }
@@ -55,6 +58,7 @@ pub struct ModuleSet {
     pub tracker: bool,
     pub agent: bool,
     pub bridge: bool,
+    pub control: bool,
 }
 
 impl ModuleSet {
@@ -64,6 +68,7 @@ impl ModuleSet {
         tracker: true,
         agent: true,
         bridge: true,
+        control: true,
     };
 
     pub const fn new(tracker: bool, agent: bool, bridge: bool) -> Self {
@@ -71,7 +76,13 @@ impl ModuleSet {
             tracker,
             agent,
             bridge,
+            control: true,
         }
+    }
+
+    pub const fn with_control(mut self, control: bool) -> Self {
+        self.control = control;
+        self
     }
 
     pub fn contains(&self, m: Module) -> bool {
@@ -79,6 +90,7 @@ impl ModuleSet {
             Module::Tracker => self.tracker,
             Module::Agent => self.agent,
             Module::Bridge => self.bridge,
+            Module::Control => self.control,
         }
     }
 
@@ -120,6 +132,7 @@ pub fn from_raw(raw: &Value) -> ModuleSet {
         Some(v) => js_truthy(v),
     };
     ModuleSet::new(on(Module::Tracker), on(Module::Agent), on(Module::Bridge))
+        .with_control(on(Module::Control))
 }
 
 /// Lenient read of the USER config file for the dispatch gate.
@@ -162,6 +175,7 @@ pub fn module_for(verb: &str, sub: Option<&str>) -> Option<Module> {
         "serve" | "status" | "token" | "data" | "backup" | "import-wakatime" => Some(Module::Tracker),
         "agent" => Some(Module::Agent),
         "bridge" => Some(Module::Bridge),
+        "control" => Some(Module::Control),
         "init" | "install" => match sub {
             Some("server") => Some(Module::Tracker),
             Some("agent") => Some(Module::Agent),
@@ -434,6 +448,8 @@ mod tests {
         ] {
             assert_eq!(module_for("bridge", sub), Some(Module::Bridge), "{sub:?}");
         }
+        assert_eq!(module_for("control", Some("hub")), Some(Module::Control));
+        assert_eq!(module_for("control", Some("node")), Some(Module::Control));
     }
 
     #[test]
@@ -680,7 +696,12 @@ mod tests {
             assert!(ctx.allows(m));
             assert_eq!(ctx.skip_line_for(m, "stackhour-x"), None);
         }
-        for (verb, sub) in [("serve", None), ("agent", None), ("bridge", Some("status"))] {
+        for (verb, sub) in [
+            ("serve", None),
+            ("agent", None),
+            ("bridge", Some("status")),
+            ("control", Some("hub")),
+        ] {
             assert_eq!(ctx.gate(verb, sub), Gate::Allowed);
             assert_eq!(ctx.refusal(verb, sub), None);
         }
