@@ -15,6 +15,7 @@ Affected areas:
 - Frontend patch metadata
 - Frontend dependency lockfile
 - GitHub CI dependency installation
+- GitHub Action runtime compatibility
 - Platform-gated Rust test helpers
 - Unsafe-scan tool validation
 - Linux CI tool setup
@@ -43,6 +44,7 @@ Commands run:
 - `git diff --check`
 - `dev/verify-full` with loopback socket access
 - `dev/verify-full` after Linux CI tool setup
+- `dev/verify-full` after the GitHub Action runtime upgrade
 
 Checks not run:
 
