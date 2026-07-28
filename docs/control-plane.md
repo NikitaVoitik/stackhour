@@ -13,8 +13,9 @@ an SSH connection when it runs a task. It uses SSH only during setup.
 
 ## Supported host setup
 
-Use a small Linux machine for the coordinator. The installer uses a systemd
-user service on Linux. It supports a launchd user service for nodes on macOS.
+Use a small Linux machine for the coordinator. This is the recommended setup.
+The installer uses a systemd user service on Linux and a launchd user service
+on macOS.
 
 Install these tools before you start:
 
@@ -22,6 +23,7 @@ Install these tools before you start:
 - Rust 1.79 or later
 - Claude Code or Codex on each execution machine
 - OpenSSH client on the coordinator if you add SSH machines
+- curl and tar on each SSH machine
 
 The coordinator needs enough disk space for the binary and the SQLite event
 log. A small machine is sufficient for a few users and nodes.
@@ -137,13 +139,15 @@ The installer requires strict host-key checks. It does not accept a password or
 a private key from the browser. It uses the coordinator SSH agent or the
 identity file that you name.
 
-The coordinator copies the current Stackhour binary to
-`~/.local/bin/stackhour` on the remote machine. It sends the node token through
-standard input. It does not put the token in a process argument. The remote
-installer writes the token to the mode `0600` config file and starts the node
-service. This copy flow requires the remote machine to use the same operating
-system and CPU architecture as the coordinator. For a different platform,
-build Stackhour on that machine and use the manual node installer.
+The coordinator downloads the release installer through SSH. The installer
+detects the remote operating system and CPU type. It downloads and verifies the
+correct Stackhour release and installs it at `~/.local/bin/stackhour`. It then
+writes the node configuration and starts the node service. The coordinator and
+remote machine can use different operating systems and CPU types.
+
+The coordinator sends the node token through standard input. It does not put
+the token in a process argument. The remote installer writes the token to the
+mode `0600` config file.
 
 ## Install a node without the panel
 
@@ -202,8 +206,8 @@ The installer keeps existing tokens, bind settings, database path, and public
 URL when you omit those options. Use `--node-token` or `--client-token` only
 when you intend to replace a token.
 
-To update an SSH node, use the panel install action again. It copies the current
-coordinator binary and restarts the remote node service.
+To update an SSH node, use the panel install action again. It downloads the
+latest release for that machine and restarts the remote node service.
 
 ## Telegram migration
 

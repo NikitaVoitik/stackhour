@@ -30,13 +30,17 @@ impl Sandbox {
     }
 
     fn run(&self, args: &[&str], node_token: Option<&str>) -> Output {
+        self.run_with_path(args, node_token, &std::env::var("PATH").unwrap_or_default())
+    }
+
+    fn run_with_path(&self, args: &[&str], node_token: Option<&str>, path: &str) -> Output {
         let mut command = Command::new(bin());
         command
             .args(args)
             .env_clear()
             .env("HOME", self.home.path())
             .env("STACKHOUR_CONFIG", self.config_path())
-            .env("PATH", std::env::var("PATH").unwrap_or_default());
+            .env("PATH", path);
         if let Some(token) = node_token {
             command.env("STACKHOUR_CONTROL_NODE_TOKEN", token);
         }
@@ -197,4 +201,54 @@ fn invalid_config_and_unknown_options_write_no_install_files() {
     assert!(!bad_option.status.success());
     assert!(stderr(&bad_option).contains("unknown option"));
     assert!(!sandbox.home.path().join(".local/bin/stackhour").exists());
+}
+
+#[test]
+fn ssh_install_uses_the_remote_release_without_exposing_the_token() {
+    let sandbox = Sandbox::new();
+    let fake_bin = sandbox.home.path().join("fake-bin");
+    std::fs::create_dir_all(&fake_bin).unwrap();
+    let fake_ssh = fake_bin.join("ssh");
+    std::fs::write(
+        &fake_ssh,
+        "#!/bin/sh\nprintf '%s\\n' \"$@\" >\"$HOME/ssh-args\"\ncat >\"$HOME/ssh-stdin\"\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&fake_ssh, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let path = format!(
+        "{}:{}",
+        fake_bin.display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let output = sandbox.run_with_path(
+        &[
+            "control",
+            "install",
+            "ssh",
+            "--host=devbox",
+            "--user=nikita",
+            "--port=2222",
+            "--hub-url=wss://control.example.com/v1/node/connect",
+            "--id=remote-devbox",
+            "--workspace=/srv/work",
+        ],
+        Some("node-secret"),
+        &path,
+    );
+    assert!(output.status.success(), "{}", stderr(&output));
+
+    let ssh_args = std::fs::read_to_string(sandbox.home.path().join("ssh-args")).unwrap();
+    let ssh_stdin = std::fs::read_to_string(sandbox.home.path().join("ssh-stdin")).unwrap();
+    assert!(ssh_args.contains("nikita@devbox"));
+    assert!(ssh_args.contains("StrictHostKeyChecking=yes"));
+    assert!(ssh_args
+        .contains("https://github.com/NikitaVoitik/stackhour/releases/latest/download/install-stackhour.sh"));
+    assert!(ssh_args.contains("control install node"));
+    assert!(ssh_args.contains("--workspace='/srv/work'"));
+    assert!(!ssh_args.contains("node-secret"));
+    assert_eq!(ssh_stdin, "node-secret\n");
 }

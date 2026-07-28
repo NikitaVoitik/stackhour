@@ -3,6 +3,9 @@ use stackhour_core::{Error, Result};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const RELEASE_INSTALLER_URL: &str =
+    "https://github.com/NikitaVoitik/stackhour/releases/latest/download/install-stackhour.sh";
+
 const HELP: &str = "\
 usage:
   stackhour control install hub [options]
@@ -247,27 +250,32 @@ fn systemd_quote(value: &str) -> Result<String> {
 }
 
 fn launchd_plist(role: &str, executable: &Path, config: &Path, path_env: &str) -> Result<String> {
-    if role != "node" {
-        return Err(Error::msg(
-            "automatic macOS installation supports the control node only",
-        ));
-    }
+    let command = match role {
+        "hub" => "hub",
+        "node" => "node",
+        _ => return Err(Error::msg("control service role must be hub or node")),
+    };
+    let label = format!("com.stackhour.control-{role}");
     Ok(format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
          <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"https://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
          <plist version=\"1.0\"><dict>\n\
-         <key>Label</key><string>com.stackhour.control-node</string>\n\
-         <key>ProgramArguments</key><array><string>{}</string><string>control</string><string>node</string></array>\n\
+         <key>Label</key><string>{}</string>\n\
+         <key>ProgramArguments</key><array><string>{}</string><string>control</string><string>{}</string></array>\n\
          <key>EnvironmentVariables</key><dict>\
          <key>STACKHOUR_CONFIG</key><string>{}</string>\
          <key>PATH</key><string>{}</string></dict>\n\
          <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>\n\
-         <key>StandardOutPath</key><string>/tmp/stackhour-control-node.log</string>\n\
-         <key>StandardErrorPath</key><string>/tmp/stackhour-control-node.log</string>\n\
+         <key>StandardOutPath</key><string>/tmp/stackhour-control-{}.log</string>\n\
+         <key>StandardErrorPath</key><string>/tmp/stackhour-control-{}.log</string>\n\
          </dict></plist>\n",
+        xml(&label),
         xml(&executable.to_string_lossy()),
+        command,
         xml(&config.to_string_lossy()),
         xml(path_env),
+        role,
+        role,
     ))
 }
 
@@ -467,9 +475,6 @@ fn validate_simple(label: &str, value: &str) -> Result<()> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SshPlan {
-    mkdir: Vec<String>,
-    copy: Vec<String>,
-    activate: Vec<String>,
     install: Vec<String>,
 }
 
@@ -477,22 +482,12 @@ fn ssh_plan(
     target: &str,
     port: u16,
     identity: Option<&Path>,
-    executable: &Path,
     settings: &NodeSettings<'_>,
 ) -> Result<SshPlan> {
     validate_simple("SSH target", target)?;
-    let port_text = port.to_string();
     let mut ssh = vec![
         "-p".to_string(),
-        port_text.clone(),
-        "-o".to_string(),
-        "BatchMode=yes".to_string(),
-        "-o".to_string(),
-        "StrictHostKeyChecking=yes".to_string(),
-    ];
-    let mut scp = vec![
-        "-P".to_string(),
-        port_text,
+        port.to_string(),
         "-o".to_string(),
         "BatchMode=yes".to_string(),
         "-o".to_string(),
@@ -500,21 +495,8 @@ fn ssh_plan(
     ];
     if let Some(identity) = identity {
         let identity = identity.to_string_lossy().to_string();
-        ssh.extend(["-i".to_string(), identity.clone()]);
-        scp.extend(["-i".to_string(), identity]);
+        ssh.extend(["-i".to_string(), identity]);
     }
-    let mut mkdir = ssh.clone();
-    mkdir.extend([target.to_string(), "mkdir -p \"$HOME/.local/bin\"".to_string()]);
-    let mut copy = scp;
-    copy.extend([
-        executable.to_string_lossy().to_string(),
-        format!("{target}:~/.local/bin/stackhour.new"),
-    ]);
-    let mut activate = ssh.clone();
-    activate.extend([
-        target.to_string(),
-        "chmod 0755 \"$HOME/.local/bin/stackhour.new\" && mv \"$HOME/.local/bin/stackhour.new\" \"$HOME/.local/bin/stackhour\"".to_string(),
-    ]);
     let mut remote = vec![
         "$HOME/.local/bin/stackhour".to_string(),
         "control".to_string(),
@@ -532,28 +514,24 @@ fn ssh_plan(
         ));
     }
     let remote = remote.join(" ");
-    let mut install = ssh;
-    install.extend([
+    ssh.extend([
         target.to_string(),
         format!(
-            "IFS= read -r STACKHOUR_CONTROL_NODE_TOKEN; export STACKHOUR_CONTROL_NODE_TOKEN; exec {remote}"
+            "set -eu; command -v curl >/dev/null 2>&1 || {{ echo 'curl is required on the SSH machine.' >&2; exit 1; }}; \
+             installer_dir=$(mktemp -d \"${{TMPDIR:-/tmp}}/stackhour-bootstrap.XXXXXX\"); \
+             trap 'rm -rf -- \"$installer_dir\"' EXIT HUP INT TERM; \
+             curl --fail --location --silent --show-error {} --output \"$installer_dir/install.sh\"; \
+             sh \"$installer_dir/install.sh\" </dev/null; \
+             rm -rf -- \"$installer_dir\"; trap - EXIT HUP INT TERM; \
+             IFS= read -r STACKHOUR_CONTROL_NODE_TOKEN; export STACKHOUR_CONTROL_NODE_TOKEN; exec {remote}",
+            shell_quote(RELEASE_INSTALLER_URL)
         ),
     ]);
-    Ok(SshPlan {
-        mkdir,
-        copy,
-        activate,
-        install,
-    })
+    Ok(SshPlan { install: ssh })
 }
 
 fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
-}
-
-fn run_owned(program: &str, args: &[String]) -> Result<()> {
-    let refs: Vec<&str> = args.iter().map(String::as_str).collect();
-    run_status(program, &refs)
 }
 
 fn run_owned_with_input(program: &str, args: &[String], input: &str) -> Result<()> {
@@ -627,7 +605,6 @@ fn install_ssh(args: &[String]) -> Result<()> {
         claude_bin: &claude_bin,
         codex_bin: &codex_bin,
     };
-    let executable = service_executable()?;
     let identity = option(args, "identity").map(PathBuf::from);
     if let Some(identity) = &identity {
         if !identity.is_file() {
@@ -637,10 +614,7 @@ fn install_ssh(args: &[String]) -> Result<()> {
             )));
         }
     }
-    let plan = ssh_plan(&target, port, identity.as_deref(), &executable, &settings)?;
-    run_owned("ssh", &plan.mkdir)?;
-    run_owned("scp", &plan.copy)?;
-    run_owned("ssh", &plan.activate)?;
+    let plan = ssh_plan(&target, port, identity.as_deref(), &settings)?;
     run_owned_with_input("ssh", &plan.install, &token)?;
     println!("Installed and started control node {id} on {target}");
     Ok(())
@@ -716,7 +690,7 @@ mod tests {
     }
 
     #[test]
-    fn ssh_plan_uses_strict_host_keys_and_no_shell_for_local_arguments() {
+    fn ssh_plan_uses_strict_host_keys_and_the_remote_release_installer() {
         let settings = NodeSettings {
             hub_url: "wss://control.example.com/v1/node/connect",
             id: "devbox",
@@ -725,23 +699,45 @@ mod tests {
             claude_bin: "claude",
             codex_bin: "codex",
         };
-        let plan = ssh_plan(
-            "nikita@devbox",
-            2222,
-            Some(Path::new("/keys/dev")),
-            Path::new("/bin/stackhour"),
-            &settings,
-        )
-        .unwrap();
-        assert!(plan.mkdir.contains(&"StrictHostKeyChecking=yes".to_string()));
-        assert!(plan.copy.contains(&"/bin/stackhour".to_string()));
+        let plan = ssh_plan("nikita@devbox", 2222, Some(Path::new("/keys/dev")), &settings).unwrap();
+        assert!(plan.install.contains(&"StrictHostKeyChecking=yes".to_string()));
+        assert!(plan.install.contains(&"/keys/dev".to_string()));
         assert!(plan.install.last().unwrap().contains("control install node"));
+        assert!(plan.install.last().unwrap().contains(RELEASE_INSTALLER_URL));
+        assert!(plan
+            .install
+            .last()
+            .unwrap()
+            .contains("sh \"$installer_dir/install.sh\" </dev/null"));
         assert!(!plan.install.last().unwrap().contains("secret"));
         assert!(plan
             .install
             .last()
             .unwrap()
             .contains("read -r STACKHOUR_CONTROL_NODE_TOKEN"));
+    }
+
+    #[test]
+    fn launchd_supports_both_control_roles() {
+        for role in ["hub", "node"] {
+            let text = launchd_plist(
+                role,
+                Path::new("/Users/u/.local/bin/stackhour"),
+                Path::new("/Users/u/.config/stackhour/config.json"),
+                "/Users/u/.local/bin:/usr/bin:/bin",
+            )
+            .unwrap();
+            assert!(text.contains(&format!("com.stackhour.control-{role}")));
+            assert!(text.contains(&format!("<string>{role}</string></array>")));
+            assert!(text.contains(&format!("/tmp/stackhour-control-{role}.log")));
+        }
+        assert!(launchd_plist(
+            "bad",
+            Path::new("/bin/stackhour"),
+            Path::new("/tmp/config.json"),
+            "/usr/bin:/bin",
+        )
+        .is_err());
     }
 
     #[test]
