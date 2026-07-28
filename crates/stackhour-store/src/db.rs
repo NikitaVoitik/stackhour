@@ -73,9 +73,7 @@ fn uri_encode_path(path: &Path) -> String {
     let mut out = String::with_capacity(raw.len());
     for b in raw.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
-                out.push(b as char)
-            }
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => out.push(b as char),
             _ => out.push_str(&format!("%{b:02X}")),
         }
     }
@@ -145,7 +143,147 @@ const ACTOR_MIGRATION: &str = r#"
         OR lower(category) GLOB '*[^a-z0-9_]ai[^a-z0-9_]*';
 "#;
 
-/// mkdir -p the parent, open, busy_timeout 5000, WAL, full DDL + migrations.
+/// Latest tracker database schema understood by this binary.
+pub const LATEST_SCHEMA_VERSION: i64 = 4;
+
+const MIGRATIONS_DDL: &str = "
+    CREATE TABLE IF NOT EXISTS stackhour_schema_migrations (
+      version    INTEGER PRIMARY KEY,
+      name       TEXT NOT NULL,
+      applied_at REAL NOT NULL
+    );
+";
+
+#[derive(Clone, Copy)]
+struct Migration {
+    version: i64,
+    name: &'static str,
+    apply: fn(&Connection) -> Result<()>,
+}
+
+const MIGRATIONS: [Migration; LATEST_SCHEMA_VERSION as usize] = [
+    Migration {
+        version: 1,
+        name: "create heartbeat schema",
+        apply: migrate_1_heartbeat_schema,
+    },
+    Migration {
+        version: 2,
+        name: "add actor classification",
+        apply: migrate_2_actor,
+    },
+    Migration {
+        version: 3,
+        name: "add token and cost accounting",
+        apply: migrate_3_usage,
+    },
+    Migration {
+        version: 4,
+        name: "add indexes and auxiliary tables",
+        apply: migrate_4_auxiliary,
+    },
+];
+
+fn migrate_1_heartbeat_schema(db: &Connection) -> Result<()> {
+    db.execute_batch(HEARTBEATS_DDL).map_err(sql_err)
+}
+
+fn migrate_2_actor(db: &Connection) -> Result<()> {
+    let cols = table_columns(db, "heartbeats")?;
+    if !cols.iter().any(|column| column == "actor") {
+        db.execute_batch(ACTOR_MIGRATION).map_err(sql_err)?;
+    }
+    Ok(())
+}
+
+fn migrate_3_usage(db: &Connection) -> Result<()> {
+    let cols = table_columns(db, "heartbeats")?;
+    let has = |name: &str| cols.iter().any(|column| column == name);
+    if !has("tokens_in") {
+        db.execute_batch("ALTER TABLE heartbeats ADD COLUMN tokens_in INTEGER NOT NULL DEFAULT 0")
+            .map_err(sql_err)?;
+    }
+    if !has("tokens_out") {
+        db.execute_batch("ALTER TABLE heartbeats ADD COLUMN tokens_out INTEGER NOT NULL DEFAULT 0")
+            .map_err(sql_err)?;
+    }
+    if !has("cost") {
+        db.execute_batch("ALTER TABLE heartbeats ADD COLUMN cost REAL NOT NULL DEFAULT 0")
+            .map_err(sql_err)?;
+    }
+    Ok(())
+}
+
+fn migrate_4_auxiliary(db: &Connection) -> Result<()> {
+    db.execute_batch(TAIL_DDL).map_err(sql_err)
+}
+
+fn applied_migrations(db: &Connection) -> Result<Vec<(i64, String)>> {
+    let mut stmt = db
+        .prepare("SELECT version, name FROM stackhour_schema_migrations ORDER BY version")
+        .map_err(sql_err)?;
+    let rows = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(sql_err)?;
+    let mut applied = Vec::new();
+    for row in rows {
+        applied.push(row.map_err(sql_err)?);
+    }
+    Ok(applied)
+}
+
+fn run_migrations(db: &Connection) -> Result<()> {
+    db.execute_batch(MIGRATIONS_DDL).map_err(sql_err)?;
+
+    let applied = applied_migrations(db)?;
+    for (index, (version, name)) in applied.iter().enumerate() {
+        let expected = MIGRATIONS.get(index).ok_or_else(|| {
+            Error::msg(format!(
+                "database schema version {version} is newer than supported version {LATEST_SCHEMA_VERSION}"
+            ))
+        })?;
+        if *version != expected.version || name != expected.name {
+            return Err(Error::msg(format!(
+                "invalid database migration history at version {version}: expected {} ({:?}), found {version} ({name:?})",
+                expected.version, expected.name
+            )));
+        }
+    }
+
+    for migration in MIGRATIONS.iter().skip(applied.len()) {
+        db.execute_batch("BEGIN IMMEDIATE").map_err(sql_err)?;
+        let result = (|| -> Result<()> {
+            (migration.apply)(db)?;
+            db.execute(
+                "INSERT INTO stackhour_schema_migrations (version, name, applied_at)
+                 VALUES (?1, ?2, ?3)",
+                params![migration.version, migration.name, now_seconds()],
+            )
+            .map_err(sql_err)?;
+            db.execute_batch("COMMIT").map_err(sql_err)
+        })();
+        if let Err(error) = result {
+            let _ = db.execute_batch("ROLLBACK");
+            return Err(Error::msg(format!(
+                "database migration {} ({}) failed: {error}",
+                migration.version, migration.name
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Return the latest migration version recorded in a tracker database.
+pub fn schema_version(db: &Connection) -> Result<i64> {
+    db.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM stackhour_schema_migrations",
+        [],
+        |row| row.get(0),
+    )
+    .map_err(sql_err)
+}
+
+/// mkdir -p the parent, open, busy_timeout 5000, WAL, then run migrations.
 pub fn open_db(path: &Path) -> Result<Connection> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
@@ -157,46 +295,12 @@ pub fn open_db(path: &Path) -> Result<Connection> {
     // `PRAGMA journal_mode` returns a row, so it must not go through
     // execute_batch's execute() path (which can reject result-producing
     // statements depending on rusqlite's feature flags).
-    db.pragma_update(None, "busy_timeout", 5000i64)
-        .map_err(sql_err)?;
+    db.pragma_update(None, "busy_timeout", 5000i64).map_err(sql_err)?;
     db.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))
         .map_err(sql_err)?;
 
-    db.execute_batch(HEARTBEATS_DDL).map_err(sql_err)?;
-
-    // Migrations for DBs created before newer columns existed. Every column is
-    // checked independently so an upgrade interrupted between ALTER statements
-    // is safely resumable on the next start.
-    let cols = table_columns(&db, "heartbeats")?;
-    let has = |name: &str| cols.iter().any(|c| c == name);
-    db.execute_batch("BEGIN IMMEDIATE").map_err(sql_err)?;
-    let migrated = (|| -> Result<()> {
-        if !has("actor") {
-            db.execute_batch(ACTOR_MIGRATION).map_err(sql_err)?;
-        }
-        if !has("tokens_in") {
-            db.execute_batch(
-                "ALTER TABLE heartbeats ADD COLUMN tokens_in INTEGER NOT NULL DEFAULT 0",
-            )
-            .map_err(sql_err)?;
-        }
-        if !has("tokens_out") {
-            db.execute_batch(
-                "ALTER TABLE heartbeats ADD COLUMN tokens_out INTEGER NOT NULL DEFAULT 0",
-            )
-            .map_err(sql_err)?;
-        }
-        if !has("cost") {
-            db.execute_batch("ALTER TABLE heartbeats ADD COLUMN cost REAL NOT NULL DEFAULT 0")
-                .map_err(sql_err)?;
-        }
-        db.execute_batch("COMMIT").map_err(sql_err)
-    })();
-    if let Err(err) = migrated {
-        let _ = db.execute_batch("ROLLBACK"); // preserve the original error
-        return Err(err);
-    }
-
+    run_migrations(&db)?;
+    // Keep the two runtime indexes self-healing if an operator removes one.
     db.execute_batch(TAIL_DDL).map_err(sql_err)?;
     Ok(db)
 }
@@ -222,9 +326,7 @@ pub fn open_immutable(path: &Path) -> Result<Connection> {
     let uri = format!("file:{}?immutable=1", uri_encode_path(path));
     Connection::open_with_flags(
         uri,
-        OpenFlags::SQLITE_OPEN_READ_ONLY
-            | OpenFlags::SQLITE_OPEN_URI
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(sql_err)
 }
@@ -444,11 +546,7 @@ fn heartbeat_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Heartbeat> {
     })
 }
 
-fn collect_heartbeats(
-    db: &Connection,
-    sql: &str,
-    params: &[&dyn rusqlite::ToSql],
-) -> Result<Vec<Heartbeat>> {
+fn collect_heartbeats(db: &Connection, sql: &str, params: &[&dyn rusqlite::ToSql]) -> Result<Vec<Heartbeat>> {
     let mut stmt = db.prepare(sql).map_err(sql_err)?;
     let rows = stmt.query_map(params, heartbeat_from_row).map_err(sql_err)?;
     let mut out = Vec::new();
@@ -593,6 +691,10 @@ mod tests {
         rows
     }
 
+    fn migration_history(db: &Connection) -> Vec<(i64, String)> {
+        applied_migrations(db).expect("migration history")
+    }
+
     #[test]
     fn open_db_is_idempotent() {
         let dir = TempDir::new().expect("tempdir");
@@ -606,6 +708,11 @@ mod tests {
             .query_row("SELECT count(*) FROM heartbeats", [], |r| r.get(0))
             .expect("count");
         assert_eq!(n, 1);
+        assert_eq!(
+            schema_version(&db).expect("schema version"),
+            LATEST_SCHEMA_VERSION
+        );
+        assert_eq!(migration_history(&db).len(), LATEST_SCHEMA_VERSION as usize);
     }
 
     #[test]
@@ -659,6 +766,13 @@ mod tests {
         // Legacy index swapped for the 6-column one.
         assert!(!index_names(&db).iter().any(|n| n == "hb_dedupe"));
         assert!(index_names(&db).iter().any(|n| n == "hb_dedupe2"));
+        assert_eq!(
+            migration_history(&db),
+            MIGRATIONS
+                .iter()
+                .map(|migration| (migration.version, migration.name.to_string()))
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
@@ -687,6 +801,109 @@ mod tests {
         assert!(cols.iter().any(|c| c == "cost"));
         // tokens_in existed already and must not have been added twice.
         assert_eq!(cols.iter().filter(|c| *c == "tokens_in").count(), 1);
+        assert_eq!(
+            schema_version(&db).expect("schema version"),
+            LATEST_SCHEMA_VERSION
+        );
+    }
+
+    #[test]
+    fn a_failed_migration_rolls_back_and_resumes_after_the_data_is_fixed() {
+        let dir = TempDir::new().expect("tempdir");
+        let path = dir.path().join("duplicate.db");
+        {
+            let old = Connection::open(&path).expect("open old");
+            old.execute_batch(
+                "CREATE TABLE heartbeats (
+                   id INTEGER PRIMARY KEY, time REAL NOT NULL, machine TEXT NOT NULL,
+                   source TEXT NOT NULL, project TEXT NOT NULL, entity TEXT NOT NULL,
+                   entity_type TEXT NOT NULL DEFAULT 'file',
+                   category TEXT NOT NULL DEFAULT 'coding',
+                   language TEXT, branch TEXT,
+                   is_write INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL);
+                 INSERT INTO heartbeats
+                   (time, machine, source, project, entity, created_at)
+                 VALUES
+                   (1, 'm', 'editor', 'p', 'same', 0),
+                   (1, 'm', 'editor', 'p', 'same', 0);",
+            )
+            .expect("legacy schema with duplicate rows");
+        }
+
+        let error = open_db(&path).expect_err("unique index migration must fail");
+        assert!(
+            error.to_string().contains("database migration 4"),
+            "unexpected error: {error}"
+        );
+
+        {
+            let db = Connection::open(&path).expect("inspect failed migration");
+            assert_eq!(schema_version(&db).expect("schema version"), 3);
+            assert!(!index_names(&db).iter().any(|name| name == "hb_dedupe2"));
+            db.execute("DELETE FROM heartbeats WHERE id = 2", [])
+                .expect("remove invalid duplicate");
+        }
+
+        let db = open_db(&path).expect("resume migration");
+        assert_eq!(
+            schema_version(&db).expect("schema version"),
+            LATEST_SCHEMA_VERSION
+        );
+        assert!(index_names(&db).iter().any(|name| name == "hb_dedupe2"));
+        let rows: i64 = db
+            .query_row("SELECT count(*) FROM heartbeats", [], |row| row.get(0))
+            .expect("count");
+        assert_eq!(rows, 1);
+    }
+
+    #[test]
+    fn a_newer_database_version_is_rejected() {
+        let dir = TempDir::new().expect("tempdir");
+        let path = dir.path().join("future.db");
+        {
+            let db = open_db(&path).expect("create current database");
+            db.execute(
+                "INSERT INTO stackhour_schema_migrations (version, name, applied_at)
+                 VALUES (?1, 'future migration', 0)",
+                [LATEST_SCHEMA_VERSION + 1],
+            )
+            .expect("mark future version");
+        }
+
+        let error = open_db(&path).expect_err("future database must be rejected");
+        assert!(
+            error.to_string().contains("newer than supported"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn corrupted_migration_versions_and_names_are_rejected_independently() {
+        for (file, update, expected) in [
+            (
+                "wrong-version.db",
+                "UPDATE stackhour_schema_migrations SET version = 0 WHERE version = 1",
+                "expected 1",
+            ),
+            (
+                "wrong-name.db",
+                "UPDATE stackhour_schema_migrations SET name = 'wrong' WHERE version = 1",
+                "wrong",
+            ),
+        ] {
+            let dir = TempDir::new().expect("tempdir");
+            let path = dir.path().join(file);
+            {
+                let db = open_db(&path).expect("create current database");
+                db.execute(update, []).expect("corrupt migration history");
+            }
+
+            let error = open_db(&path).expect_err("corrupt history must be rejected");
+            assert!(
+                error.to_string().contains(expected),
+                "unexpected error for {file}: {error}"
+            );
+        }
     }
 
     #[test]
@@ -882,12 +1099,7 @@ mod tests {
         assert_eq!(r["clockSkewSeconds"], json!(5));
         assert_eq!(r["watchers"], json!({"editor": {"enabled": true}}));
         // camelCase key order is part of the response shape.
-        let keys: Vec<&str> = r
-            .as_object()
-            .expect("obj")
-            .keys()
-            .map(String::as_str)
-            .collect();
+        let keys: Vec<&str> = r.as_object().expect("obj").keys().map(String::as_str).collect();
         assert_eq!(
             keys,
             vec![
@@ -938,8 +1150,7 @@ mod tests {
         }
         // An explicit null is Number(null) === 0 and IS accepted, unlike an
         // absent key (undefined -> NaN), which is rejected above.
-        upsert_agent_status(&db, &json!({"time": null, "machine": "nul"}), 1.0)
-            .expect("null time is 0");
+        upsert_agent_status(&db, &json!({"time": null, "machine": "nul"}), 1.0).expect("null time is 0");
         // Number("7") coerces here (unlike heartbeat time).
         upsert_agent_status(&db, &json!({"time": "7", "machine": "box"}), 9.0).expect("string time");
         let r = list_agent_status(&db, 9.0).expect("list").remove(0);
@@ -976,7 +1187,7 @@ mod tests {
             &db,
             &json!({
                 "time": 1.0, "machine": long_machine,
-                "version": long_version.clone(), "nodeVersion": long_version
+                "version": long_version, "nodeVersion": long_version
             }),
             1.0,
         )
@@ -991,8 +1202,7 @@ mod tests {
     fn agent_status_age_clamps_and_skew_does_not() {
         let (_dir, db) = temp_db();
         // Agent clock ahead of the server: skew is negative and stays negative.
-        let ack =
-            upsert_agent_status(&db, &json!({"time": 500.0, "machine": "box"}), 100.0).expect("up");
+        let ack = upsert_agent_status(&db, &json!({"time": 500.0, "machine": "box"}), 100.0).expect("up");
         assert_eq!(ack.clock_skew_seconds, -400.0);
         // `now` before received_at: ageSeconds clamps at 0.
         let r = list_agent_status(&db, 50.0).expect("list").remove(0);

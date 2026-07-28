@@ -363,10 +363,10 @@ fn the_post_hook_runs_with_placeholders_substituted() {
 
 #[test]
 fn hook_arguments_are_never_re_parsed_as_shell() {
-    let (_dir, reg, receipt) = loaded();
+    let (dir, reg, receipt) = loaded();
     // A `focus` argument full of shell metacharacters. Hooks are fixed argv,
     // so this must land in the receipt as literal text and must not execute.
-    let canary = _dir.path().join("pwned");
+    let canary = dir.path().join("pwned");
     let raw = format!(
         "9.9.9 HEAD ; touch {} && echo `whoami` $(id -u)",
         canary.display()

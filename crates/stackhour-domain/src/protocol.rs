@@ -450,6 +450,7 @@ mod tests {
     use super::*;
     use crate::event::EventKind;
     use chrono::{TimeZone, Utc};
+    use proptest::prelude::*;
     use serde_json::json;
 
     /// Serialize, read the `type` discriminant, then round-trip through
@@ -498,6 +499,41 @@ mod tests {
             occurred_at: t,
             hub_received_at: t,
             payload: json!({ "text": "hello" }),
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn subscribe_round_trips_arbitrary_tokens_and_cursors(
+            token in proptest::option::of(any::<String>()),
+            after_sequence in proptest::option::of(any::<i64>()),
+        ) {
+            let message = Subscribe {
+                token,
+                after_sequence,
+            };
+            let encoded = serde_json::to_vec(&message).expect("serialize");
+            let decoded: Subscribe = serde_json::from_slice(&encoded).expect("deserialize");
+            prop_assert_eq!(decoded, message);
+        }
+
+        #[test]
+        fn create_task_round_trips_arbitrary_unicode_titles(title in any::<String>()) {
+            let message = ClientCommand::CreateTask {
+                command_id: CommandId::new(),
+                title,
+            };
+            let encoded = serde_json::to_vec(&message).expect("serialize");
+            let decoded: ClientCommand = serde_json::from_slice(&encoded).expect("deserialize");
+            prop_assert_eq!(decoded, message);
+        }
+
+        #[test]
+        fn malformed_bytes_never_panic_protocol_decoders(data in proptest::collection::vec(any::<u8>(), 0..4096)) {
+            let _ = serde_json::from_slice::<ClientCommand>(&data);
+            let _ = serde_json::from_slice::<HubToClient>(&data);
+            let _ = serde_json::from_slice::<NodeToHub>(&data);
+            let _ = serde_json::from_slice::<HubToNode>(&data);
         }
     }
 

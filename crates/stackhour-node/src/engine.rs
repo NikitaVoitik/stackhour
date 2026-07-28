@@ -24,7 +24,7 @@ use tokio::sync::{mpsc, watch};
 
 /// A frame queued for the single writer task. Protocol messages are the norm;
 /// `Pong` lets the receive loop answer a ws-level ping without sharing the sink.
-pub(crate) enum Outgoing {
+pub enum Outgoing {
     /// One JSON-serialized protocol message, sent as a ws text frame.
     Protocol(NodeToHub),
     /// A ws-level pong echoing a received ping's payload.
@@ -149,7 +149,8 @@ impl CliEngine {
     }
 
     fn stop_run(&self, run_id: RunId) {
-        if let Some(job) = self.state.lock().unwrap().jobs.get(&run_id).cloned() {
+        let job = self.state.lock().unwrap().jobs.get(&run_id).cloned();
+        if let Some(job) = job {
             job.terminate();
         }
     }
@@ -441,7 +442,7 @@ async fn interruptible_pause(cancel: &mut watch::Receiver<bool>, step: Duration)
         return true;
     }
     tokio::select! {
-        _ = tokio::time::sleep(step) => false,
+        () = tokio::time::sleep(step) => false,
         // The only transition is false -> true; a change (or closed sender)
         // means "interrupt".
         _ = cancel.changed() => true,

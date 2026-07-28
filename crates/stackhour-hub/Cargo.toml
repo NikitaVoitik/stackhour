@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "stackhour control-plane hub: the axum WebSocket server that is the single durable authority over task history. Clients and nodes both dial IN; commands and node events flow through stackhour_domain::Hub (the SQLite event log — the only sequence authority) and newly-appended events are live-broadcast to subscribed clients."
 
 [lib]
@@ -33,3 +37,6 @@ tokio-tungstenite.workspace = true
 futures-util.workspace = true
 tempfile.workspace = true
 tower.workspace = true
+
+[lints]
+workspace = true

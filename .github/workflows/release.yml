@@ -63,9 +63,11 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             release=false
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "release=$release" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
 
   build:
     name: Build ${{ matrix.target }}

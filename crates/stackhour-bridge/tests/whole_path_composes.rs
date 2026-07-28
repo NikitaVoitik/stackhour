@@ -94,7 +94,7 @@ fn make_executable(_path: &Path) {}
 
 struct Fixture {
     _config: tempfile::TempDir,
-    _runtime: tempfile::TempDir,
+    runtime: tempfile::TempDir,
     api: MockApi,
     rt: Runtime,
 }
@@ -148,24 +148,20 @@ fn fixture() -> Fixture {
     paths.ensure_dirs().expect("ensure dirs");
     let cfg = stackhour_bridge::config::load_coordinator_cfg(&paths.config_path).expect("config loads");
 
-    let reg = stackhour_core::registry::load_with(
-        config.path(),
-        stackhour_core::registry::EnvSource::fixed(&[]),
-    );
+    let reg =
+        stackhour_core::registry::load_with(config.path(), stackhour_core::registry::EnvSource::fixed(&[]));
     assert!(
         reg.errors.is_empty(),
         "the fixture config must be valid: {:?}",
         reg.errors
     );
 
-    let tg = Tg::with_config(
-        TgConfig::new(TOKEN, CHAT).with_api_root(&api.base),
-    );
+    let tg = Tg::with_config(TgConfig::new(TOKEN, CHAT).with_api_root(&api.base));
     let rt = Runtime::new(cfg, paths, tg, RegistryCtx::from_registry(reg));
 
     Fixture {
         _config: config,
-        _runtime: runtime,
+        runtime,
         api,
         rt,
     }
@@ -212,10 +208,7 @@ fn a_telegram_update_reaches_a_config_declared_command_and_comes_back_rendered()
     //    message being edited is the whole point of the status lifecycle.
     let sends = methods.iter().filter(|m| *m == "sendMessage").count();
     let edits = methods.iter().filter(|m| *m == "editMessageText").count();
-    assert!(
-        edits >= 1,
-        "the status message was never edited; saw {methods:?}"
-    );
+    assert!(edits >= 1, "the status message was never edited; saw {methods:?}");
     assert!(
         sends <= 2,
         "status should be edited, not resent: {sends} sendMessage calls in {methods:?}"
@@ -228,7 +221,12 @@ fn a_telegram_update_reaches_a_config_declared_command_and_comes_back_rendered()
         .api
         .requests()
         .iter()
-        .filter(|r| matches!(r.method.as_str(), "sendMessage" | "editMessageText" | "sendRichMessage"))
+        .filter(|r| {
+            matches!(
+                r.method.as_str(),
+                "sendMessage" | "editMessageText" | "sendRichMessage"
+            )
+        })
         .map(|r| {
             let v = &r.body;
             v["text"]
@@ -296,15 +294,9 @@ fn engine_progress_is_streamed_into_the_status_message_while_it_runs() {
     f.rt.handle_update(&text_update(1, "/greet world"));
     settle(&f.rt);
 
-    let edited: Vec<String> = f
-        .api
-        .requests()
-        .iter()
-        .filter(|r| r.method == "editMessageText")
-        .map(|r| r.body["text"].as_str().unwrap_or_default().to_string())
-        .collect();
+    let edited = f.api.requests().iter().any(|r| r.method == "editMessageText");
     assert!(
-        !edited.is_empty(),
+        edited,
         "nothing was ever streamed; methods: {:?}",
         f.api.methods()
     );
@@ -367,18 +359,8 @@ fn an_unknown_command_is_answered_and_never_reaches_the_engine() {
     f.rt.handle_update(&text_update(1, "/definitely-not-a-command"));
 
     assert!(!f.rt.local.is_busy(), "an unknown command started a job");
-    let bodies: Vec<String> = f
-        .api
-        .requests()
-        .iter()
-        .filter(|r| r.method == "sendMessage")
-        .map(|r| r.body["text"].as_str().unwrap_or_default().to_string())
-        .collect();
-    assert!(
-        !bodies.is_empty(),
-        "the user got no answer; methods: {:?}",
-        f.api.methods()
-    );
+    let answered = f.api.requests().iter().any(|r| r.method == "sendMessage");
+    assert!(answered, "the user got no answer; methods: {:?}", f.api.methods());
 }
 
 /// A state-changing command mutates the shared state AND persists it, so a
@@ -390,7 +372,7 @@ fn a_target_switch_is_applied_and_persisted_through_the_real_state_store() {
     f.rt.handle_update(&text_update(1, "/mac"));
 
     let on_disk: Value = serde_json::from_str(
-        &fs::read_to_string(f._runtime.path().join("state.json")).expect("state.json exists"),
+        &fs::read_to_string(f.runtime.path().join("state.json")).expect("state.json exists"),
     )
     .expect("state.json parses");
     assert_eq!(

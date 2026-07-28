@@ -2,7 +2,7 @@
 //! /api/auth-check is the ONLY authed GET).
 //!
 //! /api/summary: number_param clamps, groupBy filtered against GROUP_FIELDS
-//! with ['project'] default, tz clamp ±1440, credited totals + humanTotal;
+//! with `['project']` default, tz clamp ±1440, credited totals + humanTotal;
 //! agentTotal = total − humanTotal DERIVED, not re-rounded; raw-row
 //! cost/token sums. /api/now: 150s window clamp, per-(actor, project,
 //! source, machine) dedupe keeping max time. /api/timeline: segments.
@@ -65,10 +65,7 @@ impl Query {
     }
 
     fn get(&self, name: &str) -> Option<&str> {
-        self.0
-            .iter()
-            .find(|(k, _)| k == name)
-            .map(|(_, v)| v.as_str())
+        self.0.iter().find(|(k, _)| k == name).map(|(_, v)| v.as_str())
     }
 }
 
@@ -107,7 +104,6 @@ fn group_by(raw: Option<&str>) -> Vec<&'static str> {
 // handlers
 // ---------------------------------------------------------------------------
 
-
 /// Reject an unauthenticated read when tokens ARE configured.
 ///
 /// Node left every read route open, and this port faithfully copied that: on
@@ -143,11 +139,7 @@ async fn health() -> Response {
 ///
 /// `machine` is the per-machine token's machine, and `null` for the open and
 /// legacy-global principals (JS `principal.machine || null`).
-async fn auth_check(
-    State(app): State<App>,
-    headers: HeaderMap,
-    RawQuery(raw): RawQuery,
-) -> Response {
+async fn auth_check(State(app): State<App>, headers: HeaderMap, RawQuery(raw): RawQuery) -> Response {
     let server_cfg = app.cfg().raw.get("server").cloned().unwrap_or(Value::Null);
     let Some(principal) = authenticate(&headers, raw.as_deref().unwrap_or(""), &server_cfg) else {
         return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
@@ -796,15 +788,7 @@ mod tests {
     fn recent_is_newest_first_and_honours_the_limit() {
         let (_dir, mut db) = seeded_db();
         let rows: Vec<Value> = (0..5)
-            .map(|i| {
-                raw(
-                    1000.0 + i as f64,
-                    "webstorm",
-                    "human",
-                    &format!("/a{i}.js"),
-                    0,
-                )
-            })
+            .map(|i| raw(1000.0 + i as f64, "webstorm", "human", &format!("/a{i}.js"), 0))
             .collect();
         insert(&mut db, rows);
         let page = recent_with_context(&db, 3, 120.0).expect("recent");
@@ -932,9 +916,7 @@ mod tests {
             let cfg = load_config(&cfg_path).expect("load config");
             let db = stackhour_store::open_db(&db_path).expect("open db");
             let app = crate::make_app(cfg, db, None);
-            let router = routes()
-                .merge(crate::detail::routes())
-                .with_state(app);
+            let router = routes().merge(crate::detail::routes()).with_state(app);
             (dir, router)
         }
 
@@ -970,11 +952,7 @@ mod tests {
                 StatusCode::UNAUTHORIZED
             );
             assert_eq!(
-                status(
-                    &router,
-                    "/api/detail?dimension=project&value=x&api_key=s3cret"
-                )
-                .await,
+                status(&router, "/api/detail?dimension=project&value=x&api_key=s3cret").await,
                 StatusCode::OK
             );
             // /api/health stays open: it carries no data and is what probes hit.
@@ -1007,10 +985,7 @@ mod tests {
                 status(&router, "/api/recent?api_key=wrong").await,
                 StatusCode::UNAUTHORIZED
             );
-            assert_eq!(
-                status(&router, "/api/recent?api_key=right").await,
-                StatusCode::OK
-            );
+            assert_eq!(status(&router, "/api/recent?api_key=right").await, StatusCode::OK);
         }
     }
 }

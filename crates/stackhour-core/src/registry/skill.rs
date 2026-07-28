@@ -299,6 +299,7 @@ impl SkillDef {
         }
         let content = std::fs::read_to_string(path)?;
         *cache = Some((mtime, content.clone()));
+        drop(cache);
         Ok(content)
     }
 }

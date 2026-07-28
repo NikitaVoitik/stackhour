@@ -526,7 +526,11 @@ mod tests {
         let tmp = tmp_path_for(Path::new("/tmp/export.jsonl"));
         let name = tmp.to_string_lossy().into_owned();
         assert!(name.starts_with("/tmp/export.jsonl."), "{name}");
-        assert!(name.ends_with(".tmp"), "{name}");
+        assert_eq!(
+            Path::new(&name).extension(),
+            Some(std::ffi::OsStr::new("tmp")),
+            "{name}"
+        );
         assert!(name.contains(&std::process::id().to_string()));
     }
 

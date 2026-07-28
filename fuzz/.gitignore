@@ -1,0 +1,4 @@
+/target/
+/artifacts/
+/corpus/protocol_messages/*
+!/corpus/protocol_messages/seed-*

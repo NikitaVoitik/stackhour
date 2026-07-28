@@ -951,7 +951,7 @@ async fn recv_json<T: DeserializeOwned>(stream: &mut SplitStream<WebSocket>) -> 
     loop {
         match stream.next().await {
             Some(Ok(Message::Text(t))) => return serde_json::from_str(t.as_str()).ok(),
-            Some(Ok(Message::Ping(_))) | Some(Ok(Message::Pong(_))) => continue,
+            Some(Ok(Message::Ping(_) | Message::Pong(_))) => continue,
             _ => return None,
         }
     }

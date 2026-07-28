@@ -60,7 +60,7 @@ type ClientWs = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsSt
 async fn within<F: Future>(label: &str, f: F) -> F::Output {
     match tokio::time::timeout(OP_TIMEOUT, f).await {
         Ok(v) => v,
-        Err(_) => panic!("timed out after {OP_TIMEOUT:?}: {label}"),
+        Err(error) => panic!("timed out after {OP_TIMEOUT:?}: {label}: {error}"),
     }
 }
 
@@ -127,7 +127,7 @@ async fn subscribe(ws: &mut ClientWs, after_sequence: Option<i64>) -> i64 {
         after_sequence,
     })
     .expect("serialize subscribe");
-    within("send subscribe", ws.send(TMessage::Text(text)))
+    within("send subscribe", ws.send(TMessage::Text(text.into())))
         .await
         .expect("send subscribe");
     match next_frame(ws).await {
@@ -139,7 +139,7 @@ async fn subscribe(ws: &mut ClientWs, after_sequence: Option<i64>) -> i64 {
 /// Send one client command frame.
 async fn send_command(ws: &mut ClientWs, cmd: &ClientCommand) {
     let text = serde_json::to_string(cmd).expect("serialize command");
-    within("send command", ws.send(TMessage::Text(text)))
+    within("send command", ws.send(TMessage::Text(text.into())))
         .await
         .expect("send command");
 }
@@ -161,10 +161,8 @@ async fn frame_within(ws: &mut ClientWs, dur: Duration) -> Option<HubToClient> {
             Ok(Some(Ok(TMessage::Text(t)))) => {
                 return Some(serde_json::from_str(&t).expect("parse HubToClient"));
             }
-            Ok(Some(Ok(TMessage::Ping(_)))) | Ok(Some(Ok(TMessage::Pong(_)))) => continue,
-            Ok(Some(Ok(TMessage::Close(_)))) | Ok(None) => return None,
+            Ok(Some(Ok(TMessage::Close(_)) | Err(_)) | None) => return None,
             Ok(Some(Ok(_))) => continue,
-            Ok(Some(Err(_))) => return None,
             Err(_elapsed) => return None,
         }
     }

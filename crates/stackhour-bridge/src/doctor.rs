@@ -194,10 +194,7 @@ pub fn doctor_checks(
         // The worker's whole dependency on the leader is one executable: it
         // runs `<remoteDir>/stackhour bridge claim|return` over SSH. There is
         // no remote Node interpreter and no .mjs shim left to probe.
-        let remote_check = format!(
-            "test -x {}",
-            shell_quote(&posix_join(&remote_dir, "stackhour")),
-        );
+        let remote_check = format!("test -x {}", shell_quote(&posix_join(&remote_dir, "stackhour")),);
         let ssh_ok = std::process::Command::new("ssh")
             .args([
                 "-i",
@@ -356,7 +353,6 @@ fn local_engine_checks(out: &mut dyn Write, failures: &mut Vec<String>, local: &
 fn aliased_display(v: &Value, preferred: &str, legacy: &str) -> String {
     config::leader_aliased(v, preferred, legacy).unwrap_or_else(|| "undefined".to_string())
 }
-
 
 /// A string field for display — `undefined` when absent, as JS interpolates.
 fn display_str(v: &Value, key: &str) -> String {

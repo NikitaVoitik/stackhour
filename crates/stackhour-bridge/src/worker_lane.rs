@@ -483,7 +483,7 @@ mod tests {
 
     /// A [`WorkerContext`] backed by the real registry defaults, so the
     /// template bodies under test are the shipped ones.
-    pub(crate) struct FakeCtx {
+    pub struct FakeCtx {
         pub reg: Registry,
         pub now: AtomicI64,
         pub sessions: Mutex<Vec<SessionWrite>>,

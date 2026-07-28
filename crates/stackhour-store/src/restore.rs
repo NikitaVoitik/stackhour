@@ -575,7 +575,7 @@ mod tests {
         fs::write(with_suffix(&target, "-shm"), b"").expect("shm");
 
         let out = restore_with(&target, &source, true, 1_784_384_055_000, &hooks()).expect("restore");
-        let rollback = out.rollback_path.clone().expect("rollback");
+        let rollback = out.rollback_path.expect("rollback");
 
         // Checked before reopening the WAL databases: a read may recreate them.
         assert!(!with_suffix(&target, "-wal").exists());
@@ -596,7 +596,7 @@ mod tests {
         std::os::unix::fs::symlink(&referent, &target).expect("symlink");
 
         let out = restore_with(&target, &source, true, 0, &hooks()).expect("restore");
-        let rollback = out.rollback_path.clone().expect("rollback");
+        let rollback = out.rollback_path.expect("rollback");
 
         assert!(!fs::symlink_metadata(&target)
             .expect("lstat")

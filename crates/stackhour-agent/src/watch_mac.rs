@@ -50,8 +50,7 @@ const FRONTMOST_SCRIPT: &str = r#"
       return appName & linefeed & winTitle
     end tell"#;
 
-const IDLE_SCRIPT: &str =
-    "ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'";
+const IDLE_SCRIPT: &str = "ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'";
 
 fn real_runner(program: &str, args: &[&str]) -> std::io::Result<String> {
     let out = std::process::Command::new(program).args(args).output()?;
@@ -100,7 +99,7 @@ pub fn project_from_title(
 }
 
 impl Watcher for MacWatcher {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "macApps"
     }
 
@@ -266,6 +265,7 @@ mod tests {
     /// signal, so a frontmost window with nobody typing is not activity.
     #[test]
     fn an_idle_machine_emits_nothing() {
+        #[allow(clippy::unnecessary_wraps)] // Matches the injected command-runner signature.
         fn idle_runner(program: &str, _args: &[&str]) -> std::io::Result<String> {
             assert_eq!(program, "/bin/sh", "osascript must not even be called");
             Ok("900\n".to_string())
@@ -281,6 +281,7 @@ mod tests {
     /// carrying the title-derived project.
     #[test]
     fn an_active_mapped_app_emits_one_human_row() {
+        #[allow(clippy::unnecessary_wraps)] // Matches the injected command-runner signature.
         fn runner(program: &str, _args: &[&str]) -> std::io::Result<String> {
             Ok(match program {
                 "/bin/sh" => "3\n".to_string(),
@@ -290,9 +291,7 @@ mod tests {
         let cfg = crate::test_config(json!({
             "agent": {"idleSeconds": 300, "apps": {"Zed": {"source": "zed", "category": "coding"}}}
         }));
-        let mut w = MacWatcher {
-            runner: Some(runner),
-        };
+        let mut w = MacWatcher { runner: Some(runner) };
         let rows = w.run(&cfg, &mut json!({}), 1234.0).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0]["actor"], "human");
@@ -306,6 +305,7 @@ mod tests {
     /// An app the user has not mapped is not tracked at all.
     #[test]
     fn an_unmapped_frontmost_app_emits_nothing() {
+        #[allow(clippy::unnecessary_wraps)] // Matches the injected command-runner signature.
         fn runner(program: &str, _args: &[&str]) -> std::io::Result<String> {
             Ok(match program {
                 "/bin/sh" => "0\n".to_string(),
@@ -313,9 +313,7 @@ mod tests {
             })
         }
         let cfg = crate::test_config(json!({"agent": {"idleSeconds": 300}}));
-        let mut w = MacWatcher {
-            runner: Some(runner),
-        };
+        let mut w = MacWatcher { runner: Some(runner) };
         assert!(w.run(&cfg, &mut json!({}), 1.0).unwrap().is_empty());
     }
 }

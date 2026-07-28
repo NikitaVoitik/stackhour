@@ -4,7 +4,13 @@ nohup.out
 
 # Rust
 target/
+*.profraw
 Cargo.lock.orig
+.cache/
+frontend/node_modules/
+frontend/coverage/
+frontend/dist/
+frontend/*.tsbuildinfo
 
 # Claude Code session worktrees
 .claude/worktrees/

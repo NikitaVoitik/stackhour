@@ -106,10 +106,9 @@ fn parse_time(s: &str) -> std::result::Result<DateTime<Utc>, rusqlite::Error> {
         .map_err(|e| conv_err(format!("bad timestamp {s:?}: {e}")))
 }
 
-/// The full schema. `CREATE TABLE IF NOT EXISTS`, run at every open like
-/// `stackhour-store`. `sequence` is an explicit `INTEGER PRIMARY KEY` assigned
-/// as `MAX+1` inside a write transaction — not `AUTOINCREMENT` — so the tail is
-/// provably gapless.
+/// The first control-plane schema. `sequence` is an explicit `INTEGER PRIMARY
+/// KEY` assigned as `MAX+1` inside a write transaction — not `AUTOINCREMENT` —
+/// so the tail is provably gapless.
 const SCHEMA: &str = "
     CREATE TABLE IF NOT EXISTS events (
       sequence            INTEGER PRIMARY KEY,
@@ -186,6 +185,75 @@ const SCHEMA: &str = "
       ON pending_dispatches (node_id, created_at);
 ";
 
+/// Latest control-plane database schema understood by this binary.
+pub const LATEST_HUB_SCHEMA_VERSION: i64 = 1;
+
+const MIGRATIONS_DDL: &str = "
+    CREATE TABLE IF NOT EXISTS stackhour_hub_schema_migrations (
+      version    INTEGER PRIMARY KEY,
+      name       TEXT NOT NULL,
+      applied_at TEXT NOT NULL
+    );
+";
+
+const MIGRATIONS: [(i64, &str, &str); LATEST_HUB_SCHEMA_VERSION as usize] =
+    [(1, "create control-plane schema", SCHEMA)];
+
+fn applied_migrations(conn: &Connection) -> Result<Vec<(i64, String)>> {
+    let mut stmt = conn
+        .prepare("SELECT version, name FROM stackhour_hub_schema_migrations ORDER BY version")
+        .map_err(sql_err)?;
+    let rows = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(sql_err)?;
+    let mut applied = Vec::new();
+    for row in rows {
+        applied.push(row.map_err(sql_err)?);
+    }
+    Ok(applied)
+}
+
+fn run_migrations(conn: &Connection) -> Result<()> {
+    conn.execute_batch(MIGRATIONS_DDL).map_err(sql_err)?;
+
+    let applied = applied_migrations(conn)?;
+    for (index, (version, name)) in applied.iter().enumerate() {
+        let expected = MIGRATIONS.get(index).ok_or_else(|| {
+            Error::msg(format!(
+                "control-plane database schema version {version} is newer than supported version {LATEST_HUB_SCHEMA_VERSION}"
+            ))
+        })?;
+        if *version != expected.0 || name != expected.1 {
+            return Err(Error::msg(format!(
+                "invalid control-plane migration history at version {version}: expected {} ({:?}), found {version} ({name:?})",
+                expected.0, expected.1
+            )));
+        }
+    }
+
+    for (version, name, sql) in MIGRATIONS.iter().skip(applied.len()) {
+        conn.execute_batch("BEGIN IMMEDIATE").map_err(sql_err)?;
+        let result = (|| -> Result<()> {
+            conn.execute_batch(sql).map_err(sql_err)?;
+            conn.execute(
+                "INSERT INTO stackhour_hub_schema_migrations
+                   (version, name, applied_at)
+                 VALUES (?1, ?2, ?3)",
+                params![version, name, fmt_time(Utc::now())],
+            )
+            .map_err(sql_err)?;
+            conn.execute_batch("COMMIT").map_err(sql_err)
+        })();
+        if let Err(error) = result {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(Error::msg(format!(
+                "control-plane database migration {version} ({name}) failed: {error}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 impl Hub {
     /// Open (creating parent dirs as needed) and migrate an on-disk hub db.
     /// Sets `busy_timeout` and WAL, then runs the schema, exactly like
@@ -202,7 +270,7 @@ impl Hub {
             .map_err(sql_err)?;
         conn.query_row("PRAGMA journal_mode = WAL", [], |_| Ok(()))
             .map_err(sql_err)?;
-        conn.execute_batch(SCHEMA).map_err(sql_err)?;
+        run_migrations(&conn)?;
         Ok(Hub { conn })
     }
 
@@ -211,8 +279,20 @@ impl Hub {
         let conn = Connection::open_in_memory().map_err(sql_err)?;
         conn.pragma_update(None, "busy_timeout", 5000i64)
             .map_err(sql_err)?;
-        conn.execute_batch(SCHEMA).map_err(sql_err)?;
+        run_migrations(&conn)?;
         Ok(Hub { conn })
+    }
+
+    /// Return the latest migration version recorded in this database.
+    pub fn schema_version(&self) -> Result<i64> {
+        self.conn
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0)
+                 FROM stackhour_hub_schema_migrations",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(sql_err)
     }
 
     // --- the event log ----------------------------------------------------

@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "stackhour remote-agent control plane domain: the durable core entities (Node, Task, Run, Event, Approval), the stable event vocabulary, and the append-only SQLite hub event log with one hub-assigned sequence, idempotent command receipts, node-event UUID de-duplication, and after_sequence catch-up. Pure rusqlite, no async, no network."
 
 [lib]
@@ -20,3 +24,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

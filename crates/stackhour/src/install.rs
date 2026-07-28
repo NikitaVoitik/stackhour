@@ -191,7 +191,7 @@ pub fn install_service(role: &str) -> Result<Installed> {
             .join(format!("{label}.plist"));
         stackhour_core::fsutil::atomic_write_0644(&plist_path, launchd_plist(&exe, &exe_dir).as_bytes())
             .map_err(|e| Error::msg(format!("cannot write {}: {e}", plist_path.display())))?;
-        let uid = unsafe { libc::getuid() };
+        let uid = rustix::process::getuid().as_raw();
         let domain = format!("gui/{uid}");
         let plist_str = plist_path.to_string_lossy().into_owned();
         // bootout is best-effort: it fails when nothing is loaded yet.

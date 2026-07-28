@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH='' cd -- "$(dirname "$0")/.." && pwd)
+LEVEL=${1:-}
+FRONTEND="$ROOT/frontend"
+
+case "$LEVEL" in
+    fast | standard | full) ;;
+    *)
+        echo "usage: dev/verify-frontend <fast|standard|full>" >&2
+        exit 2
+        ;;
+esac
+
+if [ ! -f "$FRONTEND/package.json" ]; then
+    echo "frontend/package.json is missing" >&2
+    exit 2
+fi
+if ! command -v pnpm >/dev/null 2>&1; then
+    echo "pnpm is required. Enable Corepack or install pnpm 11.15.0." >&2
+    exit 2
+fi
+if [ ! -d "$FRONTEND/node_modules" ]; then
+    echo "frontend dependencies are missing." >&2
+    echo "Run: pnpm --dir frontend install --frozen-lockfile" >&2
+    exit 2
+fi
+
+exec pnpm --dir "$FRONTEND" run "quality:$LEVEL"

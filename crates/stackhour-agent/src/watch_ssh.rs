@@ -37,7 +37,7 @@ fn foreground_cwd(pts: &str) -> Option<String> {
     let text = String::from_utf8_lossy(&out.stdout).into_owned();
     let procs: Vec<(String, bool)> = text
         .trim()
-        .split('\n')
+        .lines()
         .filter_map(|line| {
             let mut fields = line.split_whitespace();
             let pid = fields.next()?.to_string();
@@ -48,10 +48,7 @@ fn foreground_cwd(pts: &str) -> Option<String> {
             Some((pid, stat.contains('+')))
         })
         .collect();
-    let pick = procs
-        .iter()
-        .find(|(_, fg)| *fg)
-        .or_else(|| procs.last())?;
+    let pick = procs.iter().find(|(_, fg)| *fg).or_else(|| procs.last())?;
     std::fs::read_link(format!("/proc/{}/cwd", pick.0))
         .ok()
         .map(|p| p.to_string_lossy().into_owned())
@@ -66,7 +63,7 @@ fn atime_seconds(path: &Path) -> Option<f64> {
 }
 
 impl Watcher for SshWatcher {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ssh"
     }
 
@@ -93,10 +90,7 @@ impl Watcher for SshWatcher {
     }
 
     fn run(&mut self, cfg: &Config, _state: &mut Value, now: f64) -> Result<Vec<Value>> {
-        let pts_dir = self
-            .pts_dir
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("/dev/pts"));
+        let pts_dir = self.pts_dir.clone().unwrap_or_else(|| PathBuf::from("/dev/pts"));
         let Ok(entries) = std::fs::read_dir(&pts_dir) else {
             // No /dev/pts (a container without devpts) is not an error.
             return Ok(Vec::new());
@@ -151,22 +145,11 @@ mod tests {
 
     /// Set a file's atime to `secs` since the epoch.
     fn set_atime(path: &Path, secs: i64) {
-        let times = [
-            libc::timespec {
-                tv_sec: secs,
-                tv_nsec: 0,
-            },
-            // Leave mtime alone.
-            libc::timespec {
-                tv_sec: 0,
-                tv_nsec: libc::UTIME_OMIT,
-            },
-        ];
-        let c = std::ffi::CString::new(path.to_string_lossy().as_bytes()).unwrap();
-        let rc = unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), 0) };
-        assert_eq!(rc, 0, "utimensat failed for {path:?}");
+        filetime::set_file_atime(path, filetime::FileTime::from_unix_time(secs, 0))
+            .unwrap_or_else(|error| panic!("cannot set atime for {path:?}: {error}"));
     }
 
+    #[allow(clippy::unnecessary_wraps)] // Matches the injected cwd lookup signature.
     fn fake_cwd(pts: &str) -> Option<String> {
         Some(format!("/work/{}", pts.replace('/', "-")))
     }

@@ -83,8 +83,8 @@ fn stdout(out: &Output) -> String {
 }
 
 fn read_json(path: &PathBuf) -> Value {
-    let raw = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("read {path:?}: {e}"));
-    serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {path:?}: {e}"))
+    let raw = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    serde_json::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
 }
 
 #[cfg(unix)]
@@ -328,10 +328,7 @@ fn token_and_chat_id_survive_with_their_types() {
 
     assert_eq!(runtime["token"], legacy["token"]);
     assert_eq!(runtime["chatId"], legacy["chatId"]);
-    assert!(
-        runtime["chatId"].is_number(),
-        "chatId must stay a number"
-    );
+    assert!(runtime["chatId"].is_number(), "chatId must stay a number");
 }
 
 /// The safety property that lets the config dir be committed: secrets live in

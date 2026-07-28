@@ -86,8 +86,8 @@ pub async fn run_with_engine(
                 attempt = attempt.saturating_add(1);
                 let delay = backoff::delay(attempt, config.backoff_base, config.backoff_max);
                 tokio::select! {
-                    _ = shutdown.cancelled() => return Ok(()),
-                    _ = tokio::time::sleep(delay) => {}
+                    () = shutdown.cancelled() => return Ok(()),
+                    () = tokio::time::sleep(delay) => {}
                 }
             }
         }
@@ -113,7 +113,7 @@ async fn connect_once(
     shutdown: &ShutdownSignal,
 ) -> SessionEnd {
     let ws = tokio::select! {
-        _ = shutdown.cancelled() => return SessionEnd::Shutdown,
+        () = shutdown.cancelled() => return SessionEnd::Shutdown,
         dialed = connect_async(&config.hub_url) => match dialed {
             Ok((ws, _resp)) => ws,
             Err(_e) => return SessionEnd::Disconnected { established: false },
@@ -142,7 +142,7 @@ async fn connect_once(
 
     // First frame in: the HubWelcome.
     let welcome_frame = tokio::select! {
-        _ = shutdown.cancelled() => return SessionEnd::Shutdown,
+        () = shutdown.cancelled() => return SessionEnd::Shutdown,
         frame = read.next() => frame,
     };
     let welcome: HubWelcome = match welcome_frame {
@@ -165,8 +165,8 @@ async fn connect_once(
     let outbox = EngineOutbox::new(out_tx.clone(), config.node_id.clone());
 
     let end = tokio::select! {
-        _ = shutdown.cancelled() => SessionEnd::Shutdown,
-        _ = receive_loop(read, engine.clone(), outbox, out_tx.clone(), config.heartbeat_timeout) => {
+        () = shutdown.cancelled() => SessionEnd::Shutdown,
+        () = receive_loop(read, engine.clone(), outbox, out_tx.clone(), config.heartbeat_timeout) => {
             SessionEnd::Disconnected { established: true }
         }
     };
@@ -190,7 +190,7 @@ where
             Outgoing::Protocol(p) => {
                 Message::text(serde_json::to_string(&p).expect("protocol message serializes"))
             }
-            Outgoing::Pong(payload) => Message::Pong(payload),
+            Outgoing::Pong(payload) => Message::Pong(payload.into()),
         };
         if sink.send(msg).await.is_err() {
             break;
@@ -236,9 +236,8 @@ async fn receive_loop<R>(
 {
     loop {
         let frame = match tokio::time::timeout(heartbeat_timeout, read.next()).await {
-            Err(_elapsed) => break,    // stale: no traffic within the window
-            Ok(None) => break,         // socket closed
-            Ok(Some(Err(_))) => break, // ws-level error
+            Err(_elapsed) => break,           // stale: no traffic within the window
+            Ok(None | Some(Err(_))) => break, // socket closed or ws-level error
             Ok(Some(Ok(msg))) => msg,
         };
 
@@ -285,10 +284,8 @@ fn handle_hub_message(msg: HubToNode, engine: &Arc<dyn Engine>, outbox: &EngineO
         HubToNode::CancelCommand { command_id } => engine.cancel(command_id, outbox.clone()),
         // STUB: the stub engine gates no approvals, so a decision is a no-op in
         // Phase 1. The ACP adapter will verify and answer the pending request.
-        HubToNode::ApprovalDecision { .. } => {}
-        // Inbound heartbeats only need to reset the staleness timer, which the
-        // receive loop already does by observing any frame.
-        HubToNode::Heartbeat => {}
+        HubToNode::ApprovalDecision { .. } | HubToNode::Heartbeat => {} // Inbound heartbeats only need to reset the staleness timer, which the
+                                                                        // receive loop already does by observing any frame.
     }
 }
 

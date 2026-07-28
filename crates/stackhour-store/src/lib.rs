@@ -19,7 +19,7 @@ pub use backup::{create_backup, run_backup_cli, verify_backup, BackupInfo};
 pub use data::run_data;
 pub use db::{
     insert_heartbeats, list_agent_status, open_db, open_immutable, recent_page, rows_in_range,
-    upsert_agent_status, upsert_wakatime_day, StatusAck,
+    schema_version, upsert_agent_status, upsert_wakatime_day, StatusAck, LATEST_SCHEMA_VERSION,
 };
 pub use reattribute::{reattribute_file_saves, reattributed_range};
 pub use restore::{maintenance_lock_path, restore_backup, RestoreOutcome};
@@ -258,8 +258,7 @@ mod tests {
     #[test]
     fn round_trips_through_json() {
         let hb = sample();
-        let back: Heartbeat =
-            serde_json::from_str(&serde_json::to_string(&hb).expect("ser")).expect("de");
+        let back: Heartbeat = serde_json::from_str(&serde_json::to_string(&hb).expect("ser")).expect("de");
         assert_eq!(back, hb);
     }
 

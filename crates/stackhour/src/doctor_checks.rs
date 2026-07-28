@@ -444,14 +444,14 @@ fn services_check(out: &mut Vec<Check>) {
             .output()
             .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
             .unwrap_or_default();
-        let active = stdout.trim().split('\n').filter(|line| *line == "active").count();
+        let active = stdout.lines().filter(|line| *line == "active").count();
         out.push(Check::new(
             "services",
             if active > 0 { StatusOk } else { Warn },
             format!("{active}/2 Stackhour user services active"),
         ));
     } else if cfg!(target_os = "macos") {
-        let uid = unsafe { libc::getuid() };
+        let uid = rustix::process::getuid().as_raw();
         let ok = std::process::Command::new("launchctl")
             .args(["print", &format!("gui/{uid}/com.stackhour.agent")])
             .output()

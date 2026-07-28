@@ -323,7 +323,7 @@ fn install_service(role: &str, no_start: bool) -> Result<PathBuf> {
         )
         .map_err(|error| Error::msg(format!("cannot write {}: {error}", path.display())))?;
         if !no_start {
-            let uid = unsafe { libc::getuid() };
+            let uid = rustix::process::getuid().as_raw();
             let domain = format!("gui/{uid}");
             let path_text = path.to_string_lossy().to_string();
             let target = format!("{domain}/{label}");

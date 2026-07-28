@@ -988,7 +988,11 @@ mod tests {
         assert_eq!(m.mime, "image/jpeg");
 
         let name = m.path.file_name().unwrap().to_string_lossy().to_string();
-        assert!(name.ends_with(".jpg"), "{name}");
+        assert_eq!(
+            Path::new(&name).extension(),
+            Some(std::ffi::OsStr::new("jpg")),
+            "{name}"
+        );
         let stem = name.trim_end_matches(".jpg");
         let (ms, uuid) = stem.split_once('-').unwrap();
         assert!(ms.chars().all(|c| c.is_ascii_digit()) && ms.len() >= 13, "{ms}");
@@ -1176,13 +1180,13 @@ mod tests {
 
     impl MediaChat for Wired {
         fn react_eyes(&self, id: i64) {
-            self.chat.react_eyes(id)
+            self.chat.react_eyes(id);
         }
         fn send_plain(&self, t: &str) -> Option<i64> {
             self.chat.send_plain(t)
         }
         fn edit_plain(&self, id: i64, t: &str) {
-            self.chat.edit_plain(id, t)
+            self.chat.edit_plain(id, t);
         }
     }
 
@@ -1444,12 +1448,29 @@ mod tests {
         let addr = listener.local_addr().unwrap();
         std::thread::spawn(move || {
             if let Ok((mut sock, _)) = listener.accept() {
-                // Drain enough of the request that the client is not blocked
-                // writing while we reply.
+                // Drain the complete request body before replying. A short TCP
+                // read does not mean end-of-request; coverage instrumentation
+                // can split the multipart body across several short reads.
                 let _ = sock.set_read_timeout(Some(Duration::from_millis(200)));
                 let mut sink = [0u8; 8192];
+                let mut request = Vec::new();
                 while let Ok(n) = sock.read(&mut sink) {
-                    if n < sink.len() {
+                    if n == 0 {
+                        break;
+                    }
+                    request.extend_from_slice(&sink[..n]);
+                    let Some(header_end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n") else {
+                        continue;
+                    };
+                    let body_start = header_end + 4;
+                    let headers = String::from_utf8_lossy(&request[..header_end]);
+                    let content_length = headers.lines().find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("content-length")
+                            .then(|| value.trim().parse::<usize>().ok())
+                            .flatten()
+                    });
+                    if content_length.is_some_and(|length| request.len() >= body_start + length) {
                         break;
                     }
                 }
@@ -1505,7 +1526,7 @@ mod tests {
         // No parseable detail -> no colon clause.
         let bare = ElevenLabs {
             endpoint: mock_json(500, b"<html>oops</html>".to_vec()),
-            ..with_detail.clone()
+            ..with_detail
         };
         assert_eq!(
             transcribe_with(&bare, &f, "audio/ogg", "v.ogg").unwrap_err(),
@@ -1617,19 +1638,7 @@ mod tests {
     }
 
     fn set_mtime(path: &Path, when: SystemTime) {
-        let secs = when.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() as i64;
-        let times = [
-            libc::timespec {
-                tv_sec: secs,
-                tv_nsec: 0,
-            },
-            libc::timespec {
-                tv_sec: secs,
-                tv_nsec: 0,
-            },
-        ];
-        let c = std::ffi::CString::new(path.as_os_str().as_encoded_bytes()).unwrap();
-        let rc = unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), 0) };
-        assert_eq!(rc, 0, "utimensat on {path:?}");
+        filetime::set_file_mtime(path, filetime::FileTime::from_system_time(when))
+            .unwrap_or_else(|error| panic!("cannot set mtime for {path:?}: {error}"));
     }
 }

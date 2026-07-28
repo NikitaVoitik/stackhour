@@ -3,7 +3,7 @@ set -eu
 
 repository=${STACKHOUR_GITHUB_REPOSITORY:-NikitaVoitik/stackhour}
 install_dir=${STACKHOUR_INSTALL_DIR:-"$HOME/.local/bin"}
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)
 source_binary="$script_dir/stackhour"
 temporary_dir=
 

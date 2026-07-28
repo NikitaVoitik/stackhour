@@ -35,7 +35,7 @@ pub use protocol::{
     ClientCommand, HubToClient, HubToNode, HubWelcome, NodeHello, NodeToHub, NodeWork, ProtocolError,
     Subscribe, WIRE_PROTOCOL_VERSION,
 };
-pub use store::{AppendOutcome, EntityWrite, Hub, PendingDispatch};
+pub use store::{AppendOutcome, EntityWrite, Hub, PendingDispatch, LATEST_HUB_SCHEMA_VERSION};
 
 #[cfg(test)]
 mod tests {
@@ -469,11 +469,70 @@ mod tests {
         };
         // Reopen the same file: schema is idempotent and data survives.
         let hub = Hub::open(&path).unwrap();
+        assert_eq!(hub.schema_version().unwrap(), LATEST_HUB_SCHEMA_VERSION);
         assert_eq!(hub.get_task(&task_id).unwrap().unwrap().title, "persist me");
         let events = hub.events_after(0).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].sequence, seq);
         assert_eq!(events[0].task_id, task_id);
+    }
+
+    #[test]
+    fn an_unversioned_control_database_is_adopted_without_data_loss() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("legacy-hub.db");
+        let task_id = TaskId::new();
+        {
+            let db = rusqlite::Connection::open(&path).unwrap();
+            db.execute_batch(
+                "CREATE TABLE tasks (
+                   task_id TEXT PRIMARY KEY,
+                   title TEXT NOT NULL,
+                   status TEXT NOT NULL,
+                   created_at TEXT NOT NULL
+                 );",
+            )
+            .unwrap();
+            db.execute(
+                "INSERT INTO tasks (task_id, title, status, created_at)
+                 VALUES (?1, 'legacy task', 'open', '2026-01-01T00:00:00.000000000Z')",
+                [task_id.to_string()],
+            )
+            .unwrap();
+        }
+
+        let hub = Hub::open(&path).unwrap();
+        assert_eq!(hub.schema_version().unwrap(), LATEST_HUB_SCHEMA_VERSION);
+        assert_eq!(hub.get_task(&task_id).unwrap().unwrap().title, "legacy task");
+    }
+
+    #[test]
+    fn a_newer_control_database_version_is_rejected() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("future-hub.db");
+        {
+            let hub = Hub::open(&path).unwrap();
+            assert_eq!(hub.schema_version().unwrap(), LATEST_HUB_SCHEMA_VERSION);
+        }
+        {
+            let db = rusqlite::Connection::open(&path).unwrap();
+            db.execute(
+                "INSERT INTO stackhour_hub_schema_migrations
+                   (version, name, applied_at)
+                 VALUES (?1, 'future migration', '2026-01-01T00:00:00Z')",
+                [LATEST_HUB_SCHEMA_VERSION + 1],
+            )
+            .unwrap();
+        }
+
+        let error = match Hub::open(&path) {
+            Ok(_) => panic!("future control database must be rejected"),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().contains("newer than supported"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

@@ -29,9 +29,10 @@ invoked them with, so installing from a stable location is worth doing.
 > Stackhour was originally a Node application and was ported to Rust
 > behaviour-for-behaviour, including JavaScript's number and rounding
 > semantics. The Node implementation, its launcher, and its test suite have
-> been removed — nothing in the project needs a Node runtime any more,
-> including the Telegram bridge and its remote workers. If you are upgrading a
-> deployment that predates this change, see
+> been removed. The shipped services, including the Telegram bridge and its
+> remote workers, do not need a Node runtime. Frontend development uses Node
+> and pnpm as build tools. If you are upgrading a deployment that predates this
+> change, see
 > [docs/bridge-migration.md](docs/bridge-migration.md).
 
 ## Quick start

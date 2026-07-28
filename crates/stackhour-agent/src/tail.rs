@@ -146,7 +146,11 @@ pub fn read_first_json_line(file: &Path, limit: usize) -> Option<Value> {
 /// The size gate matters — pruning every tick would forget the offset of a
 /// file that is merely unreadable this instant (a mounted volume, a
 /// permissions blip) and replay it wholesale when it comes back.
-pub fn prune_offsets(map: &mut Map<String, Value>, live: &HashSet<String>, max: usize) {
+pub fn prune_offsets<S: std::hash::BuildHasher>(
+    map: &mut Map<String, Value>,
+    live: &HashSet<String, S>,
+    max: usize,
+) {
     if map.len() < max {
         return;
     }
@@ -256,10 +260,7 @@ mod tests {
         assert_eq!(offsets[&key(&file)], json!(0));
 
         append(&file, "1}\n");
-        assert_eq!(
-            read_new_lines(&file, &mut offsets),
-            vec![json!({"partial": 1})]
-        );
+        assert_eq!(read_new_lines(&file, &mut offsets), vec![json!({"partial": 1})]);
     }
 
     /// One malformed complete line is dropped silently and must not block the
@@ -333,7 +334,7 @@ mod tests {
         let mut map = Map::new();
         map.insert("/a".into(), json!(1));
         map.insert("/b".into(), json!(2));
-        let live: HashSet<String> = ["/a".to_string()].into_iter().collect();
+        let live: HashSet<String> = std::iter::once("/a".to_string()).collect();
 
         prune_offsets(&mut map, &live, DEFAULT_PRUNE_MAX);
         assert_eq!(map.len(), 2, "below the threshold nothing is pruned");

@@ -95,7 +95,7 @@ pub fn run(args: &[String]) -> ExitCode {
     let home = home_dir();
     let storage = stackhour_core::paths::resolve_storage_paths_from_process_env();
     let opts = MigrateOptions {
-        from: from.clone(),
+        from,
         to: to.unwrap_or(storage.config_dir),
         runtime_dir: runtime_dir
             .unwrap_or_else(|| BridgePaths::resolve(&|k| std::env::var(k).ok(), &home).runtime_dir),

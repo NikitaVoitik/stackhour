@@ -276,16 +276,7 @@ fn echo_pair(h: &Value) -> Value {
 /// (`[A-Za-z0-9_]`), so Unicode mode is disabled to match it exactly.
 fn ai_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        // A compile-time-constant pattern; the fallback only exists so this
-        // stays panic-free.
-        Regex::new(r"(?i-u:\bai\b)").unwrap_or_else(|_| {
-            Regex::new("ai").unwrap_or_else(|_| {
-                // Unreachable; a literal always compiles.
-                Regex::new("$^").unwrap_or_else(|_| unreachable!("literal regex must compile"))
-            })
-        })
-    })
+    RE.get_or_init(|| Regex::new(r"(?i-u:\bai\b)").expect("the constant AI regex must compile"))
 }
 
 /// JS `h[key] || fallback`, keeping the RAW truthy value (an editor plugin

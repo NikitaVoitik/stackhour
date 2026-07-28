@@ -483,7 +483,12 @@ fn the_help_banner_is_byte_identical_when_every_module_is_enabled() {
     assert!(baseline.contains("usage: stackhour <command>\n"), "{baseline}");
     assert!(!baseline.contains("note: the "), "{baseline}");
     // The last line is still `config: <path>` with nothing after it.
-    assert!(baseline.trim_end().lines().last().unwrap().starts_with("config: "));
+    assert!(baseline
+        .trim_end()
+        .lines()
+        .last()
+        .unwrap()
+        .starts_with("config: "));
 
     // An explicitly all-true block, and a JS-truthy `"false"` string, both
     // resolve to "nothing is off" and so must print the same bytes.

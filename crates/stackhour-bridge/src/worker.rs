@@ -528,7 +528,7 @@ pub fn run_worker(runtime_dir: &Path) -> ! {
         registry,
         paths.media_dir.clone(),
         cfg.remote_dir.clone(),
-        cfg.target.clone(),
+        cfg.target,
         log_path,
     );
     worker.run_forever(&paths.media_dir)
@@ -610,6 +610,7 @@ mod tests {
                 .1
                 .clone()
                 .expect("the payload is piped on stdin");
+            drop(calls);
             serde_json::from_str(&body).expect("valid JSON payload")
         }
         fn returned(&self) -> bool {
@@ -638,7 +639,8 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push((remote_path.to_string(), local.to_path_buf()));
-            match self.scp_err.lock().unwrap().clone() {
+            let scp_error = self.scp_err.lock().unwrap().clone();
+            match scp_error {
                 Some(e) => Err(e),
                 None => {
                     let _ = std::fs::create_dir_all(local.parent().unwrap());

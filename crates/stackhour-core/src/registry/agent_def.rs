@@ -156,6 +156,7 @@ impl Soul {
         }
         let content = std::fs::read_to_string(&self.path)?;
         *cache = Some((mtime, content.clone()));
+        drop(cache);
         Ok(content)
     }
 }
@@ -674,6 +675,7 @@ mod tests {
 
         // A job snapshot taken mid-flight keeps reading the same document.
         let snapshot = soul.clone();
+        assert_eq!(soul.path(), path.as_path());
         fs::write(&path, "v2").unwrap();
         bump_mtime(&path, 10);
         assert_eq!(snapshot.text().unwrap(), "v2");

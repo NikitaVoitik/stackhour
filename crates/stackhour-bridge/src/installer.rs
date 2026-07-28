@@ -283,29 +283,49 @@ impl Prompter for StdPrompter {
 /// treat Ctrl-C as 'Setup cancelled.'. Requires both stdin and stdout to be
 /// TTYs, with the Node error text otherwise.
 #[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)] // The lock is owned by the restore guard until raw mode ends.
 fn read_secret_raw(label: &str, env_name: &str, optional: bool) -> Result<String, String> {
-    use std::io::Read as _;
-    let tty = unsafe { libc::isatty(libc::STDIN_FILENO) == 1 && libc::isatty(libc::STDOUT_FILENO) == 1 };
-    let mut term: libc::termios = unsafe { std::mem::zeroed() };
-    if !tty || unsafe { libc::tcgetattr(libc::STDIN_FILENO, &mut term) } != 0 {
+    use rustix::termios::{InputModes, LocalModes, OptionalActions};
+    use std::io::{IsTerminal as _, Read as _};
+
+    let stdin = std::io::stdin();
+    if !stdin.is_terminal() || !std::io::stdout().is_terminal() {
         return Err(format!(
             "Cannot read {label} securely here; set {env_name} and retry."
         ));
     }
-    print!("{label}{}: ", if optional { " (optional)" } else { "" });
-    let _ = std::io::stdout().flush();
-
-    let saved = term;
+    let input = stdin.lock();
+    let saved = rustix::termios::tcgetattr(&input)
+        .map_err(|_| format!("Cannot read {label} securely here; set {env_name} and retry."))?;
+    let mut raw = saved.clone();
     // Node's `setRawMode(true)`: no echo, no line buffering, no signal keys;
     // output post-processing stays on so the final '\n' still works.
-    term.c_lflag &= !(libc::ECHO | libc::ICANON | libc::ISIG | libc::IEXTEN);
-    term.c_iflag &= !(libc::IXON | libc::ICRNL);
-    unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &term) };
+    raw.local_modes
+        .remove(LocalModes::ECHO | LocalModes::ICANON | LocalModes::ISIG | LocalModes::IEXTEN);
+    raw.input_modes.remove(InputModes::IXON | InputModes::ICRNL);
+    rustix::termios::tcsetattr(&input, OptionalActions::Now, &raw)
+        .map_err(|_| format!("Cannot read {label} securely here; set {env_name} and retry."))?;
+
+    struct TerminalRestore<'a> {
+        input: std::io::StdinLock<'a>,
+        saved: rustix::termios::Termios,
+    }
+
+    impl Drop for TerminalRestore<'_> {
+        fn drop(&mut self) {
+            let _ =
+                rustix::termios::tcsetattr(&self.input, rustix::termios::OptionalActions::Now, &self.saved);
+        }
+    }
+
+    let mut terminal = TerminalRestore { input, saved };
+    print!("{label}{}: ", if optional { " (optional)" } else { "" });
+    let _ = std::io::stdout().flush();
 
     let mut bytes: Vec<u8> = Vec::new();
     let outcome = loop {
         let mut byte = [0u8; 1];
-        match std::io::stdin().read(&mut byte) {
+        match terminal.input.read(&mut byte) {
             Ok(0) => break Ok(()),
             Err(e) => break Err(e.to_string()),
             Ok(_) => {}
@@ -340,7 +360,7 @@ fn read_secret_raw(label: &str, env_name: &str, optional: bool) -> Result<String
         }
     };
 
-    unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &saved) };
+    drop(terminal);
     println!();
     outcome?;
     let value = String::from_utf8_lossy(&bytes).to_string();
@@ -755,7 +775,7 @@ pub(crate) fn run_cmd(program: &str, args: &[&str]) -> Result<(), String> {
 /// `getuid()` for the launchd `gui/<uid>` domain.
 #[cfg(unix)]
 pub(crate) fn uid() -> u32 {
-    unsafe { libc::getuid() }
+    rustix::process::getuid().as_raw()
 }
 #[cfg(not(unix))]
 pub(crate) fn uid() -> u32 {
@@ -834,7 +854,6 @@ fn install_binary(runtime_dir: &Path) -> Result<PathBuf, String> {
     }
     Ok(dest)
 }
-
 
 // ---------------------------------------------------------------------------
 // Services

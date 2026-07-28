@@ -135,7 +135,7 @@ fn serve_one(
         }
         json!(pending)
     } else {
-        log.lock().unwrap().push((method, body.clone()));
+        log.lock().unwrap().push((method, body));
         *next_id += 1;
         json!({ "message_id": *next_id, "date": 0, "chat": { "id": CHAT } })
     };

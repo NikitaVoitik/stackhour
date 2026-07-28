@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "stackhour execution node: an outbound WebSocket client that dials the hub, authenticates with NodeHello, and starts local Claude or Codex CLI processes behind a supervised Engine trait."
 
 [lib]
@@ -32,3 +36,6 @@ axum = { workspace = true, features = ["ws"] }
 tokio-tungstenite.workspace = true
 futures-util.workspace = true
 tempfile.workspace = true
+
+[lints]
+workspace = true

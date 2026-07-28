@@ -31,9 +31,7 @@ const BREAKDOWN_LIMIT: usize = 20;
 pub fn routes() -> Router<App> {
     Router::new()
         .route("/api/detail", get(detail))
-        .method_not_allowed_fallback(|| async {
-            crate::json_error(StatusCode::NOT_FOUND, "not found")
-        })
+        .method_not_allowed_fallback(|| async { crate::json_error(StatusCode::NOT_FOUND, "not found") })
 }
 
 /// A parsed query string with JS `URLSearchParams` lookup semantics.

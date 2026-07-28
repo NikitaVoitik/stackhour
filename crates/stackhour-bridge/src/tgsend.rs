@@ -357,7 +357,8 @@ pub fn run_tg_send(args: &[String]) -> i32 {
 
 #[cfg(unix)]
 fn stdin_is_tty() -> bool {
-    unsafe { libc::isatty(libc::STDIN_FILENO) == 1 }
+    use std::io::IsTerminal as _;
+    std::io::stdin().is_terminal()
 }
 
 #[cfg(not(unix))]
