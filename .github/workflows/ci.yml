@@ -40,6 +40,7 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: brew install ripgrep
       - run: pnpm --dir frontend install --frozen-lockfile
       - run: dev/verify-fast
       - run: cargo test --workspace --all-features --locked

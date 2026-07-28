@@ -6,20 +6,24 @@ Profile: Full
 
 Reason:
 
-This change repairs a frozen frontend dependency installation in GitHub CI.
-It changes the dependency lockfile and CI installation boundary, so it
-requires Full verification.
+This change repairs GitHub CI on both supported runner platforms. It changes
+dependency installation, macOS test compilation, and verification-tool setup,
+so it requires Full verification.
 
 Affected areas:
 
 - Frontend patch metadata
 - Frontend dependency lockfile
 - GitHub CI dependency installation
+- Platform-gated Rust test helpers
+- Unsafe-scan tool validation
+- macOS CI tool setup
 
 Additional focused checks:
 
 - A clean frozen pnpm installation
 - The frontend patch applies from a clean dependency store
+- The unsafe scan fails clearly when ripgrep is unavailable
 - GitHub CI on Linux and macOS
 
 ## Verification result
@@ -31,7 +35,12 @@ Commands run:
 - `pnpm --dir frontend install --no-frozen-lockfile`
 - `pnpm --dir frontend install --frozen-lockfile`
 - Clean temporary `pnpm install --frozen-lockfile` with an empty store
-- `dev/verify-full`
+- Missing-ripgrep failure check with a restricted `PATH`
+- `dev/check-unsafe.sh`
+- `cargo fmt --all --check`
+- `dev/verify-fast`
+- `git diff --check`
+- `dev/verify-full` with loopback socket access
 
 Checks not run:
 

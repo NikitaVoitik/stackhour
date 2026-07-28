@@ -15,8 +15,11 @@
 //! are expected to fail in the sandbox — the assertions stop at the files the
 //! installer writes before them.
 
+#[cfg(target_os = "linux")]
 use std::path::Path;
-use std::process::{Command, Output, Stdio};
+#[cfg(target_os = "linux")]
+use std::process::Stdio;
+use std::process::{Command, Output};
 use tempfile::TempDir;
 
 const BIN: &str = env!("CARGO_BIN_EXE_stackhour");
@@ -54,6 +57,7 @@ fn stderr(out: &Output) -> String {
 }
 
 /// A 0755 stand-in for claude/codex.
+#[cfg(target_os = "linux")]
 fn fake_bin(dir: &Path, name: &str) -> String {
     let p = dir.join(name);
     std::fs::write(&p, "#!/bin/sh\nexit 0\n").unwrap();
