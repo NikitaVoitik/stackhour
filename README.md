@@ -589,7 +589,6 @@ installers for:
 
 - Linux x86-64
 - Linux ARM64
-- macOS Intel
 - macOS Apple Silicon
 
 The workflow creates the matching `v<version>` tag and GitHub release. It does

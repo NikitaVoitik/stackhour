@@ -24,24 +24,22 @@ if [ ! -x "$source_binary" ]; then
     exit 1
   }
 
-  case "$(uname -s)" in
-    Linux) system=unknown-linux-gnu ;;
-    Darwin) system=apple-darwin ;;
-    *)
-      echo "Stackhour does not support this operating system." >&2
+  system_name=$(uname -s)
+  machine_name=$(uname -m)
+  case "$system_name/$machine_name" in
+    Linux/x86_64|Linux/amd64) target=x86_64-unknown-linux-gnu ;;
+    Linux/arm64|Linux/aarch64) target=aarch64-unknown-linux-gnu ;;
+    Darwin/arm64|Darwin/aarch64) target=aarch64-apple-darwin ;;
+    Darwin/x86_64|Darwin/amd64)
+      echo "Stackhour does not support Intel macOS." >&2
       exit 1
       ;;
-  esac
-  case "$(uname -m)" in
-    x86_64|amd64) architecture=x86_64 ;;
-    arm64|aarch64) architecture=aarch64 ;;
     *)
-      echo "Stackhour does not support this CPU architecture." >&2
+      echo "Stackhour does not support this operating system and CPU type." >&2
       exit 1
       ;;
   esac
 
-  target="$architecture-$system"
   asset="stackhour-$target.tar.gz"
   release_root="https://github.com/$repository/releases/latest/download"
   temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/stackhour-install.XXXXXX")
