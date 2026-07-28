@@ -17,15 +17,13 @@ Affected areas:
 - GitHub CI dependency installation
 - GitHub Action runtime compatibility
 - Platform-gated Rust test helpers
-- Unsafe-scan tool validation
-- Linux CI tool setup
-- macOS CI tool setup
+- Portable unsafe-scan tool selection
 
 Additional focused checks:
 
 - A clean frozen pnpm installation
 - The frontend patch applies from a clean dependency store
-- The unsafe scan fails clearly when ripgrep is unavailable
+- The unsafe scan uses a strict grep fallback when ripgrep is unavailable
 - GitHub CI on Linux and macOS
 
 ## Verification result
@@ -37,7 +35,8 @@ Commands run:
 - `pnpm --dir frontend install --no-frozen-lockfile`
 - `pnpm --dir frontend install --frozen-lockfile`
 - Clean temporary `pnpm install --frozen-lockfile` with an empty store
-- Missing-ripgrep failure check with a restricted `PATH`
+- Clean grep-fallback scan with a restricted `PATH`
+- Grep-fallback detection check with a temporary unsafe fixture
 - `dev/check-unsafe.sh`
 - `cargo fmt --all --check`
 - `dev/verify-fast`
@@ -45,6 +44,7 @@ Commands run:
 - `dev/verify-full` with loopback socket access
 - `dev/verify-full` after Linux CI tool setup
 - `dev/verify-full` after the GitHub Action runtime upgrade
+- `dev/verify-full` after the portable scanner change
 
 Checks not run:
 
