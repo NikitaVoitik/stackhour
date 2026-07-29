@@ -129,6 +129,9 @@ struct CliState {
 struct RunSpec {
     task_id: TaskId,
     engine: String,
+    model: Option<String>,
+    reasoning_effort: Option<String>,
+    system_prompt: Option<String>,
     access_policy: AccessPolicy,
     workspace: Option<PathBuf>,
 }
@@ -170,6 +173,9 @@ impl Engine for CliEngine {
                 run_id,
                 task_id,
                 engine,
+                model,
+                reasoning_effort,
+                system_prompt,
                 access_policy,
                 workspace_path,
             } => {
@@ -181,6 +187,9 @@ impl Engine for CliEngine {
                     RunSpec {
                         task_id,
                         engine,
+                        model,
+                        reasoning_effort,
+                        system_prompt,
                         access_policy,
                         workspace,
                     },
@@ -241,6 +250,9 @@ impl Engine for CliEngine {
                 let req = RunRequest {
                     prompt: text,
                     session_id,
+                    model: spec.model,
+                    system_prompt: spec.system_prompt,
+                    effort: spec.reasoning_effort,
                     permission_mode: Some(permission_mode.to_string()),
                     cwd: spec.workspace,
                     live_status: true,
@@ -317,6 +329,12 @@ impl Engine for CliEngine {
                 self.stop_run(run_id);
                 tokio::spawn(async move {
                     out.ack(command_id).await;
+                });
+            }
+            NodeWork::Update { version } => {
+                tokio::spawn(async move {
+                    out.ack(command_id).await;
+                    let _ = tokio::task::spawn_blocking(move || launch_node_update(&version)).await;
                 });
             }
         }
@@ -422,6 +440,11 @@ impl Engine for StubEngine {
                     engine.trip(run_id);
                 });
             }
+            NodeWork::Update { .. } => {
+                tokio::spawn(async move {
+                    out.ack(command_id).await;
+                });
+            }
         }
     }
 
@@ -432,6 +455,44 @@ impl Engine for StubEngine {
             self.trip(run_id);
         }
     }
+}
+
+fn launch_node_update(version: &str) -> std::io::Result<()> {
+    if version.is_empty()
+        || version.len() > 80
+        || version
+            .chars()
+            .any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '+')))
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "invalid update version",
+        ));
+    }
+    let executable = std::env::current_exe()?;
+    let target = format!("--target-version={version}");
+    if cfg!(target_os = "linux") {
+        let unit = format!("--unit=stackhour-control-update-node-{}", std::process::id());
+        let status = std::process::Command::new("systemd-run")
+            .args(["--user", "--collect", "--quiet", &unit])
+            .arg(&executable)
+            .args(["control", "update", "--role=node", &target])
+            .status()?;
+        if !status.success() {
+            return Err(std::io::Error::other(format!("systemd-run exited {status}")));
+        }
+    } else if cfg!(target_os = "macos") {
+        let label = format!("stackhour-control-update-node-{}", std::process::id());
+        let status = std::process::Command::new("launchctl")
+            .args(["submit", "-l", &label, "--"])
+            .arg(&executable)
+            .args(["control", "update", "--role=node", &target])
+            .status()?;
+        if !status.success() {
+            return Err(std::io::Error::other(format!("launchctl submit exited {status}")));
+        }
+    }
+    Ok(())
 }
 
 /// Return `true` immediately if already cancelled, otherwise sleep for `step`
@@ -584,6 +645,9 @@ mod tests {
             run_id: RunId::new(),
             task_id: TaskId::new(),
             engine: "stub".to_string(),
+            model: None,
+            reasoning_effort: None,
+            system_prompt: None,
             access_policy: AccessPolicy::Supervised,
             workspace_path: None,
         };
@@ -613,6 +677,38 @@ mod tests {
             run_started, 1,
             "a redelivered dispatch must not spawn a second run"
         );
+    }
+
+    #[tokio::test]
+    async fn cli_engine_keeps_run_model_effort_and_system_prompt() {
+        let (tx, mut rx) = mpsc::channel::<Outgoing>(8);
+        let out = EngineOutbox::new(tx, NodeId::from("local"));
+        let engine = CliEngine::new(CliEngineConfig::default());
+        let run_id = RunId::new();
+        engine.dispatch(
+            CommandId::new(),
+            NodeWork::StartRun {
+                run_id,
+                task_id: TaskId::new(),
+                engine: "codex".to_string(),
+                model: Some("gpt-5.6-luna".to_string()),
+                reasoning_effort: Some("high".to_string()),
+                system_prompt: Some("You are Claire.".to_string()),
+                access_policy: AccessPolicy::Supervised,
+                workspace_path: Some("/tmp/project".to_string()),
+            },
+            out,
+        );
+        assert!(matches!(
+            rx.recv().await,
+            Some(Outgoing::Protocol(NodeToHub::CommandAck { .. }))
+        ));
+        let state = engine.state.lock().unwrap();
+        let spec = state.runs.get(&run_id).unwrap();
+        assert_eq!(spec.model.as_deref(), Some("gpt-5.6-luna"));
+        assert_eq!(spec.reasoning_effort.as_deref(), Some("high"));
+        assert_eq!(spec.system_prompt.as_deref(), Some("You are Claire."));
+        drop(state);
     }
 
     #[cfg(unix)]
@@ -647,6 +743,9 @@ mod tests {
                 run_id,
                 task_id,
                 engine: "claude".to_string(),
+                model: None,
+                reasoning_effort: None,
+                system_prompt: None,
                 access_policy: AccessPolicy::Automatic,
                 workspace_path: None,
             },
@@ -709,6 +808,9 @@ mod tests {
                 run_id,
                 task_id,
                 engine: "codex".to_string(),
+                model: None,
+                reasoning_effort: None,
+                system_prompt: None,
                 access_policy: AccessPolicy::Automatic,
                 workspace_path: None,
             },
@@ -755,6 +857,9 @@ mod tests {
                 run_id,
                 task_id,
                 engine: "unknown".to_string(),
+                model: None,
+                reasoning_effort: None,
+                system_prompt: None,
                 access_policy: AccessPolicy::Automatic,
                 workspace_path: None,
             },

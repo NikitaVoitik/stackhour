@@ -71,7 +71,9 @@ Enroll each worker machine with `stackhour bridge install worker`, pointing
 `leaderSsh` at the leader and giving every worker a **unique** target name
 (the wizard's "Worker target name" prompt; `BRIDGE_TARGET`
 non-interactively). Linux workers get a systemd user unit
-(`stackhour-bridge-worker.service`); macOS workers keep the LaunchAgent.
+(`stackhour-bridge-worker@<target>.service`); macOS workers get
+`com.stackhour.bridge-worker.<target>`. The target-scoped identity permits
+several workers and workspaces on one machine without overwriting a service.
 Each named worker claims only jobs dispatched to its target and beats its
 own `worker-heartbeat-<target>` file, so `bridge doctor coordinator` reports
 every worker's online/offline on its own line.
@@ -153,7 +155,11 @@ cd ~/stackhour
 ./target/release/stackhour bridge install worker
 ```
 
-The Mac wizard verifies the SSH key and local agent paths, installs the runtime, generates and validates a LaunchAgent, and starts it. With the Rust binary the worker installer also runs on Linux, writing a systemd user unit (`stackhour-bridge-worker.service`) instead of a LaunchAgent — see [Topologies](#topologies).
+The Mac wizard verifies the SSH key and local agent paths, installs the runtime,
+generates and validates a target-scoped LaunchAgent, starts it, and runs the
+post-install doctor. With the Rust binary the worker installer also runs on
+Linux, writing `stackhour-bridge-worker@<target>.service` instead of a
+LaunchAgent — see [Topologies](#topologies).
 
 Run the end-to-end health check on each machine:
 
@@ -170,8 +176,9 @@ The installer only writes inside the current user's home directory:
 
 - `~/.local/share/stackhour/bridge/` — runtime, private config, queue data, media, and logs
 - Linux coordinator: `~/.config/systemd/user/stackhour-bridge.service`
-- Linux worker (Rust installer): `~/.config/systemd/user/stackhour-bridge-worker.service`
-- macOS: `~/Library/LaunchAgents/com.stackhour.bridge-worker.plist`
+- Linux worker: `~/.config/systemd/user/stackhour-bridge-worker@<target>.service`
+- macOS worker:
+  `~/Library/LaunchAgents/com.stackhour.bridge-worker.<target>.plist`
 
 It does not install npm dependencies or require root. On Linux, it may recommend one explicit `sudo loginctl enable-linger <user>` command so the user service remains alive after logout.
 
@@ -184,6 +191,16 @@ git pull
 ```
 
 Use another runtime location with `--runtime-dir` or `STACKHOUR_BRIDGE_HOME`.
+The absolute runtime directory is embedded in every systemd `ExecStart` and
+launchd `ProgramArguments`, so custom locations survive service restarts.
+
+Targets may declare optional `machine` and `icon` fields. A roster such as
+`machine: "GCP", label: "General"` and
+`machine: "GCP", label: "Blort"` renders as **GCP / General** and
+**GCP / Blort** rather than pretending they are separate computers. `/where`
+also includes the target's configured working directory. An explicit icon is
+used as-is, and a label that already begins with an emoji is not prefixed with
+a second icon.
 
 ## Non-interactive installation
 

@@ -54,7 +54,7 @@ use futures_util::stream::SplitStream;
 use futures_util::{SinkExt, StreamExt};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::Path;
@@ -154,6 +154,157 @@ pub struct NodeView {
     pub last_seen_sequence: Option<i64>,
 }
 
+const ASSISTANT_SETTINGS_KEY: &str = "assistant.settings";
+const UPDATE_SETTINGS_KEY: &str = "update.settings";
+const CLAIRE_PERSONALITY: &str = "You are Claire, Nikita's personal operations assistant. \
+You are warm, composed, candid, lightly witty, and economical with words. You remember context, \
+take ownership of follow-through, and distinguish clearly between what you know, what you inferred, \
+and what you changed. You coordinate Stackhour tasks and coding agents; do not pretend work happened \
+until a durable Stackhour event confirms it.";
+
+/// Durable configuration for Claire and the worker models she selects.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AssistantSettings {
+    pub name: String,
+    pub personality: String,
+    pub engine: String,
+    pub claude_model: Option<String>,
+    pub codex_model: Option<String>,
+    pub reasoning_effort: String,
+    pub node_id: String,
+    pub workspace: Option<String>,
+    pub memory_enabled: bool,
+    pub memory_command: Option<String>,
+    pub memory_dir: Option<String>,
+}
+
+/// Durable automatic-update policy. Automatic updates are opt-in.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateSettings {
+    pub automatic: bool,
+    pub interval_hours: u16,
+    pub include_nodes: bool,
+}
+
+impl Default for UpdateSettings {
+    fn default() -> Self {
+        UpdateSettings {
+            automatic: false,
+            interval_hours: 24,
+            include_nodes: true,
+        }
+    }
+}
+
+impl UpdateSettings {
+    fn validate(&self) -> std::result::Result<(), String> {
+        if !(1..=168).contains(&self.interval_hours) {
+            return Err("interval_hours must be between 1 and 168".to_string());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UpdateInfo {
+    pub current_version: String,
+    pub latest_version: String,
+    pub update_available: bool,
+}
+
+impl Default for AssistantSettings {
+    fn default() -> Self {
+        AssistantSettings {
+            name: "Claire".to_string(),
+            personality: CLAIRE_PERSONALITY.to_string(),
+            engine: "claude".to_string(),
+            claude_model: None,
+            codex_model: None,
+            reasoning_effort: "high".to_string(),
+            node_id: "local".to_string(),
+            workspace: None,
+            memory_enabled: false,
+            memory_command: None,
+            memory_dir: None,
+        }
+    }
+}
+
+impl AssistantSettings {
+    pub fn model(&self) -> Option<String> {
+        match self.engine.as_str() {
+            "claude" => self.claude_model.clone(),
+            "codex" => self.codex_model.clone(),
+            _ => None,
+        }
+    }
+
+    pub fn validate(&self) -> std::result::Result<(), String> {
+        validate_text("name", &self.name, 40)?;
+        validate_text("personality", &self.personality, 16_000)?;
+        if !matches!(self.engine.as_str(), "claude" | "codex") {
+            return Err("engine must be claude or codex".to_string());
+        }
+        if !matches!(self.reasoning_effort.as_str(), "low" | "medium" | "high") {
+            return Err("reasoning_effort must be low, medium, or high".to_string());
+        }
+        validate_identifier("node_id", &self.node_id)?;
+        for (label, value) in [
+            ("claude_model", self.claude_model.as_deref()),
+            ("codex_model", self.codex_model.as_deref()),
+        ] {
+            if let Some(value) = value {
+                validate_identifier(label, value)?;
+            }
+        }
+        for (label, value) in [
+            ("workspace", self.workspace.as_deref()),
+            ("memory_command", self.memory_command.as_deref()),
+            ("memory_dir", self.memory_dir.as_deref()),
+        ] {
+            if let Some(value) = value {
+                validate_text(label, value, 1_024)?;
+                if !Path::new(value).is_absolute() {
+                    return Err(format!("{label} must be an absolute path"));
+                }
+            }
+        }
+        if self.memory_enabled && self.memory_command.is_none() {
+            return Err("memory_command is required when OptMem is enabled".to_string());
+        }
+        Ok(())
+    }
+}
+
+fn validate_text(label: &str, value: &str, max: usize) -> std::result::Result<(), String> {
+    if value.trim().is_empty() {
+        return Err(format!("{label} must not be blank"));
+    }
+    if value.chars().count() > max || value.chars().any(char::is_control) {
+        return Err(format!("{label} is invalid or longer than {max} characters"));
+    }
+    Ok(())
+}
+
+fn validate_identifier(label: &str, value: &str) -> std::result::Result<(), String> {
+    validate_text(label, value, 200)?;
+    if value
+        .chars()
+        .any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '/' | ':')))
+    {
+        return Err(format!("{label} contains unsupported characters"));
+    }
+    Ok(())
+}
+
+/// Durable binding from one assistant channel to its current task and run.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AssistantSession {
+    pub task_id: TaskId,
+    pub run_id: Option<RunId>,
+    pub engine: String,
+}
+
 impl HubState {
     /// A hub backed by an in-memory SQLite database (tests, ephemeral use).
     pub fn in_memory(node_secret: impl Into<String>) -> Result<Arc<HubState>> {
@@ -222,6 +373,94 @@ impl HubState {
         f(&mut guard)
     }
 
+    pub fn assistant_settings(&self) -> Result<AssistantSettings> {
+        self.with_hub(|hub| match hub.get_setting(ASSISTANT_SETTINGS_KEY)? {
+            Some(value) => {
+                let settings: AssistantSettings = serde_json::from_value(value)
+                    .map_err(|error| Error::msg(format!("bad assistant settings: {error}")))?;
+                settings.validate().map_err(Error::msg)?;
+                Ok(settings)
+            }
+            None => Ok(AssistantSettings::default()),
+        })
+    }
+
+    pub fn save_assistant_settings(&self, settings: &AssistantSettings) -> Result<()> {
+        settings.validate().map_err(Error::msg)?;
+        self.with_hub(|hub| hub.put_setting(ASSISTANT_SETTINGS_KEY, &serde_json::to_value(settings)?))
+    }
+
+    pub fn initialize_assistant_settings(&self, settings: &AssistantSettings) -> Result<()> {
+        settings.validate().map_err(Error::msg)?;
+        self.with_hub(|hub| {
+            if hub.get_setting(ASSISTANT_SETTINGS_KEY)?.is_none() {
+                hub.put_setting(ASSISTANT_SETTINGS_KEY, &serde_json::to_value(settings)?)?;
+            }
+            Ok(())
+        })
+    }
+
+    pub fn update_settings(&self) -> Result<UpdateSettings> {
+        self.with_hub(|hub| match hub.get_setting(UPDATE_SETTINGS_KEY)? {
+            Some(value) => {
+                let settings: UpdateSettings = serde_json::from_value(value)
+                    .map_err(|error| Error::msg(format!("bad update settings: {error}")))?;
+                settings.validate().map_err(Error::msg)?;
+                Ok(settings)
+            }
+            None => Ok(UpdateSettings::default()),
+        })
+    }
+
+    pub fn save_update_settings(&self, settings: &UpdateSettings) -> Result<()> {
+        settings.validate().map_err(Error::msg)?;
+        self.with_hub(|hub| hub.put_setting(UPDATE_SETTINGS_KEY, &serde_json::to_value(settings)?))
+    }
+
+    fn dispatch_update_to_nodes(&self, version: &str) -> usize {
+        let expires_at = Utc::now()
+            .checked_add_signed(chrono::Duration::minutes(10))
+            .expect("ten minute update expiry is representable");
+        let senders = self.nodes.lock().unwrap_or_else(|poison| poison.into_inner());
+        senders
+            .values()
+            .filter(|sender| {
+                sender
+                    .send(HubToNode::DispatchCommand {
+                        command_id: CommandId::new(),
+                        expires_at: Some(expires_at),
+                        work: NodeWork::Update {
+                            version: version.to_string(),
+                        },
+                    })
+                    .is_ok()
+            })
+            .count()
+    }
+
+    pub fn assistant_session(&self, channel: &str) -> Result<Option<AssistantSession>> {
+        let key = format!("assistant.session.{channel}");
+        self.with_hub(|hub| {
+            hub.get_setting(&key)?
+                .filter(|value| !value.is_null())
+                .map(|value| {
+                    serde_json::from_value(value)
+                        .map_err(|error| Error::msg(format!("bad assistant session: {error}")))
+                })
+                .transpose()
+        })
+    }
+
+    pub fn save_assistant_session(&self, channel: &str, session: &AssistantSession) -> Result<()> {
+        let key = format!("assistant.session.{channel}");
+        self.with_hub(|hub| hub.put_setting(&key, &serde_json::to_value(session)?))
+    }
+
+    pub fn clear_assistant_session(&self, channel: &str) -> Result<()> {
+        let key = format!("assistant.session.{channel}");
+        self.with_hub(|hub| hub.put_setting(&key, &Value::Null))
+    }
+
     /// Append a client command and, iff it created a new event, persist any
     /// durable entity it mints and broadcast that event to subscribed clients.
     ///
@@ -278,6 +517,14 @@ impl HubState {
     /// Read the durable event tail for an in-process client such as Telegram.
     pub fn read_events_after(&self, after: i64) -> Result<Vec<Event>> {
         self.events_after(after)
+    }
+
+    pub fn task_events(&self, task_id: TaskId) -> Result<Vec<Event>> {
+        Ok(self
+            .events_after(0)?
+            .into_iter()
+            .filter(|event| event.task_id == task_id)
+            .collect())
     }
 
     /// Apply and route one command from an in-process client.
@@ -388,10 +635,25 @@ impl HubState {
                 task_id,
                 node_id,
                 engine,
+                model,
+                reasoning_effort,
+                system_prompt,
                 access_policy,
                 workspace_path,
                 ..
             } => {
+                if let Err(message) = validate_run_configuration(
+                    &engine,
+                    model.as_deref(),
+                    reasoning_effort.as_deref(),
+                    system_prompt.as_deref(),
+                    workspace_path.as_deref(),
+                ) {
+                    return CommandEffect {
+                        receipt: HubToClient::rejected(command_id, ProtocolError::InvalidRequest { message }),
+                        dispatch: None,
+                    };
+                }
                 let run_id = RunId::new();
                 // The durable `Run` row shares the id the hub stamps on the
                 // `run.started` event and dispatches to the node.
@@ -400,6 +662,9 @@ impl HubState {
                     task_id,
                     node_id: node_id.clone(),
                     engine: engine.clone(),
+                    model: model.clone(),
+                    reasoning_effort: reasoning_effort.clone(),
+                    system_prompt: system_prompt.clone(),
                     access_policy,
                     workspace_path: workspace_path.clone(),
                     status: RunStatus::Started,
@@ -414,6 +679,9 @@ impl HubState {
                             run_id,
                             task_id,
                             engine: engine.clone(),
+                            model: model.clone(),
+                            reasoning_effort: reasoning_effort.clone(),
+                            system_prompt,
                             access_policy,
                             workspace_path: workspace_path.clone(),
                         },
@@ -423,6 +691,8 @@ impl HubState {
                     .with_run(run_id)
                     .with_payload(json!({
                         "engine": engine,
+                        "model": model,
+                        "reasoning_effort": reasoning_effort,
                         "access_policy": access_policy,
                         "workspace_path": workspace_path,
                     }));
@@ -685,6 +955,35 @@ impl HubState {
     }
 }
 
+fn validate_run_configuration(
+    engine: &str,
+    model: Option<&str>,
+    reasoning_effort: Option<&str>,
+    system_prompt: Option<&str>,
+    workspace_path: Option<&str>,
+) -> std::result::Result<(), String> {
+    validate_identifier("engine", engine)?;
+    if let Some(model) = model {
+        validate_identifier("model", model)?;
+    }
+    if let Some(effort) = reasoning_effort {
+        if !matches!(effort, "low" | "medium" | "high") {
+            return Err("reasoning_effort must be low, medium, or high".to_string());
+        }
+    }
+    if let Some(prompt) = system_prompt {
+        if prompt.is_empty() || prompt.len() > 128 * 1024 || prompt.contains('\0') {
+            return Err("system_prompt is empty, too large, or contains NUL".to_string());
+        }
+    }
+    if let Some(path) = workspace_path {
+        if !Path::new(path).is_absolute() || path.contains('\0') {
+            return Err("workspace_path must be an absolute path".to_string());
+        }
+    }
+    Ok(())
+}
+
 /// The result of applying one [`ClientCommand`]: the receipt to return to the
 /// issuing client, and any hub→node work to route. The resulting event, when
 /// new, has already been broadcast to all subscribers.
@@ -712,10 +1011,238 @@ pub fn router(state: Arc<HubState>) -> Router {
         .route("/", get(control_panel))
         .route("/health", get(health))
         .route("/v1/nodes", get(list_nodes))
+        .route(
+            "/v1/settings/assistant",
+            get(get_assistant_settings).put(put_assistant_settings),
+        )
+        .route(
+            "/v1/settings/update",
+            get(get_update_settings).put(put_update_settings),
+        )
+        .route("/v1/admin/update", get(check_update).post(apply_update))
         .route("/v1/admin/install", post(install_node))
         .route("/v1/node/connect", get(node_connect))
         .route("/v1/client/connect", get(client_connect))
         .with_state(state)
+}
+
+async fn get_assistant_settings(State(state): State<Arc<HubState>>, headers: HeaderMap) -> Response {
+    if !state.accepts_client(bearer(&headers)) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "invalid client token"})),
+        )
+            .into_response();
+    }
+    match state.assistant_settings() {
+        Ok(settings) => Json(json!({"assistant": settings})).into_response(),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": error.message()})),
+        )
+            .into_response(),
+    }
+}
+
+async fn put_assistant_settings(
+    State(state): State<Arc<HubState>>,
+    headers: HeaderMap,
+    Json(settings): Json<AssistantSettings>,
+) -> Response {
+    if !state.accepts_client(bearer(&headers)) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "invalid client token"})),
+        )
+            .into_response();
+    }
+    match state.save_assistant_settings(&settings) {
+        Ok(()) => Json(json!({"ok": true, "assistant": settings})).into_response(),
+        Err(error) => (StatusCode::BAD_REQUEST, Json(json!({"error": error.message()}))).into_response(),
+    }
+}
+
+async fn get_update_settings(State(state): State<Arc<HubState>>, headers: HeaderMap) -> Response {
+    if !state.accepts_client(bearer(&headers)) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "invalid client token"})),
+        )
+            .into_response();
+    }
+    match state.update_settings() {
+        Ok(settings) => Json(json!({
+            "updates": settings,
+            "current_version": stackhour_core::VERSION,
+        }))
+        .into_response(),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": error.message()})),
+        )
+            .into_response(),
+    }
+}
+
+async fn put_update_settings(
+    State(state): State<Arc<HubState>>,
+    headers: HeaderMap,
+    Json(settings): Json<UpdateSettings>,
+) -> Response {
+    if !state.accepts_client(bearer(&headers)) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "invalid client token"})),
+        )
+            .into_response();
+    }
+    match state.save_update_settings(&settings) {
+        Ok(()) => Json(json!({"ok": true, "updates": settings})).into_response(),
+        Err(error) => (StatusCode::BAD_REQUEST, Json(json!({"error": error.message()}))).into_response(),
+    }
+}
+
+async fn check_update(State(state): State<Arc<HubState>>, headers: HeaderMap) -> Response {
+    if !state.accepts_client(bearer(&headers)) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "invalid client token"})),
+        )
+            .into_response();
+    }
+    match tokio::task::spawn_blocking(check_official_update).await {
+        Ok(Ok(info)) => Json(json!({"update": info})).into_response(),
+        Ok(Err(error)) => (StatusCode::BAD_GATEWAY, Json(json!({"error": error.message()}))).into_response(),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("update check failed: {error}")})),
+        )
+            .into_response(),
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct UpdateRequest {
+    #[serde(default)]
+    include_nodes: Option<bool>,
+}
+
+async fn apply_update(
+    State(state): State<Arc<HubState>>,
+    headers: HeaderMap,
+    Json(request): Json<UpdateRequest>,
+) -> Response {
+    if !state.accepts_client(bearer(&headers)) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "invalid client token"})),
+        )
+            .into_response();
+    }
+    let include_nodes = request
+        .include_nodes
+        .or_else(|| {
+            state
+                .update_settings()
+                .ok()
+                .map(|settings| settings.include_nodes)
+        })
+        .unwrap_or(true);
+    match tokio::task::spawn_blocking(move || trigger_update(&state, include_nodes)).await {
+        Ok(Ok(result)) => (StatusCode::ACCEPTED, Json(result)).into_response(),
+        Ok(Err(error)) => (StatusCode::BAD_GATEWAY, Json(json!({"error": error.message()}))).into_response(),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("update request failed: {error}")})),
+        )
+            .into_response(),
+    }
+}
+
+fn check_official_update() -> Result<UpdateInfo> {
+    let executable =
+        std::env::current_exe().map_err(|error| Error::msg(format!("cannot locate stackhour: {error}")))?;
+    let output = Command::new(executable)
+        .args(["control", "update", "--check", "--json"])
+        .output()
+        .map_err(|error| Error::msg(format!("cannot start update check: {error}")))?;
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(Error::msg(if error.is_empty() {
+            "update check failed".to_string()
+        } else {
+            error
+        }));
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|error| Error::msg(format!("update check returned invalid data: {error}")))
+}
+
+fn trigger_update(state: &HubState, include_nodes: bool) -> Result<Value> {
+    let info = check_official_update()?;
+    if !info.update_available {
+        return Ok(json!({
+            "ok": true,
+            "scheduled": false,
+            "message": format!("Stackhour {} is already current.", info.current_version),
+            "update": info,
+        }));
+    }
+    let nodes = if include_nodes {
+        state.dispatch_update_to_nodes(&info.latest_version)
+    } else {
+        0
+    };
+    schedule_local_update(&info.latest_version)?;
+    Ok(json!({
+        "ok": true,
+        "scheduled": true,
+        "nodes_scheduled": nodes,
+        "message": format!("Stackhour {} update scheduled.", info.latest_version),
+        "update": info,
+    }))
+}
+
+fn schedule_local_update(version: &str) -> Result<()> {
+    if version.is_empty()
+        || version.len() > 80
+        || version
+            .chars()
+            .any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '+')))
+    {
+        return Err(Error::msg("official update version is invalid"));
+    }
+    let executable =
+        std::env::current_exe().map_err(|error| Error::msg(format!("cannot locate stackhour: {error}")))?;
+    let target = format!("--target-version={version}");
+    let status = if cfg!(target_os = "linux") {
+        Command::new("systemd-run")
+            .args([
+                "--user",
+                "--collect",
+                "--quiet",
+                "--unit=stackhour-control-update-hub",
+            ])
+            .arg(executable)
+            .args(["control", "update", "--role=all", &target])
+            .status()
+    } else if cfg!(target_os = "macos") {
+        let label = format!("stackhour-control-update-hub-{}", std::process::id());
+        Command::new("launchctl")
+            .args(["submit", "-l", &label, "--"])
+            .arg(executable)
+            .args(["control", "update", "--role=all", &target])
+            .status()
+    } else {
+        return Err(Error::msg("in-app updates require Linux or macOS"));
+    }
+    .map_err(|error| Error::msg(format!("cannot schedule update: {error}")))?;
+    if !status.success() {
+        return Err(Error::msg(format!(
+            "cannot schedule update: service manager exited {status}"
+        )));
+    }
+    Ok(())
 }
 
 async fn health() -> impl IntoResponse {
@@ -896,9 +1423,26 @@ async fn install_node(
 
 /// Serve the hub on an already-bound listener until the process ends.
 pub async fn serve(state: Arc<HubState>, listener: TcpListener) -> Result<()> {
-    axum::serve(listener, router(state))
+    let updater = tokio::spawn(automatic_update_loop(state.clone()));
+    let result = axum::serve(listener, router(state))
         .await
-        .map_err(|e| Error::msg(e.to_string()))
+        .map_err(|e| Error::msg(e.to_string()));
+    updater.abort();
+    result
+}
+
+async fn automatic_update_loop(state: Arc<HubState>) {
+    loop {
+        let settings = state.update_settings().unwrap_or_default();
+        if settings.automatic {
+            let update_state = state.clone();
+            let include_nodes = settings.include_nodes;
+            let _ = tokio::task::spawn_blocking(move || trigger_update(&update_state, include_nodes)).await;
+            tokio::time::sleep(Duration::from_secs(u64::from(settings.interval_hours) * 60 * 60)).await;
+        } else {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
+    }
 }
 
 /// Bind `addr`, learn the actual [`SocketAddr`] (so callers can pass port 0),
@@ -1299,6 +1843,9 @@ mod tests {
             task_id: task,
             node_id: node.clone(),
             engine: "acp".to_string(),
+            model: None,
+            reasoning_effort: None,
+            system_prompt: None,
             access_policy: AccessPolicy::Supervised,
             workspace_path: Some("/w".to_string()),
         });
@@ -1377,6 +1924,9 @@ mod tests {
             task_id: task,
             node_id: node.clone(),
             engine: "acp".to_string(),
+            model: Some("m".to_string()),
+            reasoning_effort: Some("high".to_string()),
+            system_prompt: Some("system".to_string()),
             access_policy: AccessPolicy::Supervised,
             workspace_path: Some("/w".to_string()),
         });
@@ -1393,8 +1943,111 @@ mod tests {
             .expect("durable run row exists");
         assert_eq!(run.task_id, task);
         assert_eq!(run.node_id, node);
+        assert_eq!(run.model.as_deref(), Some("m"));
+        assert_eq!(run.reasoning_effort.as_deref(), Some("high"));
+        assert_eq!(run.system_prompt.as_deref(), Some("system"));
         assert_eq!(run.access_policy, AccessPolicy::Supervised);
         assert_eq!(run.status, stackhour_domain::RunStatus::Started);
+    }
+
+    #[test]
+    fn assistant_settings_and_session_survive_database_reopen() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("hub.db");
+        let session = AssistantSession {
+            task_id: TaskId::new(),
+            run_id: Some(RunId::new()),
+            engine: "codex".to_string(),
+        };
+        {
+            let state = HubState::open(&path, "secret").unwrap();
+            let settings = AssistantSettings {
+                engine: "codex".to_string(),
+                codex_model: Some("gpt-5.6-luna".to_string()),
+                ..AssistantSettings::default()
+            };
+            state.save_assistant_settings(&settings).unwrap();
+            state.save_assistant_session("telegram.1", &session).unwrap();
+        }
+        let reopened = HubState::open(&path, "secret").unwrap();
+        assert_eq!(
+            reopened.assistant_settings().unwrap().codex_model.as_deref(),
+            Some("gpt-5.6-luna")
+        );
+        assert_eq!(reopened.assistant_session("telegram.1").unwrap(), Some(session));
+    }
+
+    #[test]
+    fn assistant_settings_reject_unsafe_models_and_relative_memory_commands() {
+        let state = state();
+        let mut settings = AssistantSettings {
+            codex_model: Some("luna; touch /tmp/x".to_string()),
+            ..AssistantSettings::default()
+        };
+        assert!(state.save_assistant_settings(&settings).is_err());
+
+        settings.codex_model = Some("gpt-5.6-luna".to_string());
+        settings.memory_enabled = true;
+        settings.memory_command = Some(".optmem/memo".to_string());
+        assert!(state.save_assistant_settings(&settings).is_err());
+    }
+
+    #[test]
+    fn update_settings_are_durable_and_bounded() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("hub.db");
+        {
+            let state = HubState::open(&path, "secret").unwrap();
+            state
+                .save_update_settings(&UpdateSettings {
+                    automatic: true,
+                    interval_hours: 6,
+                    include_nodes: false,
+                })
+                .unwrap();
+            assert!(state
+                .save_update_settings(&UpdateSettings {
+                    automatic: true,
+                    interval_hours: 0,
+                    include_nodes: true,
+                })
+                .is_err());
+        }
+        let reopened = HubState::open(&path, "secret").unwrap();
+        assert_eq!(
+            reopened.update_settings().unwrap(),
+            UpdateSettings {
+                automatic: true,
+                interval_hours: 6,
+                include_nodes: false,
+            }
+        );
+    }
+
+    #[test]
+    fn invalid_run_configuration_is_rejected_without_an_event_or_dispatch() {
+        let state = state();
+        let effect = state.apply_command(ClientCommand::StartRun {
+            command_id: CommandId::new(),
+            task_id: TaskId::new(),
+            node_id: NodeId::from("local"),
+            engine: "codex".to_string(),
+            model: Some("luna;bad".to_string()),
+            reasoning_effort: Some("extreme".to_string()),
+            system_prompt: None,
+            access_policy: AccessPolicy::Supervised,
+            workspace_path: None,
+        });
+        assert!(effect.dispatch.is_none());
+        assert!(matches!(
+            effect.receipt,
+            HubToClient::CommandReceipt {
+                accepted: false,
+                error: Some(ProtocolError::InvalidRequest { .. }),
+                ..
+            }
+        ));
+        assert!(state.read_events_after(0).unwrap().is_empty());
     }
 
     #[test]
@@ -1555,6 +2208,101 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn assistant_settings_api_requires_auth_and_persists_valid_changes() {
+        let state = HubState::in_memory_secured("node", "client").unwrap();
+        let unauthorized = router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/settings/assistant")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+        let settings = AssistantSettings {
+            engine: "codex".to_string(),
+            codex_model: Some("gpt-5.6-luna".to_string()),
+            ..AssistantSettings::default()
+        };
+        let response = router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/v1/settings/assistant")
+                    .header("content-type", "application/json")
+                    .header("authorization", "Bearer client")
+                    .body(Body::from(serde_json::to_vec(&settings).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            state.assistant_settings().unwrap().codex_model.as_deref(),
+            Some("gpt-5.6-luna")
+        );
+    }
+
+    #[tokio::test]
+    async fn update_settings_api_requires_auth_and_persists_policy() {
+        let state = HubState::in_memory_secured("node", "client").unwrap();
+        let unauthorized = router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/settings/update")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+        let settings = UpdateSettings {
+            automatic: true,
+            interval_hours: 12,
+            include_nodes: true,
+        };
+        let response = router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .method("PUT")
+                    .uri("/v1/settings/update")
+                    .header("content-type", "application/json")
+                    .header("authorization", "Bearer client")
+                    .body(Body::from(serde_json::to_vec(&settings).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(state.update_settings().unwrap(), settings);
+    }
+
+    #[tokio::test]
+    async fn update_admin_api_rejects_bad_auth_before_network_or_processes() {
+        for method in ["GET", "POST"] {
+            let response = router(HubState::in_memory_secured("node", "client").unwrap())
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri("/v1/admin/update")
+                        .header("content-type", "application/json")
+                        .body(if method == "POST" {
+                            Body::from("{}")
+                        } else {
+                            Body::empty()
+                        })
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        }
+    }
+
+    #[tokio::test]
     async fn node_api_returns_live_node_state() {
         let state = HubState::in_memory_secured("node", "client").unwrap();
         let hello = hello("devbox", "node", WIRE_PROTOCOL_VERSION);
@@ -1612,6 +2360,9 @@ mod tests {
             task_id: task,
             node_id: node.clone(),
             engine: "claude".to_string(),
+            model: None,
+            reasoning_effort: None,
+            system_prompt: None,
             access_policy: AccessPolicy::Automatic,
             workspace_path: None,
         });
@@ -1630,6 +2381,9 @@ mod tests {
             task_id: TaskId::new(),
             node_id: node.clone(),
             engine: "claude".to_string(),
+            model: None,
+            reasoning_effort: None,
+            system_prompt: None,
             access_policy: AccessPolicy::Automatic,
             workspace_path: None,
         });
@@ -1651,6 +2405,9 @@ mod tests {
                 task_id: TaskId::new(),
                 node_id: NodeId::from("laptop"),
                 engine: "codex".to_string(),
+                model: None,
+                reasoning_effort: None,
+                system_prompt: None,
                 access_policy: AccessPolicy::Automatic,
                 workspace_path: None,
             });

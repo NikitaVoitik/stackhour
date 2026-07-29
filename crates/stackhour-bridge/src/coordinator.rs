@@ -125,7 +125,18 @@ impl CoordCtx {
         self.cfg
             .targets
             .iter()
-            .map(|(name, t)| (name.clone(), t.label.clone()))
+            .map(|(name, target)| {
+                let mut label = target.machine.as_ref().map_or_else(
+                    || target.label.clone(),
+                    |machine| format!("{machine} / {}", target.label),
+                );
+                if target.machine.is_some() {
+                    if let Some(cwd) = &target.cwd {
+                        label.push_str(&format!(" · {cwd}"));
+                    }
+                }
+                (name.clone(), label)
+            })
             .collect()
     }
 
@@ -218,8 +229,13 @@ impl WorkerContext for CoordCtx {
 /// order for a legacy gcp+mac config — mac (the worker) preceded gcp (the
 /// local box) even though the config file listed gcp first.
 pub fn target_specs(cfg: &CoordinatorCfg) -> Vec<TargetSpec> {
-    let spec =
-        |(name, t): (&String, &TargetCfg)| TargetSpec::new(name.as_str(), t.label.as_str(), t.kind.as_str());
+    let spec = |(name, target): (&String, &TargetCfg)| {
+        let label = target.machine.as_ref().map_or_else(
+            || target.label.clone(),
+            |machine| format!("{machine} / {}", target.label),
+        );
+        TargetSpec::new(name.as_str(), label, target.kind.as_str()).with_icon(target.icon.clone())
+    };
     cfg.targets
         .iter()
         .filter(|(_, t)| t.kind != "local")

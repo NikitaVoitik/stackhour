@@ -185,8 +185,20 @@ const SCHEMA: &str = "
       ON pending_dispatches (node_id, created_at);
 ";
 
+const RUN_CONFIGURATION_AND_SETTINGS: &str = "
+    ALTER TABLE runs ADD COLUMN model TEXT;
+    ALTER TABLE runs ADD COLUMN reasoning_effort TEXT;
+    ALTER TABLE runs ADD COLUMN system_prompt TEXT;
+
+    CREATE TABLE control_settings (
+      key        TEXT PRIMARY KEY,
+      value      TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+";
+
 /// Latest control-plane database schema understood by this binary.
-pub const LATEST_HUB_SCHEMA_VERSION: i64 = 1;
+pub const LATEST_HUB_SCHEMA_VERSION: i64 = 2;
 
 const MIGRATIONS_DDL: &str = "
     CREATE TABLE IF NOT EXISTS stackhour_hub_schema_migrations (
@@ -196,8 +208,14 @@ const MIGRATIONS_DDL: &str = "
     );
 ";
 
-const MIGRATIONS: [(i64, &str, &str); LATEST_HUB_SCHEMA_VERSION as usize] =
-    [(1, "create control-plane schema", SCHEMA)];
+const MIGRATIONS: [(i64, &str, &str); LATEST_HUB_SCHEMA_VERSION as usize] = [
+    (1, "create control-plane schema", SCHEMA),
+    (
+        2,
+        "add run model configuration and control settings",
+        RUN_CONFIGURATION_AND_SETTINGS,
+    ),
+];
 
 fn applied_migrations(conn: &Connection) -> Result<Vec<(i64, String)>> {
     let mut stmt = conn
@@ -570,6 +588,9 @@ impl Hub {
             task_id: *task_id,
             node_id: node_id.clone(),
             engine: engine.to_string(),
+            model: None,
+            reasoning_effort: None,
+            system_prompt: None,
             access_policy,
             workspace_path: None,
             status: RunStatus::Started,
@@ -592,13 +613,49 @@ impl Hub {
     pub fn get_run(&self, id: &RunId) -> Result<Option<Run>> {
         self.conn
             .query_row(
-                "SELECT run_id, task_id, node_id, engine, access_policy, workspace_path, status, started_at
+                "SELECT run_id, task_id, node_id, engine, model, reasoning_effort,
+                        system_prompt, access_policy, workspace_path, status, started_at
                  FROM runs WHERE run_id = ?1",
                 params![id.to_string()],
                 row_to_run,
             )
             .optional()
             .map_err(sql_err)
+    }
+
+    /// Read one opaque JSON setting owned by the control plane.
+    pub fn get_setting(&self, key: &str) -> Result<Option<Value>> {
+        let encoded: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT value FROM control_settings WHERE key = ?1",
+                params![key],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(sql_err)?;
+        encoded
+            .map(|value| {
+                serde_json::from_str(&value)
+                    .map_err(|error| Error::msg(format!("bad control setting {key:?}: {error}")))
+            })
+            .transpose()
+    }
+
+    /// Atomically create or replace one control-plane JSON setting.
+    pub fn put_setting(&mut self, key: &str, value: &Value) -> Result<()> {
+        let encoded = serde_json::to_string(value)?;
+        self.conn
+            .execute(
+                "INSERT INTO control_settings (key, value, updated_at)
+                 VALUES (?1, ?2, ?3)
+                 ON CONFLICT(key) DO UPDATE SET
+                   value = excluded.value,
+                   updated_at = excluded.updated_at",
+                params![key, encoded, fmt_time(Utc::now())],
+            )
+            .map_err(sql_err)?;
+        Ok(())
     }
 
     // --- approvals --------------------------------------------------------
@@ -868,6 +925,9 @@ fn row_to_run(row: &Row<'_>) -> rusqlite::Result<Run> {
         task_id: req_id::<TaskId>(row.get("task_id")?)?,
         node_id: NodeId(row.get::<_, String>("node_id")?),
         engine: row.get("engine")?,
+        model: row.get("model")?,
+        reasoning_effort: row.get("reasoning_effort")?,
+        system_prompt: row.get("system_prompt")?,
         access_policy: AccessPolicy::from_db(&row.get::<_, String>("access_policy")?)
             .map_err(|e| conv_err(e.message().to_string()))?,
         workspace_path: row.get("workspace_path")?,
@@ -899,13 +959,19 @@ fn insert_task_row(conn: &Connection, task: &Task) -> Result<()> {
 /// connection-or-transaction contract as [`insert_task_row`].
 fn insert_run_row(conn: &Connection, run: &Run) -> Result<()> {
     conn.execute(
-        "INSERT INTO runs (run_id, task_id, node_id, engine, access_policy, workspace_path, status, started_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO runs (
+           run_id, task_id, node_id, engine, model, reasoning_effort,
+           system_prompt, access_policy, workspace_path, status, started_at
+         )
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             run.id.to_string(),
             run.task_id.to_string(),
             run.node_id.as_str(),
             run.engine,
+            run.model,
+            run.reasoning_effort,
+            run.system_prompt,
             run.access_policy.as_str(),
             run.workspace_path,
             run.status.as_str(),

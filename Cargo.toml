@@ -40,6 +40,8 @@ constant_time_eq = "0.3"
 hostname = "0.4"
 rustix = { version = "1", features = ["process", "termios"] }
 anyhow = "1"
+semver = "1"
+sha2 = "0.10"
 
 # Test-only.
 tempfile = "3"

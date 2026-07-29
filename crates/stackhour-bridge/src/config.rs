@@ -14,6 +14,10 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct TargetCfg {
     pub label: String,
+    /// Physical machine name used to group several workspaces on one host.
+    pub machine: Option<String>,
+    /// Optional explicit UI icon. When absent, the target kind supplies one.
+    pub icon: Option<String>,
     /// `local` | `remote`.
     pub kind: String,
     pub cwd: Option<String>,
@@ -81,11 +85,37 @@ pub struct WorkerCfg {
 
 /// The systemd unit name the coordinator installs as.
 pub const SERVICE_NAME: &str = "stackhour-bridge.service";
-/// The systemd unit name a LINUX pull-worker installs as. NEW vs the Node
-/// bridge, whose worker installer was macOS-only.
-pub const WORKER_SERVICE_NAME: &str = "stackhour-bridge-worker.service";
-/// The launchd label the mac worker installs as.
-pub const LAUNCHD_LABEL: &str = "com.stackhour.bridge-worker";
+
+/// The stable, per-target service instance used by both systemd and launchd.
+pub fn worker_service_instance(target: Option<&str>) -> Result<String> {
+    let instance = target.filter(|value| !value.is_empty()).unwrap_or("default");
+    if instance.len() > 80
+        || instance
+            .chars()
+            .any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.')))
+    {
+        return Err(stackhour_core::Error::msg(
+            "worker target contains unsupported service-name characters",
+        ));
+    }
+    Ok(instance.to_string())
+}
+
+/// The systemd user unit for a worker target.
+pub fn worker_service_name(target: Option<&str>) -> Result<String> {
+    Ok(format!(
+        "stackhour-bridge-worker@{}.service",
+        worker_service_instance(target)?
+    ))
+}
+
+/// The launchd label for a worker target.
+pub fn worker_launchd_label(target: Option<&str>) -> Result<String> {
+    Ok(format!(
+        "com.stackhour.bridge-worker.{}",
+        worker_service_instance(target)?
+    ))
+}
 
 /// `CONFIG.maxMediaBytes || 512 * 1024 * 1024` — JS `||`, so 0 falls back too.
 const DEFAULT_MAX_MEDIA_BYTES: u64 = 512 * 1024 * 1024;
@@ -147,6 +177,8 @@ pub fn load_coordinator_cfg(path: &Path) -> Result<CoordinatorCfg> {
                 TargetCfg {
                     // `targets[name]?.label || name` — the Node label() fallback.
                     label: truthy_str(t, "label").unwrap_or_else(|| name.clone()),
+                    machine: truthy_str(t, "machine"),
+                    icon: truthy_str(t, "icon"),
                     // The JSON key is `type`; `kind` is the Rust-side name.
                     kind: target_kind(name, t),
                     cwd: truthy_str(t, "cwd"),
@@ -372,6 +404,28 @@ fn systemd_quote(s: &str) -> String {
     format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
+/// Escape an absolute path for a systemd directive whose value must remain an
+/// unquoted absolute path.
+fn systemd_absolute_path(path: &str) -> Result<String> {
+    if !Path::new(path).is_absolute() {
+        return Err(stackhour_core::Error::msg("dir must be an absolute path"));
+    }
+    if path.chars().any(char::is_control) {
+        return Err(stackhour_core::Error::msg(
+            "dir must not contain control characters",
+        ));
+    }
+    let mut escaped = String::with_capacity(path.len());
+    for ch in path.chars() {
+        if ch.is_ascii_whitespace() || matches!(ch, '\\' | '"' | '\'') {
+            escaped.push_str(&format!("\\x{:02x}", ch as u32));
+        } else {
+            escaped.push(ch);
+        }
+    }
+    Ok(escaped)
+}
+
 /// Render the coordinator's systemd unit text (double-quote escaping,
 /// newline rejection).
 ///
@@ -403,6 +457,7 @@ fn render_systemd_unit_for(role: &str, exec: &str, dir: &str, home: &str, path: 
             )));
         }
     }
+    let dir_value = systemd_absolute_path(dir)?;
     Ok(format!(
         "[Unit]\n\
          Description=Stackhour Telegram bridge {role} for Claude Code and Codex\n\
@@ -411,8 +466,8 @@ fn render_systemd_unit_for(role: &str, exec: &str, dir: &str, home: &str, path: 
          \n\
          [Service]\n\
          Type=simple\n\
-         WorkingDirectory={dir_q}\n\
-         ExecStart={exec_q} bridge {role}\n\
+         WorkingDirectory={dir_value}\n\
+         ExecStart={exec_q} bridge {role} --runtime-dir {runtime_dir_q}\n\
          Restart=always\n\
          RestartSec=5\n\
          UMask=0077\n\
@@ -421,8 +476,8 @@ fn render_systemd_unit_for(role: &str, exec: &str, dir: &str, home: &str, path: 
          \n\
          [Install]\n\
          WantedBy=default.target\n",
-        dir_q = systemd_quote(dir),
         exec_q = systemd_quote(exec),
+        runtime_dir_q = systemd_quote(dir),
         home_q = systemd_quote(&format!("HOME={home}")),
         path_q = systemd_quote(&format!("PATH={path}")),
     ))
@@ -441,9 +496,16 @@ fn xml_escape(s: &str) -> String {
 ///
 /// As with the systemd unit, `exec` is the stackhour binary: the agent runs
 /// `<exec> bridge worker`.
-pub fn render_launch_agent(exec: &str, dir: &str, home: &str, path: &str) -> String {
+pub fn render_launch_agent(
+    exec: &str,
+    dir: &str,
+    home: &str,
+    path: &str,
+    target: Option<&str>,
+) -> Result<String> {
     let x = xml_escape;
-    format!(
+    let label = worker_launchd_label(target)?;
+    Ok(format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -455,6 +517,8 @@ pub fn render_launch_agent(exec: &str, dir: &str, home: &str, path: &str) -> Str
     <string>{exec}</string>
     <string>bridge</string>
     <string>worker</string>
+    <string>--runtime-dir</string>
+    <string>{runtime_dir}</string>
   </array>
   <key>WorkingDirectory</key>
   <string>{dir}</string>
@@ -478,14 +542,15 @@ pub fn render_launch_agent(exec: &str, dir: &str, home: &str, path: &str) -> Str
 </dict>
 </plist>
 "#,
-        label = LAUNCHD_LABEL,
+        label = x(&label),
         exec = x(exec),
+        runtime_dir = x(dir),
         dir = x(dir),
         home = x(home),
         path = x(path),
         out = x(&format!("{}/worker.launchd.out.log", dir.trim_end_matches('/'))),
         err = x(&format!("{}/worker.launchd.err.log", dir.trim_end_matches('/'))),
-    )
+    ))
 }
 
 /// `find_executable`: PATH search for a bare binary name.
@@ -953,7 +1018,13 @@ mod tests {
         )
         .unwrap();
         assert!(
-            unit.contains(r#"ExecStart="/usr/local/bin/stackhour" bridge coordinator"#),
+            unit.contains(
+                r#"ExecStart="/usr/local/bin/stackhour" bridge coordinator --runtime-dir "/home/me/.local/share/stackhour/bridge""#
+            ),
+            "{unit}"
+        );
+        assert!(
+            unit.contains("WorkingDirectory=/home/me/.local/share/stackhour/bridge"),
             "{unit}"
         );
         assert!(unit.contains("WantedBy=default.target"));
@@ -977,7 +1048,9 @@ mod tests {
         )
         .unwrap();
         assert!(
-            unit.contains(r#"ExecStart="/usr/local/bin/stackhour" bridge worker"#),
+            unit.contains(
+                r#"ExecStart="/usr/local/bin/stackhour" bridge worker --runtime-dir "/home/me/.local/share/stackhour/bridge""#
+            ),
             "{unit}"
         );
         assert!(unit.contains("bridge worker for Claude Code and Codex"), "{unit}");
@@ -1009,12 +1082,15 @@ mod tests {
             "/Users/me/A & B",
             "/Users/me",
             "/usr/bin:/bin",
-        );
-        assert!(plist.contains(LAUNCHD_LABEL));
+            Some("blort"),
+        )
+        .unwrap();
+        assert!(plist.contains("com.stackhour.bridge-worker.blort"));
         assert!(plist.contains("node&amp;tools"), "{plist}");
         assert!(plist.contains("A &amp; B"), "{plist}");
         assert!(plist.contains("<string>bridge</string>"));
         assert!(plist.contains("<string>worker</string>"));
+        assert!(plist.contains("<string>--runtime-dir</string>"));
         assert!(
             plist.contains("/Users/me/A &amp; B/worker.launchd.out.log"),
             "{plist}"
@@ -1022,6 +1098,30 @@ mod tests {
         for bad in ["__HOME__", "__NODE__", "worker.mjs"] {
             assert!(!plist.contains(bad), "{bad} leaked:\n{plist}");
         }
+    }
+
+    #[test]
+    fn worker_service_identity_is_per_target_and_validated() {
+        assert_eq!(
+            worker_service_name(Some("gcp")).unwrap(),
+            "stackhour-bridge-worker@gcp.service"
+        );
+        assert_eq!(
+            worker_service_name(Some("blort")).unwrap(),
+            "stackhour-bridge-worker@blort.service"
+        );
+        assert_ne!(
+            worker_launchd_label(Some("gcp")).unwrap(),
+            worker_launchd_label(Some("blort")).unwrap()
+        );
+        assert!(worker_service_name(Some("bad target; reboot")).is_err());
+    }
+
+    #[test]
+    fn systemd_working_directory_is_bare_and_escaped() {
+        let unit = render_systemd_unit("/bin/true", "/home/me/A B", "/home/me", "/bin").unwrap();
+        assert!(unit.contains("WorkingDirectory=/home/me/A\\x20B"), "{unit}");
+        assert!(!unit.contains("WorkingDirectory=\""), "{unit}");
     }
 
     #[test]

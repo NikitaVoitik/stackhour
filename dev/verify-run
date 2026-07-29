@@ -72,6 +72,7 @@ run_deep() {
 
 run_release() {
     run_deep
+    step systemd-units dev/test-systemd-units.sh
     step release-build cargo build --workspace --all-features --release --locked
     step release-tests cargo test --workspace --all-features --release --locked
     step release-package dev/test-release-package.sh

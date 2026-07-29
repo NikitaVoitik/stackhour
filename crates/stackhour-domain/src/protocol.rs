@@ -93,6 +93,15 @@ pub enum ClientCommand {
         node_id: NodeId,
         /// The engine/agent label (e.g. an ACP agent name).
         engine: String,
+        /// Optional provider model selected for this run.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        /// Optional reasoning-effort setting.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reasoning_effort: Option<String>,
+        /// Optional trusted system prompt.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        system_prompt: Option<String>,
         /// The access policy the run executes under.
         access_policy: AccessPolicy,
         /// An optional node-local checkout path for the run.
@@ -350,7 +359,8 @@ pub enum HubToNode {
 }
 
 /// The concrete work carried by a [`HubToNode::DispatchCommand`]. Phase-1
-/// scope: start a run, send a prompt, or interrupt a run.
+/// scope: start a run, send a prompt, interrupt a run, or install one
+/// coordinator-selected official release.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NodeWork {
@@ -362,6 +372,15 @@ pub enum NodeWork {
         task_id: TaskId,
         /// The engine/agent to launch.
         engine: String,
+        /// Optional provider model selected for this run.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        /// Optional reasoning-effort setting.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reasoning_effort: Option<String>,
+        /// Optional trusted system prompt.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        system_prompt: Option<String>,
         /// The access policy to enforce.
         access_policy: AccessPolicy,
         /// The node-local checkout path, when configured.
@@ -383,6 +402,13 @@ pub enum NodeWork {
     InterruptRun {
         /// The run to interrupt.
         run_id: RunId,
+    },
+    /// Install an official Stackhour release and restart this node.
+    Update {
+        /// Exact semantic version selected from Stackhour's fixed official
+        /// release endpoint. The node independently re-discovers and verifies
+        /// that release before replacing its binary.
+        version: String,
     },
 }
 
@@ -424,6 +450,11 @@ pub enum ProtocolError {
     /// The referenced work or approval is no longer actionable (past its
     /// expiry).
     Expired,
+    /// An authenticated command carried invalid or unsupported input.
+    InvalidRequest {
+        /// A safe explanation suitable for an operator client.
+        message: String,
+    },
 }
 
 impl fmt::Display for ProtocolError {
@@ -439,6 +470,9 @@ impl fmt::Display for ProtocolError {
                 write!(f, "unknown approval: {approval_id}")
             }
             ProtocolError::Expired => f.write_str("request expired"),
+            ProtocolError::InvalidRequest { message } => {
+                write!(f, "invalid request: {message}")
+            }
         }
     }
 }
@@ -542,7 +576,7 @@ mod tests {
     #[test]
     fn wire_protocol_version_tracks_the_event_protocol_version() {
         assert_eq!(WIRE_PROTOCOL_VERSION, PROTOCOL_VERSION);
-        assert_eq!(WIRE_PROTOCOL_VERSION, 1);
+        assert_eq!(WIRE_PROTOCOL_VERSION, 3);
     }
 
     // --- top-level message enums: tag + round-trip -------------------------
@@ -571,6 +605,9 @@ mod tests {
                 task_id: TaskId::new(),
                 node_id: NodeId::from("laptop"),
                 engine: "acp".to_string(),
+                model: Some("claude-opus".to_string()),
+                reasoning_effort: Some("high".to_string()),
+                system_prompt: Some("Be concise.".to_string()),
                 access_policy: AccessPolicy::Supervised,
                 workspace_path: Some("/home/nikita/proj".to_string()),
             },
@@ -614,6 +651,9 @@ mod tests {
                 task_id: TaskId::new(),
                 node_id: NodeId::from("n"),
                 engine: "acp".to_string(),
+                model: None,
+                reasoning_effort: None,
+                system_prompt: None,
                 access_policy: AccessPolicy::Automatic,
                 workspace_path: None,
             },
@@ -684,6 +724,9 @@ mod tests {
                     run_id: RunId::new(),
                     task_id: TaskId::new(),
                     engine: "acp".to_string(),
+                    model: None,
+                    reasoning_effort: None,
+                    system_prompt: None,
                     access_policy: AccessPolicy::Supervised,
                     workspace_path: Some("/w".to_string()),
                 },
@@ -714,6 +757,9 @@ mod tests {
                 run_id: RunId::new(),
                 task_id: TaskId::new(),
                 engine: "acp".to_string(),
+                model: None,
+                reasoning_effort: None,
+                system_prompt: None,
                 access_policy: AccessPolicy::FullAccess,
                 workspace_path: None,
             },
@@ -729,6 +775,12 @@ mod tests {
             "send_prompt",
         );
         assert_tag_and_round_trip(&NodeWork::InterruptRun { run_id: RunId::new() }, "interrupt_run");
+        assert_tag_and_round_trip(
+            &NodeWork::Update {
+                version: "0.3.0".to_string(),
+            },
+            "update",
+        );
     }
 
     #[test]
@@ -745,6 +797,12 @@ mod tests {
             "unknown_task",
         );
         assert_tag_and_round_trip(&ProtocolError::Expired, "expired");
+        assert_tag_and_round_trip(
+            &ProtocolError::InvalidRequest {
+                message: "bad model".to_string(),
+            },
+            "invalid_request",
+        );
     }
 
     // --- the durable payloads survive the wire, DateTime included ----------

@@ -20,7 +20,7 @@ use stackhour_core::fsutil;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use crate::config::{self, validate_coordinator_config, validate_worker_config, LAUNCHD_LABEL, SERVICE_NAME};
+use crate::config::{self, validate_coordinator_config, validate_worker_config, SERVICE_NAME};
 
 /// The usage banner, byte for byte the Node `usage()` template (cli.mjs).
 pub const USAGE: &str = "stackhour bridge — install and operate the Telegram Claude + Codex bridge\n\
@@ -117,7 +117,9 @@ pub fn run_bridge_cli(args: &[String]) -> i32 {
     match command {
         "install" => run_install(role, args),
         "doctor" => crate::doctor::run_doctor(role, &resolve_runtime_dir(parsed.runtime_dir.as_deref())),
-        verb => crate::doctor::run_service_cmd(role, verb),
+        verb => {
+            crate::doctor::run_service_cmd(role, verb, &resolve_runtime_dir(parsed.runtime_dir.as_deref()))
+        }
     }
 }
 
@@ -220,6 +222,11 @@ fn install(role: &str, opts: &InstallOpts) -> Result<(), String> {
         install_coordinator_service(&cfg, &opts.runtime_dir, &home, !opts.no_start)?;
     } else {
         install_worker_service(&cfg, &opts.runtime_dir, &home, !opts.no_start)?;
+    }
+    if !opts.no_start && crate::doctor::run_doctor(role, &opts.runtime_dir) != 0 {
+        return Err(format!(
+            "The {role} service was installed but failed its post-install doctor."
+        ));
     }
     println!("\n✓ {role} installed in {}", opts.runtime_dir.display());
     println!("  Run: stackhour bridge doctor {role}");
@@ -901,6 +908,24 @@ fn install_systemd_user_unit(
     run_cmd("systemctl", &["--user", "daemon-reload"])?;
     if start {
         run_cmd("systemctl", &["--user", "enable", "--now", unit_name])?;
+        let mut active = false;
+        for _ in 0..10 {
+            active = std::process::Command::new("systemctl")
+                .args(["--user", "is-active", "--quiet", unit_name])
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false);
+            if active {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        if !active {
+            let _ = std::process::Command::new("journalctl")
+                .args(["--user-unit", unit_name, "-n", "40", "--no-pager"])
+                .status();
+            return Err(format!("{unit_name} did not become active after installation"));
+        }
     }
     println!("Installed user service: {}", unit_path.display());
     if config::find_executable("loginctl").is_some() {
@@ -962,16 +987,23 @@ fn install_worker_service(
         .get("extraPath")
         .and_then(Value::as_str)
         .unwrap_or_default();
+    let target = config
+        .get("target")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty());
     if cfg!(target_os = "macos") {
+        let label = config::worker_launchd_label(target).map_err(|error| error.message().to_string())?;
         let agents = home.join("Library").join("LaunchAgents");
         ensure_dir(&agents, 0o755)?;
-        let plist_path = agents.join(format!("{LAUNCHD_LABEL}.plist"));
+        let plist_path = agents.join(format!("{label}.plist"));
         let plist = config::render_launch_agent(
             &exec.display().to_string(),
             &runtime_dir.display().to_string(),
             &home.display().to_string(),
             extra_path,
-        );
+            target,
+        )
+        .map_err(|error| error.message().to_string())?;
         fsutil::atomic_write_0600(&plist_path, plist.as_bytes())
             .map_err(|e| format!("{}: {e}", plist_path.display()))?;
         let plist_str = plist_path.display().to_string();
@@ -979,12 +1011,17 @@ fn install_worker_service(
         if start {
             let domain = format!("gui/{}", uid());
             // bootout is allowFailure: it fails when nothing is loaded yet.
-            let _ = run_cmd("launchctl", &["bootout", &format!("{domain}/{LAUNCHD_LABEL}")]);
+            let _ = run_cmd("launchctl", &["bootout", &format!("{domain}/{label}")]);
             run_cmd("launchctl", &["bootstrap", &domain, &plist_str])?;
-            run_cmd(
-                "launchctl",
-                &["kickstart", "-k", &format!("{domain}/{LAUNCHD_LABEL}")],
-            )?;
+            run_cmd("launchctl", &["kickstart", "-k", &format!("{domain}/{label}")])?;
+            if !std::process::Command::new("launchctl")
+                .args(["print", &format!("{domain}/{label}")])
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false)
+            {
+                return Err(format!("{label} was not healthy after installation"));
+            }
         }
         println!("Installed LaunchAgent: {}", plist_path.display());
         Ok(())
@@ -996,7 +1033,8 @@ fn install_worker_service(
             extra_path,
         )
         .map_err(|e| e.message().to_string())?;
-        install_systemd_user_unit(config::WORKER_SERVICE_NAME, &unit, home, start, "worker")
+        let unit_name = config::worker_service_name(target).map_err(|error| error.message().to_string())?;
+        install_systemd_user_unit(&unit_name, &unit, home, start, "worker")
     } else {
         Err("The worker service installer requires macOS (launchd) or Linux (systemd).".to_string())
     }

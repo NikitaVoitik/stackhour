@@ -19,12 +19,16 @@ mod bridge_migrate;
 mod control;
 #[cfg(feature = "control")]
 mod control_install;
+#[cfg(feature = "control")]
+mod control_update;
 mod doctor;
 mod doctor_checks;
 mod init;
 mod install;
 #[cfg(feature = "tracker")]
 mod status;
+#[cfg(feature = "tracker")]
+mod tempo_migrate;
 #[cfg(feature = "tracker")]
 mod token;
 
@@ -57,6 +61,8 @@ const HELP: &str = concat!(
     "                                   create and verify a consistent snapshot\n",
     "  backup verify FILE               integrity-check a backup\n",
     "  backup restore FILE [--confirm]  preview or restore, preserving old DB\n",
+    "  migrate tempo --from=FILE [--to=FILE]\n",
+    "                                   online-copy a Tempo SQLite database\n",
     "  install <server|agent>           install and start user service(s)\n",
     "  bridge install <coordinator|worker> [--reconfigure] [--no-start]\n",
     "                                   set up the Telegram Claude/Codex bridge\n",
@@ -215,6 +221,13 @@ fn main() -> ExitCode {
             });
             deferred(cmd, result)
         }
+        #[cfg(feature = "tracker")]
+        "migrate" if tail.first().map(String::as_str) == Some("tempo") => {
+            let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
+            let result = stackhour_core::config::load_config(&paths.config_path)
+                .and_then(|cfg| tempo_migrate::run(&tail[1..], &cfg));
+            deferred("migrate tempo", result)
+        }
 
         // ---------------------------------------------------------------
         // Verbs below the `const cfg = loadConfig()` line: a corrupt
@@ -361,6 +374,9 @@ fn main() -> ExitCode {
         "control" => {
             if tail.first().map(String::as_str) == Some("install") {
                 return deferred("control install", control_install::run(&tail[1..]));
+            }
+            if tail.first().map(String::as_str) == Some("update") {
+                return deferred("control update", control_update::run(&tail[1..]));
             }
             let paths = stackhour_core::paths::resolve_storage_paths_from_process_env();
             let result = stackhour_core::config::load_config(&paths.config_path)

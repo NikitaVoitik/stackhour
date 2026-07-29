@@ -172,7 +172,9 @@ pub fn from_config_file(path: &Path) -> ModuleSet {
 /// services owned by two different modules. See `service_roles_for`.
 pub fn module_for(verb: &str, sub: Option<&str>) -> Option<Module> {
     match verb {
-        "serve" | "status" | "token" | "data" | "backup" | "import-wakatime" => Some(Module::Tracker),
+        "serve" | "status" | "token" | "data" | "backup" | "migrate" | "import-wakatime" => {
+            Some(Module::Tracker)
+        }
         "agent" => Some(Module::Agent),
         "bridge" => Some(Module::Bridge),
         "control" => Some(Module::Control),
@@ -218,7 +220,9 @@ pub fn service_roles_for(role: &str) -> &'static [(&'static str, Module)] {
 /// The role is included only for the two role-dependent verbs.
 pub fn invocation_label(verb: &str, sub: Option<&str>) -> String {
     match (verb, sub) {
-        ("init" | "install", Some(role @ ("server" | "agent"))) => format!("{verb} {role}"),
+        ("init" | "install", Some(role @ ("server" | "agent"))) | ("migrate", Some(role @ "tempo")) => {
+            format!("{verb} {role}")
+        }
         _ => verb.to_string(),
     }
 }

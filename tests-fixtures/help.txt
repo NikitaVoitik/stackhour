@@ -24,6 +24,8 @@ usage: stackhour <command>
                                    create and verify a consistent snapshot
   backup verify FILE               integrity-check a backup
   backup restore FILE [--confirm]  preview or restore, preserving old DB
+  migrate tempo --from=FILE [--to=FILE]
+                                   online-copy a Tempo SQLite database
   install <server|agent>           install and start user service(s)
   bridge install <coordinator|worker> [--reconfigure] [--no-start]
                                    set up the Telegram Claude/Codex bridge

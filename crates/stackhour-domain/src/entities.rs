@@ -211,6 +211,12 @@ pub struct Run {
     pub node_id: NodeId,
     /// The engine/agent label (e.g. an ACP agent name).
     pub engine: String,
+    /// Optional provider model selected for this run.
+    pub model: Option<String>,
+    /// Optional provider reasoning-effort setting.
+    pub reasoning_effort: Option<String>,
+    /// Optional trusted system prompt supplied by the authenticated client.
+    pub system_prompt: Option<String>,
     /// The access policy in force for this run.
     pub access_policy: AccessPolicy,
     /// The workspace/checkout path the run executes against, if configured. The

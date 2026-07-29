@@ -250,8 +250,9 @@ fn coordinator_install_writes_config_runtime_and_unit() {
     let unit = std::fs::read_to_string(&unit_path).expect("unit file written");
     assert!(
         unit.contains(&format!(
-            "ExecStart=\"{}\" bridge coordinator",
-            rt.join("stackhour").display()
+            "ExecStart=\"{}\" bridge coordinator --runtime-dir \"{}\"",
+            rt.join("stackhour").display(),
+            rt.display()
         )),
         "{unit}"
     );
@@ -456,13 +457,14 @@ fn worker_install_on_linux_writes_config_and_a_systemd_unit() {
     let unit = std::fs::read_to_string(
         sb.home
             .path()
-            .join(".config/systemd/user/stackhour-bridge-worker.service"),
+            .join(".config/systemd/user/stackhour-bridge-worker@attic.service"),
     )
     .expect("worker unit written");
     assert!(
         unit.contains(&format!(
-            "ExecStart=\"{}\" bridge worker",
-            rt.join("stackhour").display()
+            "ExecStart=\"{}\" bridge worker --runtime-dir \"{}\"",
+            rt.join("stackhour").display(),
+            rt.display()
         )),
         "{unit}"
     );

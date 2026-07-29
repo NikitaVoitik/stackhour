@@ -78,29 +78,76 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-musl
+            flavor: full
           - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
+            target: aarch64-unknown-linux-musl
+            flavor: full
           - runner: macos-15
             target: aarch64-apple-darwin
+            flavor: full
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            flavor: bridge
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            flavor: bridge
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            flavor: bridge
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
+      - name: Install static Linux linker
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes musl-tools
       - run: rustup target add "${{ matrix.target }}"
-      - run: cargo build --locked --release -p stackhour --target "${{ matrix.target }}"
+      - name: Build release binary
+        env:
+          FLAVOR: ${{ matrix.flavor }}
+        run: |
+          if [ "$FLAVOR" = bridge ]; then
+            cargo build --locked --release -p stackhour --target "${{ matrix.target }}" \
+              --no-default-features --features bridge
+          else
+            cargo build --locked --release -p stackhour --target "${{ matrix.target }}"
+          fi
       - name: Package installer
         env:
           TARGET: ${{ matrix.target }}
+          FLAVOR: ${{ matrix.flavor }}
         run: |
-          mkdir -p "package/stackhour-$TARGET" dist
-          cp "target/$TARGET/release/stackhour" "package/stackhour-$TARGET/stackhour"
-          cp deploy/install.sh "package/stackhour-$TARGET/install.sh"
-          cp LICENSE README.md "package/stackhour-$TARGET/"
-          chmod 0755 "package/stackhour-$TARGET/stackhour" "package/stackhour-$TARGET/install.sh"
-          tar -C package -czf "dist/stackhour-$TARGET.tar.gz" "stackhour-$TARGET"
+          prefix=stackhour
+          [ "$FLAVOR" = full ] || prefix="stackhour-$FLAVOR"
+          package="$prefix-$TARGET"
+          mkdir -p "package/$package" dist
+          cp "target/$TARGET/release/stackhour" "package/$package/stackhour"
+          cp deploy/install.sh "package/$package/install.sh"
+          cp LICENSE README.md "package/$package/"
+          chmod 0755 "package/$package/stackhour" "package/$package/install.sh"
+          tar -C package -czf "dist/$package.tar.gz" "$package"
+      - name: Smoke-test static Linux artifact on supported distributions
+        if: runner.os == 'Linux'
+        env:
+          TARGET: ${{ matrix.target }}
+          FLAVOR: ${{ matrix.flavor }}
+        run: |
+          prefix=stackhour
+          [ "$FLAVOR" = full ] || prefix="stackhour-$FLAVOR"
+          binary="$PWD/package/$prefix-$TARGET/stackhour"
+          docker run --rm -v "$binary:/stackhour:ro" debian:12 /stackhour
+          docker run --rm -v "$binary:/stackhour:ro" amazonlinux:2023 /stackhour
+      - name: Validate generated systemd service contracts
+        if: runner.os == 'Linux'
+        run: |
+          units="$PWD/deploy/systemd"
+          docker run --rm -v "$units:/units:ro" debian:12 sh -c \
+            'apt-get update && apt-get install --yes systemd && systemd-analyze verify /units/*.service'
+          docker run --rm -v "$units:/units:ro" amazonlinux:2023 sh -c \
+            'systemd-analyze verify /units/*.service'
       - uses: actions/upload-artifact@v7
         with:
-          name: stackhour-${{ matrix.target }}
+          name: stackhour-${{ matrix.flavor }}-${{ matrix.target }}
           path: dist/*.tar.gz
           if-no-files-found: error
 
@@ -138,6 +185,7 @@ jobs:
           cp deploy/install.sh dist/install-stackhour.sh
           cd dist
           sha256sum stackhour-*.tar.gz > SHA256SUMS
+          printf '%s\n' "$VERSION" > VERSION
       - name: Create GitHub release
         run: |
           gh release create "$TAG" dist/* \

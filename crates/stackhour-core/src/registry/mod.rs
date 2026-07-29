@@ -86,6 +86,8 @@ pub struct TargetSpec {
     /// `"local"` = runs on the coordinator's own box; anything else is a
     /// worker / remote lane.
     pub kind: String,
+    /// Optional explicit icon from the deployment config.
+    pub icon: Option<String>,
 }
 
 impl TargetSpec {
@@ -94,7 +96,13 @@ impl TargetSpec {
             name: name.into(),
             label: label.into(),
             kind: kind.into(),
+            icon: None,
         }
+    }
+
+    pub fn with_icon(mut self, icon: Option<String>) -> Self {
+        self.icon = icon;
+        self
     }
 
     /// Whether this target runs on the coordinator's own box.
@@ -105,12 +113,10 @@ impl TargetSpec {
     /// The emoji on this target's button and `/help` line. Inherited from the
     /// legacy pair, where the LOCAL box was the GCP cloud instance (☁️) and
     /// the remote worker was the Mac (🖥️).
-    pub(crate) fn emoji(&self) -> &'static str {
-        if self.is_local() {
-            "☁️"
-        } else {
-            "🖥️"
-        }
+    pub(crate) fn emoji(&self) -> &str {
+        self.icon
+            .as_deref()
+            .unwrap_or_else(|| if self.is_local() { "☁️" } else { "🖥️" })
     }
 
     /// The "run on …" phrase used in descriptions, toasts and help lines.

@@ -3,6 +3,7 @@ set -eu
 
 repository=${STACKHOUR_GITHUB_REPOSITORY:-NikitaVoitik/stackhour}
 install_dir=${STACKHOUR_INSTALL_DIR:-"$HOME/.local/bin"}
+release_flavor=${STACKHOUR_RELEASE_FLAVOR:-full}
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd)
 source_binary="$script_dir/stackhour"
 temporary_dir=
@@ -27,8 +28,8 @@ if [ ! -x "$source_binary" ]; then
   system_name=$(uname -s)
   machine_name=$(uname -m)
   case "$system_name/$machine_name" in
-    Linux/x86_64|Linux/amd64) target=x86_64-unknown-linux-gnu ;;
-    Linux/arm64|Linux/aarch64) target=aarch64-unknown-linux-gnu ;;
+    Linux/x86_64|Linux/amd64) target=x86_64-unknown-linux-musl ;;
+    Linux/arm64|Linux/aarch64) target=aarch64-unknown-linux-musl ;;
     Darwin/arm64|Darwin/aarch64) target=aarch64-apple-darwin ;;
     Darwin/x86_64|Darwin/amd64)
       echo "Stackhour does not support Intel macOS." >&2
@@ -40,7 +41,15 @@ if [ ! -x "$source_binary" ]; then
       ;;
   esac
 
-  asset="stackhour-$target.tar.gz"
+  case "$release_flavor" in
+    full) prefix=stackhour ;;
+    bridge) prefix=stackhour-bridge ;;
+    *)
+      echo "STACKHOUR_RELEASE_FLAVOR must be full or bridge." >&2
+      exit 1
+      ;;
+  esac
+  asset="$prefix-$target.tar.gz"
   release_root="https://github.com/$repository/releases/latest/download"
   temporary_dir=$(mktemp -d "${TMPDIR:-/tmp}/stackhour-install.XXXXXX")
 
@@ -67,7 +76,7 @@ if [ ! -x "$source_binary" ]; then
   fi
 
   tar -xzf "$temporary_dir/$asset" -C "$temporary_dir"
-  source_binary="$temporary_dir/stackhour-$target/stackhour"
+  source_binary="$temporary_dir/$prefix-$target/stackhour"
 fi
 
 mkdir -p "$install_dir"

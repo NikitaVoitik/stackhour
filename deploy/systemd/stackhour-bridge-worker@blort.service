@@ -1,0 +1,17 @@
+[Unit]
+Description=Stackhour Telegram bridge worker for Claude Code and Codex
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/stackhour/blort
+ExecStart="/bin/true" bridge worker --runtime-dir "/home/stackhour/blort"
+Restart=always
+RestartSec=5
+UMask=0077
+Environment="HOME=/home/stackhour"
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=default.target

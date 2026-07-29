@@ -19,7 +19,7 @@ use serde_json::Value;
 /// The protocol version stamped on every event this crate writes. Capability
 /// negotiation across hub/node/client versions is required from the first
 /// protocol version, so it is recorded per row rather than assumed.
-pub const PROTOCOL_VERSION: i64 = 1;
+pub const PROTOCOL_VERSION: i64 = 3;
 
 /// The initial, deliberately small set of durable product events.
 ///

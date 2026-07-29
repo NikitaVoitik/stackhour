@@ -330,10 +330,10 @@ each can be switched off at either of two layers.
 
 | Module | Verbs |
 |---|---|
-| `tracker` | `serve`, `status`, `token`, `data`, `backup`, `import-wakatime`, `init server`, `install server` |
+| `tracker` | `serve`, `status`, `token`, `data`, `backup`, `migrate tempo`, `import-wakatime`, `init server`, `install server` |
 | `agent` | `agent`, `init agent`, `install agent` |
 | `bridge` | `bridge *` |
-| `control` | `control hub`, `control node` |
+| `control` | `control hub`, `control node`, `control update` |
 
 `doctor` belongs to no module and is never gated — it is the diagnostic of
 last resort. `stackhour-core` (config, paths, tokens, the registries) is the
@@ -546,9 +546,9 @@ See [docs/bridge.md](docs/bridge.md) for the full guide and
 ## Multi-client control plane
 
 The control plane has a durable coordinator, outbound execution nodes, a web
-control panel, an optional Telegram client, and real Claude and Codex
-command-line adapters. Commands for an offline node stay in SQLite and run
-after the node reconnects.
+control panel, the persistent Telegram assistant **Claire**, and real Claude
+and Codex command-line adapters. Commands for an offline node stay in SQLite
+and run after the node reconnects.
 
 ```sh
 curl -fsSL https://github.com/NikitaVoitik/stackhour/releases/latest/download/install-stackhour.sh |
@@ -560,6 +560,17 @@ curl -fsSL https://github.com/NikitaVoitik/stackhour/releases/latest/download/in
 Open the coordinator URL. Enter the client token. Use **Add machine** to install
 a node on the coordinator or on an SSH machine. The SSH connection is used only
 for setup. Normal node traffic uses an outbound WebSocket connection.
+
+Claire keeps a durable Telegram conversation and can create, follow up on, and
+stop Stackhour tasks. Use `/claude` or `/codex` to switch her engine without
+starting a new conversation. Her personality, active engine, per-engine model,
+reasoning effort, node, workspace, and optional
+[OptMem](https://github.com/VictorTaelin/OptMem) executable are managed in the
+authenticated **Claire settings** panel.
+
+The same panel contains checksum-verified **Stackhour updates**. Manual update
+checks and installation are authenticated; automatic updates are opt-in and
+can include all currently connected execution nodes.
 
 See [docs/control-plane.md](docs/control-plane.md) for installation, TLS, node
 setup, updates, security, Telegram migration, recovery, and current limits.
@@ -588,12 +599,25 @@ Change `[workspace.package].version` in `Cargo.toml` to publish a release.
 After that change reaches `master`, GitHub Actions builds checksum-verified
 installers for:
 
-- Linux x86-64
-- Linux ARM64
+- Linux x86-64 (static musl; smoke-tested on Debian 12 and Amazon Linux 2023)
+- Linux ARM64 (static musl; smoke-tested on Debian 12 and Amazon Linux 2023)
 - macOS Apple Silicon
 
+Each platform has a full binary and a smaller bridge-only binary. Set
+`STACKHOUR_RELEASE_FLAVOR=bridge` when running the release installer on a
+coordinator that only needs `stackhour bridge`; the default flavor is `full`.
 The workflow creates the matching `v<version>` tag and GitHub release. It does
 not create a second release when the version already exists.
+
+To migrate the old Tempo tracker database without losing committed WAL rows:
+
+```sh
+stackhour migrate tempo --from=/path/to/tempo.db
+```
+
+The command uses SQLite's online backup API, refuses to overwrite the
+Stackhour database, migrates and verifies the copied schema and heartbeat
+count, and leaves the Tempo source untouched.
 
 The suite uses temporary configs, databases, queues, watcher fixtures, and
 ephemeral loopback ports. It never reads or writes the live Stackhour config,

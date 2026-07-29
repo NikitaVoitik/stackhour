@@ -282,11 +282,15 @@ fn server_checks(cfg: &Config, out: &mut Vec<Check>) {
             return;
         }
     };
-    let mut req = client.get(format!("{base}/api/auth-check"));
-    if !cfg.agent.token.is_empty() {
-        req = req.header("authorization", format!("Bearer {}", cfg.agent.token));
-    }
-    let res = match req.send() {
+    let authenticated_get = |path: &str| {
+        let request = client.get(format!("{base}{path}"));
+        if cfg.agent.token.is_empty() {
+            request
+        } else {
+            request.header("authorization", format!("Bearer {}", cfg.agent.token))
+        }
+    };
+    let res = match authenticated_get("/api/auth-check").send() {
         Result::Ok(r) => r,
         Result::Err(e) => {
             out.push(Check::new("server-auth", Error, format!("{base}: {e}")));
@@ -303,15 +307,32 @@ fn server_checks(cfg: &Config, out: &mut Vec<Check>) {
     }
     out.push(Check::new("server-auth", StatusOk, base.clone()));
 
-    let statuses: Value = match client
-        .get(format!("{base}/api/agent-status"))
-        .send()
-        .and_then(reqwest::blocking::Response::json)
-    {
-        Result::Ok(v) => v,
-        // The second `server-auth` error entry after an ok one.
-        Result::Err(e) => {
-            out.push(Check::new("server-auth", Error, format!("{base}: {e}")));
+    let status_response = match authenticated_get("/api/agent-status").send() {
+        Result::Ok(response) => response,
+        Result::Err(error) => {
+            out.push(Check::new("server-auth", Error, format!("{base}: {error}")));
+            return;
+        }
+    };
+    if !status_response.status().is_success() {
+        out.push(Check::new(
+            "server-auth",
+            Error,
+            format!(
+                "{base}/api/agent-status: HTTP {}",
+                status_response.status().as_u16()
+            ),
+        ));
+        return;
+    }
+    let statuses: Value = match status_response.json() {
+        Result::Ok(value) => value,
+        Result::Err(error) => {
+            out.push(Check::new(
+                "server-auth",
+                Error,
+                format!("{base}/api/agent-status: invalid JSON: {error}"),
+            ));
             return;
         }
     };
@@ -516,9 +537,21 @@ pub fn all_checks(cfg: Result<&Config, &str>, opts: &DoctorOpts) -> Vec<Check> {
     // appended at the end.
     let mut out = vec![runtime_check()];
     #[cfg(any(feature = "tracker", feature = "agent"))]
-    out.push(sqlite_check());
+    if cfg
+        .as_ref()
+        .map(|config| config.modules.contains(Module::Tracker) || config.modules.contains(Module::Agent))
+        .unwrap_or(true)
+    {
+        out.push(sqlite_check());
+    }
     config_checks(cfg, opts, &mut out);
-    data_dir_checks(opts, &mut out);
+    if cfg
+        .as_ref()
+        .map(|config| config.modules.contains(Module::Tracker) || config.modules.contains(Module::Agent))
+        .unwrap_or(true)
+    {
+        data_dir_checks(opts, &mut out);
+    }
 
     // Everything below needs a config; a load failure stops the report here,
     // exactly like Node's `if (cfg) { ... }` guard.
@@ -534,12 +567,18 @@ pub fn all_checks(cfg: Result<&Config, &str>, opts: &DoctorOpts) -> Vec<Check> {
         );
         return out;
     };
-    out.push(token_check(cfg));
-    project_root_checks(cfg, &mut out);
-    input_checks(cfg, opts, &mut out);
+    if cfg.modules.contains(Module::Tracker) || cfg.modules.contains(Module::Agent) {
+        out.push(token_check(cfg));
+    }
+    if cfg.modules.contains(Module::Agent) {
+        project_root_checks(cfg, &mut out);
+        input_checks(cfg, opts, &mut out);
+    }
     #[cfg(feature = "tracker")]
-    out.push(database_check(cfg));
-    if opts.check_server {
+    if cfg.modules.contains(Module::Tracker) {
+        out.push(database_check(cfg));
+    }
+    if opts.check_server && cfg.modules.contains(Module::Agent) {
         server_checks(cfg, &mut out);
     }
     if opts.check_services {

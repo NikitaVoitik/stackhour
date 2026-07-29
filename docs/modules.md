@@ -196,18 +196,12 @@ error here would make a healthy bridge-only leader start exiting 1. `--json`
 carries these as ordinary `checks[]` entries — the document keeps its exact
 `{ok, version, checks}` shape and `checks[0].name` is `runtime`.
 
-A build without the `tracker` feature also has **no `database` check**. The
-`sqlite` check goes away only when NEITHER `tracker` nor `agent` is compiled
-in — it is gated on the two modules that link rusqlite, so the agent-only
-worker box build still reports `sqlite` and only the bridge-only leader
-build, which links no SQLite at all, omits it. Those absences are expected,
-and the `module-*` lines are what tell you so rather than leaving you to
-debug a broken install.
-
-Note that `doctor` reports the disabled module and then reports the
-consequences anyway: a box with `"tracker": false` still gets its
-`server-auth` check, which will fail because nothing is serving. The module
-line is the explanation, not a filter.
+A build or runtime with `tracker` disabled has **no `database` check**. The
+`sqlite` check appears only when either the tracker or agent is enabled, and
+watcher/project/server checks appear only when the agent is enabled. Deliberate
+module choices therefore read as `module-*` status lines, not misleading
+warnings about databases and inputs that the machine was configured not to
+use.
 
 ## Installing services with a module off
 

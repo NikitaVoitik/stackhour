@@ -648,12 +648,23 @@ fn target_command(spec: &TargetSpec, index: usize) -> CommandDef {
         "gcp" => vec!["remote".to_string()],
         _ => Vec::new(),
     };
+    let button = if spec.icon.is_none()
+        && spec
+            .label
+            .chars()
+            .next()
+            .is_some_and(|first| !first.is_ascii_alphanumeric())
+    {
+        spec.label.clone()
+    } else {
+        format!("{emoji} {}", spec.label)
+    };
     CommandDef {
         command: spec.name.clone(),
         description: format!("Run on {phrase} {emoji}"),
         aliases,
         keyboard: true,
-        button: Some(format!("{emoji} {}", spec.label)),
+        button: Some(button),
         button_order: Some(TARGET_BUTTON_ORDER_BASE + index as i64),
         toast: Some(format!("On {phrase} {emoji}")),
         kind: CommandKind::Target,

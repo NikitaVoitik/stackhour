@@ -271,9 +271,12 @@ pub fn builtin_codex() -> EngineDef {
         prompt_delivery: PromptDelivery::Stdin,
         env: IndexMap::new(),
         partial_messages_flag: None,
-        // Left unset to preserve byte-parity with coordinator.mjs/worker.mjs,
-        // which never pass a reasoning-effort flag to codex.
-        effort_args: None,
+        // Codex exposes reasoning effort as a config override. This remains a
+        // structured argv pair; no shell parses the value.
+        effort_args: Some(vec![
+            "-c".to_string(),
+            "model_reasoning_effort=\"{{effort}}\"".to_string(),
+        ]),
         // `codex exec` has no per-tool allow/deny flags. Leaving these None
         // means a `[tools]` policy on a codex agent is UNENFORCEABLE, which
         // `unenforceable_policy` turns into a refusal rather than a silent
@@ -1059,21 +1062,29 @@ effort_args = ["--reasoning-effort", "{{effort}}"]
     }
 
     #[test]
-    fn effort_on_an_engine_without_effort_args_is_silently_ignored() {
-        // Byte-parity guard: an agent may declare effort while running on
-        // claude/codex, which have no such flag. It must not leak into argv.
-        for def in [builtin_claude(), builtin_codex()] {
-            let with = ArgvVars {
-                effort: Some("high"),
-                live_status: true,
-                ..ArgvVars::default()
-            };
-            let without = ArgvVars {
-                live_status: true,
-                ..ArgvVars::default()
-            };
-            assert_eq!(def.assemble_argv(&with), def.assemble_argv(&without));
-        }
+    fn effort_on_claude_is_silently_ignored() {
+        let def = builtin_claude();
+        let with = ArgvVars {
+            effort: Some("high"),
+            live_status: true,
+            ..ArgvVars::default()
+        };
+        let without = ArgvVars {
+            live_status: true,
+            ..ArgvVars::default()
+        };
+        assert_eq!(def.assemble_argv(&with), def.assemble_argv(&without));
+    }
+
+    #[test]
+    fn codex_reasoning_effort_is_a_structured_config_override() {
+        let argv = builtin_codex().assemble_argv(&ArgvVars {
+            effort: Some("high"),
+            ..ArgvVars::default()
+        });
+        assert!(argv
+            .windows(2)
+            .any(|pair| { pair == ["-c".to_string(), "model_reasoning_effort=\"high\"".to_string(),] }));
     }
 
     #[test]

@@ -25,6 +25,7 @@ stackhour-domain = { workspace = true, optional = true }
 stackhour-hub = { workspace = true, optional = true }
 stackhour-node = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 serde_json.workspace = true
 # NOT optional: status.rs and doctor's `server_checks` both use the blocking
 # client, and neither belongs to a module.
@@ -32,6 +33,9 @@ reqwest.workspace = true
 rusqlite = { workspace = true, optional = true }
 hostname.workspace = true
 rustix.workspace = true
+semver.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
 
 [features]
 default = ["tracker", "agent", "bridge", "control"]
@@ -48,10 +52,8 @@ control = [
   "dep:stackhour-node",
   "dep:stackhour-bridge",
   "dep:tokio",
+  "dep:serde",
 ]
-
-[dev-dependencies]
-tempfile.workspace = true
 
 [lints]
 workspace = true

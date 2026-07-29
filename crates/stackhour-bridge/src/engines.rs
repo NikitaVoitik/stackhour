@@ -43,7 +43,8 @@ pub struct RunRequest {
     pub session_id: Option<String>,
     pub model: Option<String>,
     pub permission_mode: Option<String>,
-    /// Composed system prompt (souls + skills), when an agent is active.
+    /// Trusted system prompt for this run. Engines with no system-prompt argv
+    /// support receive it as a bounded prompt prefix on fresh attempts.
     pub system_prompt: Option<String>,
     /// Reasoning effort, spliced through the engine's declared `effort_args`.
     /// Engines that declare none ignore it (see `souls::agent_effort`).
@@ -140,6 +141,25 @@ pub fn resume_retry_log_line_local(engine: &str, target: &str, code: Option<i32>
 
 /// The default `house-rules-turn` shape, used when the caller passes none.
 const HOUSE_RULES_TURN_FALLBACK: &str = "[Standing style rules]\n{{system}}\n\n{{prompt}}";
+const SYSTEM_PROMPT_TURN_FALLBACK: &str = "[System instructions]\n{{system}}\n\n[User message]\n{{prompt}}";
+
+/// Deliver a trusted system prompt to engines that have no dedicated argv
+/// support. Resumed sessions already carry the instructions, while a failed
+/// resume retried fresh receives them again.
+pub fn apply_system_prompt(def: &EngineDef, req: &mut RunRequest) {
+    if def.system_prompt_args.is_some() || req.session_id.is_some() {
+        return;
+    }
+    let Some(system) = req.system_prompt.take() else {
+        return;
+    };
+    if system.trim().is_empty() {
+        return;
+    }
+    req.prompt = SYSTEM_PROMPT_TURN_FALLBACK
+        .replace("{{system}}", &system)
+        .replace("{{prompt}}", &req.prompt);
+}
 
 /// Fold the standing house rules into a request, exactly where the JS puts
 /// them.
@@ -250,6 +270,7 @@ pub fn spawn_engine(
     activity: Option<mpsc::Sender<String>>,
 ) -> (RunningJob, std::thread::JoinHandle<RunResult>) {
     let job = RunningJob::default();
+    apply_system_prompt(def, &mut req);
     apply_house_rules(def, &mut req);
     let argv = build_argv(def, &req);
 
@@ -494,6 +515,7 @@ impl StreamState {
 mod tests {
     use super::*;
     use serde_json::json;
+    use stackhour_core::registry::engine::{builtin_claude, builtin_codex};
 
     fn drain(kind: StreamKind, lines: &[&str]) -> (RunResult, Vec<String>) {
         let (tx, rx) = mpsc::channel();
@@ -510,6 +532,44 @@ mod tests {
             },
             rx.iter().collect(),
         )
+    }
+
+    #[test]
+    fn system_prompt_is_prefixed_for_fresh_codex_but_not_a_resume() {
+        let def = builtin_codex();
+        let mut fresh = RunRequest {
+            prompt: "Do the work.".to_string(),
+            system_prompt: Some("You are Claire.".to_string()),
+            ..RunRequest::default()
+        };
+        apply_system_prompt(&def, &mut fresh);
+        assert_eq!(
+            fresh.prompt,
+            "[System instructions]\nYou are Claire.\n\n[User message]\nDo the work."
+        );
+        assert_eq!(fresh.system_prompt, None);
+
+        let mut resumed = RunRequest {
+            prompt: "Continue.".to_string(),
+            session_id: Some("thread-1".to_string()),
+            system_prompt: Some("You are Claire.".to_string()),
+            ..RunRequest::default()
+        };
+        apply_system_prompt(&def, &mut resumed);
+        assert_eq!(resumed.prompt, "Continue.");
+    }
+
+    #[test]
+    fn system_prompt_stays_structured_for_claude() {
+        let def = builtin_claude();
+        let mut req = RunRequest {
+            prompt: "Do the work.".to_string(),
+            system_prompt: Some("You are Claire.".to_string()),
+            ..RunRequest::default()
+        };
+        apply_system_prompt(&def, &mut req);
+        assert_eq!(req.prompt, "Do the work.");
+        assert_eq!(req.system_prompt.as_deref(), Some("You are Claire."));
     }
 
     #[test]

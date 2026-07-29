@@ -217,6 +217,9 @@ fn start_run(task_id: TaskId) -> ClientCommand {
         task_id,
         node_id: NodeId::from(NODE_ID),
         engine: "stub".to_string(),
+        model: None,
+        reasoning_effort: None,
+        system_prompt: None,
         access_policy: AccessPolicy::Automatic,
         workspace_path: None,
     }

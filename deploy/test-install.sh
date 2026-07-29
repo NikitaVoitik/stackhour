@@ -19,6 +19,12 @@ run_download_case() {
   system_name=$1
   machine_name=$2
   expected_target=$3
+  flavor=${4:-full}
+  if [ "$flavor" = bridge ]; then
+    expected_asset="stackhour-bridge-$expected_target.tar.gz"
+  else
+    expected_asset="stackhour-$expected_target.tar.gz"
+  fi
   case_dir="$test_dir/$expected_target"
   fake_bin="$case_dir/bin"
   install_dir="$case_dir/install"
@@ -48,7 +54,7 @@ run_download_case() {
     'printf "%s\n" "$url" >>"$TEST_CURL_LOG"' \
     'case "$url" in' \
     '  */SHA256SUMS)' \
-    '    printf "test-checksum  stackhour-%s.tar.gz\n" "$TEST_EXPECTED_TARGET" >"$output"' \
+    '    printf "test-checksum  %s\n" "$TEST_EXPECTED_ASSET" >"$output"' \
     '    ;;' \
     '  */stackhour-*.tar.gz)' \
     '    printf "archive\n" >"$output"' \
@@ -74,13 +80,15 @@ run_download_case() {
   TEST_UNAME_S=$system_name \
   TEST_UNAME_M=$machine_name \
   TEST_EXPECTED_TARGET=$expected_target \
+  TEST_EXPECTED_ASSET=$expected_asset \
   TEST_CURL_LOG=$case_dir/curl-log \
   STACKHOUR_INSTALL_DIR=$install_dir \
+  STACKHOUR_RELEASE_FLAVOR=$flavor \
   PATH="$fake_bin:/usr/bin:/bin" \
     sh "$case_dir/install.sh" >"$case_dir/output"
 
   test -x "$install_dir/stackhour" || fail "$expected_target was not installed"
-  grep -q "/stackhour-$expected_target.tar.gz$" "$case_dir/curl-log" ||
+  grep -q "/$expected_asset$" "$case_dir/curl-log" ||
     fail "$expected_target release was not requested"
   grep -q "/SHA256SUMS$" "$case_dir/curl-log" ||
     fail "release checksums were not requested"
@@ -88,9 +96,10 @@ run_download_case() {
     fail "$expected_target did not report its install path"
 }
 
-run_download_case Linux x86_64 x86_64-unknown-linux-gnu
-run_download_case Linux aarch64 aarch64-unknown-linux-gnu
+run_download_case Linux x86_64 x86_64-unknown-linux-musl
+run_download_case Linux aarch64 aarch64-unknown-linux-musl
 run_download_case Darwin arm64 aarch64-apple-darwin
+run_download_case Linux x86_64 x86_64-unknown-linux-musl bridge
 
 unsupported_dir="$test_dir/unsupported-intel-macos"
 mkdir -p "$unsupported_dir/bin"

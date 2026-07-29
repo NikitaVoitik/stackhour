@@ -172,6 +172,26 @@ pub fn install_service(role: &str) -> Result<Installed> {
             .map_err(|e| Error::msg(format!("cannot write {}: {e}", unit_path.display())))?;
         run_cmd("systemctl", &["--user", "daemon-reload"])?;
         run_cmd("systemctl", &["--user", "enable", "--now", &unit_name])?;
+        let mut active = false;
+        for _ in 0..10 {
+            active = std::process::Command::new("systemctl")
+                .args(["--user", "is-active", "--quiet", &unit_name])
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false);
+            if active {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
+        if !active {
+            let _ = std::process::Command::new("journalctl")
+                .args(["--user-unit", &unit_name, "-n", "40", "--no-pager"])
+                .status();
+            return Err(Error::msg(format!(
+                "{unit_name} did not become active after installation"
+            )));
+        }
         return Ok(Installed {
             role: role.to_string(),
             unit_path,
@@ -200,6 +220,14 @@ pub fn install_service(role: &str) -> Result<Installed> {
         let target = format!("{domain}/{label}");
         run_cmd("launchctl", &["enable", &target])?;
         run_cmd("launchctl", &["kickstart", "-k", &target])?;
+        let healthy = std::process::Command::new("launchctl")
+            .args(["print", &target])
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false);
+        if !healthy {
+            return Err(Error::msg(format!("{label} was not healthy after installation")));
+        }
         return Ok(Installed {
             role: role.to_string(),
             unit_path: plist_path,

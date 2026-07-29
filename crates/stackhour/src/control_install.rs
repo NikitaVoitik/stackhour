@@ -311,6 +311,26 @@ fn install_service(role: &str, no_start: bool) -> Result<PathBuf> {
         if !no_start {
             run_status("systemctl", &["--user", "daemon-reload"])?;
             run_status("systemctl", &["--user", "enable", "--now", &name])?;
+            let mut active = false;
+            for _ in 0..10 {
+                active = Command::new("systemctl")
+                    .args(["--user", "is-active", "--quiet", &name])
+                    .status()
+                    .map(|status| status.success())
+                    .unwrap_or(false);
+                if active {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            if !active {
+                let _ = Command::new("journalctl")
+                    .args(["--user-unit", &name, "-n", "40", "--no-pager"])
+                    .status();
+                return Err(Error::msg(format!(
+                    "{name} did not become active after installation"
+                )));
+            }
         }
         return Ok(path);
     }
@@ -331,6 +351,14 @@ fn install_service(role: &str, no_start: bool) -> Result<PathBuf> {
             run_status("launchctl", &["bootstrap", &domain, &path_text])?;
             run_status("launchctl", &["enable", &target])?;
             run_status("launchctl", &["kickstart", "-k", &target])?;
+            let healthy = Command::new("launchctl")
+                .args(["print", &target])
+                .status()
+                .map(|status| status.success())
+                .unwrap_or(false);
+            if !healthy {
+                return Err(Error::msg(format!("{label} was not healthy after installation")));
+            }
         }
         return Ok(path);
     }

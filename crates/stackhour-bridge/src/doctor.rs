@@ -10,10 +10,7 @@ use serde_json::Value;
 use std::io::Write;
 use std::path::Path;
 
-use crate::config::{
-    self, shell_quote, validate_coordinator_config, validate_worker_config, LAUNCHD_LABEL, SERVICE_NAME,
-    WORKER_SERVICE_NAME,
-};
+use crate::config::{self, shell_quote, validate_coordinator_config, validate_worker_config, SERVICE_NAME};
 use crate::installer::{run_cmd, uid};
 
 /// Run `stackhour bridge doctor <role>`; returns the exit code.
@@ -180,6 +177,10 @@ pub fn doctor_checks(
         }
     }
     if role == "worker" {
+        let target = config
+            .get("target")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty());
         // The leader keys accept either spelling (leader* preferred, the
         // legacy gcp* fallback), exactly as the loader reads them.
         let key = aliased_display(&config, "leaderKey", "gcpKey");
@@ -227,20 +228,18 @@ pub fn doctor_checks(
         // DELIBERATE DIVERGENCE: the Node doctor only knew the macOS
         // LaunchAgent; a Linux worker checks its systemd user unit.
         if cfg!(target_os = "macos") {
+            let label = config::worker_launchd_label(target).map_err(|error| error.message().to_string())?;
             let loaded = std::process::Command::new("launchctl")
-                .args(["print", &format!("gui/{}/{LAUNCHD_LABEL}", uid())])
+                .args(["print", &format!("gui/{}/{label}", uid())])
                 .output()
                 .map(|o| o.status.success())
                 .unwrap_or(false);
-            check(
-                out,
-                &mut failures,
-                loaded,
-                format!("LaunchAgent loaded: {LAUNCHD_LABEL}"),
-            );
+            check(out, &mut failures, loaded, format!("LaunchAgent loaded: {label}"));
         } else if cfg!(target_os = "linux") {
+            let unit_name =
+                config::worker_service_name(target).map_err(|error| error.message().to_string())?;
             let active = std::process::Command::new("systemctl")
-                .args(["--user", "is-active", "--quiet", WORKER_SERVICE_NAME])
+                .args(["--user", "is-active", "--quiet", &unit_name])
                 .output()
                 .map(|o| o.status.success())
                 .unwrap_or(false);
@@ -248,7 +247,7 @@ pub fn doctor_checks(
                 out,
                 &mut failures,
                 active,
-                format!("User service active: {WORKER_SERVICE_NAME}"),
+                format!("User service active: {unit_name}"),
             );
         }
     }
@@ -275,8 +274,8 @@ pub fn doctor_checks(
 
 /// Run `stackhour bridge status|restart <role>` (the exact systemctl /
 /// launchctl sequences); returns the exit code.
-pub fn run_service_cmd(role: &str, verb: &str) -> i32 {
-    match service_action(role, verb) {
+pub fn run_service_cmd(role: &str, verb: &str, runtime_dir: &Path) -> i32 {
+    match service_action(role, verb, runtime_dir) {
         Ok(()) => 0,
         Err(message) => {
             eprintln!("\nError: {message}");
@@ -287,14 +286,15 @@ pub fn run_service_cmd(role: &str, verb: &str) -> i32 {
 
 /// `serviceAction` — stdio is inherited, so systemctl/launchctl output IS
 /// the status report.
-fn service_action(role: &str, verb: &str) -> Result<(), String> {
+fn service_action(role: &str, verb: &str, runtime_dir: &Path) -> Result<(), String> {
     if role == "coordinator" {
         if !cfg!(target_os = "linux") {
             return Err("Coordinator service commands require Linux.".to_string());
         }
         run_cmd("systemctl", &["--user", verb, SERVICE_NAME])
     } else if cfg!(target_os = "macos") {
-        let target = format!("gui/{}/{LAUNCHD_LABEL}", uid());
+        let label = worker_label_from_config(runtime_dir)?;
+        let target = format!("gui/{}/{label}", uid());
         if verb == "status" {
             run_cmd("launchctl", &["print", &target])
         } else {
@@ -303,10 +303,32 @@ fn service_action(role: &str, verb: &str) -> Result<(), String> {
     } else if cfg!(target_os = "linux") {
         // DELIBERATE DIVERGENCE: the Node CLI threw 'Worker service commands
         // require macOS.' — Linux workers now drive their systemd user unit.
-        run_cmd("systemctl", &["--user", verb, WORKER_SERVICE_NAME])
+        let unit_name = worker_unit_from_config(runtime_dir)?;
+        run_cmd("systemctl", &["--user", verb, &unit_name])
     } else {
         Err("Worker service commands require Linux or macOS.".to_string())
     }
+}
+
+fn worker_target_from_config(runtime_dir: &Path) -> Result<Option<String>, String> {
+    let path = runtime_dir.join("worker-config.json");
+    let text = std::fs::read_to_string(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+    let value: Value = serde_json::from_str(&text).map_err(|error| format!("{}: {error}", path.display()))?;
+    Ok(value
+        .get("target")
+        .and_then(Value::as_str)
+        .filter(|target| !target.is_empty())
+        .map(str::to_string))
+}
+
+fn worker_unit_from_config(runtime_dir: &Path) -> Result<String, String> {
+    let target = worker_target_from_config(runtime_dir)?;
+    config::worker_service_name(target.as_deref()).map_err(|error| error.message().to_string())
+}
+
+fn worker_label_from_config(runtime_dir: &Path) -> Result<String, String> {
+    let target = worker_target_from_config(runtime_dir)?;
+    config::worker_launchd_label(target.as_deref()).map_err(|error| error.message().to_string())
 }
 
 // ---------------------------------------------------------------------------
