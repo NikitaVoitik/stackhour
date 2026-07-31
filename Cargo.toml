@@ -19,7 +19,7 @@ axum = "0.8"
 tower = { version = "0.5", features = ["util"] }
 
 # SQLite — store crate + the agent's zed watcher.
-rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+rusqlite = { version = "0.40", features = ["bundled", "backup"] }
 
 # JSON / config. preserve_order + float_roundtrip are load-bearing parity features.
 serde = { version = "1", features = ["derive"] }
