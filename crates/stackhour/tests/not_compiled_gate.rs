@@ -1,4 +1,4 @@
-#![cfg(not(all(feature = "tracker", feature = "agent", feature = "bridge")))]
+#![cfg(not(all(feature = "tracker", feature = "agent", feature = "control")))]
 //! The compile-time half of the module gate (Layer 1), driven through the
 //! BUILT binary.
 //!
@@ -14,7 +14,7 @@
 //!
 //! SAFETY: every run gets `env_clear()` and a throwaway HOME, so nothing here
 //! reads the developer's own `~/.config/stackhour/config.json` — and no
-//! bridge daemon verb is ever spawned.
+//! control daemon verb is ever spawned.
 
 use std::process::{Command, Output};
 use tempfile::TempDir;
@@ -53,7 +53,7 @@ fn code(out: &Output) -> i32 {
 /// each. Built from `cfg!` rather than from the binary's own report so the
 /// test would still catch a `compiled_modules()` that lies.
 ///
-/// `bridge` is represented by the bare verb: it needs no sub-verb, touches no
+/// `control` is represented by the bare verb: it needs no sub-verb, touches no
 /// network, and starts no poller even when the module IS compiled in.
 fn missing_modules() -> Vec<(&'static str, &'static str)> {
     let mut out = Vec::new();
@@ -63,8 +63,8 @@ fn missing_modules() -> Vec<(&'static str, &'static str)> {
     if !cfg!(feature = "agent") {
         out.push(("agent", "agent"));
     }
-    if !cfg!(feature = "bridge") {
-        out.push(("bridge", "bridge"));
+    if !cfg!(feature = "control") {
+        out.push(("control", "control"));
     }
     // The file-level `cfg` guarantees at least one.
     assert!(!out.is_empty(), "a reduced build has at least one module off");

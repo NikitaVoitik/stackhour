@@ -25,7 +25,6 @@ rusqlite = { version = "0.32", features = ["bundled", "backup"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 indexmap = { version = "2", features = ["serde"] }
-toml = "0.8"
 
 # The single blocking HTTP client (agent posts, CLI probes, wakatime, Telegram, ElevenLabs).
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
@@ -61,7 +60,6 @@ stackhour-core = { path = "crates/stackhour-core", version = "0.2.0" }
 stackhour-store = { path = "crates/stackhour-store", version = "0.2.0" }
 stackhour-server = { path = "crates/stackhour-server", version = "0.2.0" }
 stackhour-agent = { path = "crates/stackhour-agent", version = "0.2.0" }
-stackhour-bridge = { path = "crates/stackhour-bridge", version = "0.2.0" }
 stackhour-hub = { path = "crates/stackhour-hub", version = "0.2.0" }
 stackhour-node = { path = "crates/stackhour-node", version = "0.2.0" }
 

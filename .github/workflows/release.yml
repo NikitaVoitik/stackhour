@@ -86,15 +86,6 @@ jobs:
           - runner: macos-15
             target: aarch64-apple-darwin
             flavor: full
-          - runner: ubuntu-24.04
-            target: x86_64-unknown-linux-musl
-            flavor: bridge
-          - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-musl
-            flavor: bridge
-          - runner: macos-15
-            target: aarch64-apple-darwin
-            flavor: bridge
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
@@ -103,23 +94,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install --yes musl-tools
       - run: rustup target add "${{ matrix.target }}"
       - name: Build release binary
-        env:
-          FLAVOR: ${{ matrix.flavor }}
-        run: |
-          if [ "$FLAVOR" = bridge ]; then
-            cargo build --locked --release -p stackhour --target "${{ matrix.target }}" \
-              --no-default-features --features bridge
-          else
-            cargo build --locked --release -p stackhour --target "${{ matrix.target }}"
-          fi
+        run: cargo build --locked --release -p stackhour --target "${{ matrix.target }}"
       - name: Package installer
         env:
           TARGET: ${{ matrix.target }}
           FLAVOR: ${{ matrix.flavor }}
         run: |
-          prefix=stackhour
-          [ "$FLAVOR" = full ] || prefix="stackhour-$FLAVOR"
-          package="$prefix-$TARGET"
+          package="stackhour-$TARGET"
           mkdir -p "package/$package" dist
           cp "target/$TARGET/release/stackhour" "package/$package/stackhour"
           cp deploy/install.sh "package/$package/install.sh"
@@ -132,19 +113,9 @@ jobs:
           TARGET: ${{ matrix.target }}
           FLAVOR: ${{ matrix.flavor }}
         run: |
-          prefix=stackhour
-          [ "$FLAVOR" = full ] || prefix="stackhour-$FLAVOR"
-          binary="$PWD/package/$prefix-$TARGET/stackhour"
+          binary="$PWD/package/stackhour-$TARGET/stackhour"
           docker run --rm -v "$binary:/stackhour:ro" debian:12 /stackhour
           docker run --rm -v "$binary:/stackhour:ro" amazonlinux:2023 /stackhour
-      - name: Validate generated systemd service contracts
-        if: runner.os == 'Linux'
-        run: |
-          units="$PWD/deploy/systemd"
-          docker run --rm -v "$units:/units:ro" debian:12 sh -c \
-            'apt-get update && apt-get install --yes systemd && systemd-analyze verify /units/*.service'
-          docker run --rm -v "$units:/units:ro" amazonlinux:2023 sh -c \
-            'systemd-analyze verify /units/*.service'
       - uses: actions/upload-artifact@v7
         with:
           name: stackhour-${{ matrix.flavor }}-${{ matrix.target }}

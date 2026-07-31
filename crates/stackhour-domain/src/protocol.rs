@@ -89,8 +89,10 @@ pub enum ClientCommand {
         command_id: CommandId,
         /// The task to attempt.
         task_id: TaskId,
-        /// The node that should execute it.
-        node_id: NodeId,
+        /// The preferred node, or `None` for hub-side scheduling onto any
+        /// eligible active execution node.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node_id: Option<NodeId>,
         /// The engine/agent label (e.g. an ACP agent name).
         engine: String,
         /// Optional provider model selected for this run.
@@ -354,6 +356,12 @@ pub enum HubToNode {
         /// The dispatch to cancel.
         command_id: CommandId,
     },
+    /// The hub durably accepted (or had already accepted) a node event. Nodes
+    /// retain events in their reconnect outbox until this acknowledgement.
+    EventAck {
+        /// The stable node-minted event id now present in the hub log.
+        event_id: EventId,
+    },
     /// Liveness.
     Heartbeat,
 }
@@ -442,6 +450,16 @@ pub enum ProtocolError {
         /// The unknown run.
         run_id: RunId,
     },
+    /// No currently connected node can execute the requested engine. When a
+    /// preferred node was supplied, `node_id` names the unavailable or
+    /// ineligible target.
+    NoEligibleNode {
+        /// The requested engine.
+        engine: String,
+        /// The preferred target, when the command named one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        node_id: Option<NodeId>,
+    },
     /// A command referenced an approval the hub does not know.
     UnknownApproval {
         /// The unknown approval.
@@ -466,6 +484,12 @@ impl fmt::Display for ProtocolError {
             ProtocolError::Unauthenticated => f.write_str("unauthenticated node"),
             ProtocolError::UnknownTask { task_id } => write!(f, "unknown task: {task_id}"),
             ProtocolError::UnknownRun { run_id } => write!(f, "unknown run: {run_id}"),
+            ProtocolError::NoEligibleNode { engine, node_id } => match node_id {
+                Some(node_id) => {
+                    write!(f, "node {node_id} is not active and eligible for engine {engine}")
+                }
+                None => write!(f, "no active node is eligible for engine {engine}"),
+            },
             ProtocolError::UnknownApproval { approval_id } => {
                 write!(f, "unknown approval: {approval_id}")
             }
@@ -576,7 +600,7 @@ mod tests {
     #[test]
     fn wire_protocol_version_tracks_the_event_protocol_version() {
         assert_eq!(WIRE_PROTOCOL_VERSION, PROTOCOL_VERSION);
-        assert_eq!(WIRE_PROTOCOL_VERSION, 3);
+        assert_eq!(WIRE_PROTOCOL_VERSION, 5);
     }
 
     // --- top-level message enums: tag + round-trip -------------------------
@@ -603,7 +627,7 @@ mod tests {
             &ClientCommand::StartRun {
                 command_id: CommandId::new(),
                 task_id: TaskId::new(),
-                node_id: NodeId::from("laptop"),
+                node_id: Some(NodeId::from("laptop")),
                 engine: "acp".to_string(),
                 model: Some("claude-opus".to_string()),
                 reasoning_effort: Some("high".to_string()),
@@ -649,7 +673,7 @@ mod tests {
             ClientCommand::StartRun {
                 command_id: id,
                 task_id: TaskId::new(),
-                node_id: NodeId::from("n"),
+                node_id: Some(NodeId::from("n")),
                 engine: "acp".to_string(),
                 model: None,
                 reasoning_effort: None,
@@ -746,6 +770,12 @@ mod tests {
                 command_id: CommandId::new(),
             },
             "cancel_command",
+        );
+        assert_tag_and_round_trip(
+            &HubToNode::EventAck {
+                event_id: EventId::new(),
+            },
+            "event_ack",
         );
         assert_tag_and_round_trip(&HubToNode::Heartbeat, "heartbeat");
     }

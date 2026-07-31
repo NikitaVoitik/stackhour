@@ -1,20 +1,16 @@
 //! stackhour — the single binary; verb dispatch with the parity-critical
 //! config-load ordering.
 //!
-//! doctor/init/token/data/backup/install/bridge dispatch WITHOUT loading
-//! config; serve/agent/import-wakatime/status/help load config FIRST — so a
+//! doctor/init/token/data/backup/install dispatch WITHOUT loading config;
+//! serve/agent/import-wakatime/status/help load config FIRST — so a
 //! corrupt config.json still crashes the help path, exactly like today.
 //! Errors print `stackhour <cmd>: <message>` to stderr with a deferred
-//! exit-code-1 (vs status's immediate exit(1)). Hidden verbs
-//! (coordinator/worker/claim/return/tg-send) route to the bridge crate.
-//! stderr stays clean on success. NO tokio here — the server crate builds
-//! its own runtime.
+//! exit-code-1 (vs status's immediate exit(1)). stderr stays clean on
+//! success.
 
 use std::process::ExitCode;
 
 mod args;
-#[cfg(feature = "bridge")]
-mod bridge_migrate;
 #[cfg(feature = "control")]
 mod control;
 #[cfg(feature = "control")]
@@ -23,10 +19,14 @@ mod control_install;
 mod control_update;
 mod doctor;
 mod doctor_checks;
+#[cfg(feature = "control")]
+mod fake_telegram;
 mod init;
 mod install;
 #[cfg(feature = "tracker")]
 mod status;
+#[cfg(feature = "control")]
+mod telegram;
 #[cfg(feature = "tracker")]
 mod tempo_migrate;
 #[cfg(feature = "tracker")]
@@ -64,11 +64,7 @@ const HELP: &str = concat!(
     "  migrate tempo --from=FILE [--to=FILE]\n",
     "                                   online-copy a Tempo SQLite database\n",
     "  install <server|agent>           install and start user service(s)\n",
-    "  bridge install <coordinator|worker> [--reconfigure] [--no-start]\n",
-    "                                   set up the Telegram Claude/Codex bridge\n",
-    "  bridge doctor|status|restart <coordinator|worker>\n",
-    "                                   operate the bridge service\n",
-    "  control <hub|node>               run the control plane\n",
+    "  control <hub|node|fake-telegram> run the control plane or local Telegram simulator\n",
     "  control install <hub|node|ssh>   configure and install a control service\n",
     "\n",
 );
@@ -90,16 +86,15 @@ fn deferred(cmd: &str, result: stackhour_core::Result<()>) -> ExitCode {
 /// The modules compiled into this binary — Layer 1.
 ///
 /// The Cargo feature names and the `modules` config sub-keys are deliberately
-/// the same three strings (`Module::name`), so one identifier names both
-/// layers. A default build turns all three on and therefore resolves to
+/// the same strings (`Module::name`), so one identifier names both layers. A
+/// default build turns all modules on and therefore resolves to
 /// `ModuleSet::ALL`, which is exactly what the gate treats as "no opinion".
 fn compiled_modules() -> stackhour_core::modules::ModuleSet {
     stackhour_core::modules::ModuleSet::new(
         cfg!(feature = "tracker"),
         cfg!(feature = "agent"),
-        cfg!(feature = "bridge"),
+        cfg!(feature = "control"),
     )
-    .with_control(cfg!(feature = "control"))
 }
 
 /// Both gate layers plus the config file the runtime one came from, resolved
@@ -300,76 +295,6 @@ fn main() -> ExitCode {
                 }
             }
         }
-        // The bridge family. Hidden wire/daemon verbs are routed here;
-        // everything else falls through to the operator CLI (cli.mjs
-        // runBridgeCli): install/doctor/status/restart plus the usage banner.
-        #[cfg(feature = "bridge")]
-        "bridge" => match tail.first().map(String::as_str) {
-            // The one bridge verb that is ported. It touches no network and
-            // starts no poller, so it is safe to run beside the live Node
-            // coordinator.
-            Some("migrate") => bridge_migrate::run(&tail[1..]),
-            // The two daemons. Both long-poll or long-run and never return;
-            // `--runtime-dir <dir>` beats $STACKHOUR_BRIDGE_HOME, which beats
-            // the default, matching cli.mjs.
-            //
-            // `bridge coordinator` opens a getUpdates long-poll against the
-            // configured token. Two pollers on one token silently steal each
-            // other's messages, so the Node coordinator MUST be stopped first
-            // — `bridge migrate` says so on the way out.
-            // The two halves of the Mac worker's on-disk protocol. Both are
-            // invoked over SSH by the worker (directly, or through the
-            // node shims the installer writes), touch no network, and are
-            // safe to run beside the live Node coordinator: `claim` only
-            // renames files the worker is entitled to take, `return` only
-            // publishes a result the worker produced.
-            Some(verb @ ("claim" | "return")) => {
-                let paths = match runtime_dir_from(&tail[1..]) {
-                    Ok(dir) => dir,
-                    Err(msg) => {
-                        eprintln!("stackhour bridge {verb}: {msg}");
-                        return ExitCode::FAILURE;
-                    }
-                };
-                let code = if verb == "claim" {
-                    // `bridge claim [target]`: the optional positional names
-                    // the target this worker claims for. No positional = the
-                    // legacy claim-anything mode the live Node Mac worker
-                    // drives through the claim.mjs shim.
-                    let target = positional_after(&tail[1..]);
-                    stackhour_bridge::jobs::run_claim(&paths, target.as_deref())
-                } else {
-                    // `argv[2]` in return.mjs: the first positional after the
-                    // verb, ignoring the --runtime-dir pair. A missing id is
-                    // exit 2 with the reference's own message.
-                    let id = positional_after(&tail[1..]).unwrap_or_default();
-                    stackhour_bridge::jobs::run_return(&paths, &id)
-                };
-                ExitCode::from(code as u8)
-            }
-            Some(role @ ("coordinator" | "worker")) => {
-                let paths = match runtime_dir_from(&tail[1..]) {
-                    Ok(dir) => dir,
-                    Err(msg) => {
-                        eprintln!("stackhour bridge {role}: {msg}");
-                        return ExitCode::FAILURE;
-                    }
-                };
-                if role == "coordinator" {
-                    stackhour_bridge::coordinator::run_coordinator(&paths)
-                } else {
-                    stackhour_bridge::worker::run_worker(&paths)
-                }
-            }
-            // The one-shot notifier (fully ported + tested in tgsend.rs).
-            // Node ran it as a standalone script, so its args are everything
-            // after the verb.
-            Some("tg-send") => ExitCode::from(stackhour_bridge::tgsend::run_tg_send(&tail[1..]) as u8),
-            // install | doctor | status | restart, plus -h/--help and the
-            // usage-on-stderr exit(1) for anything unknown — exactly what
-            // cli.js hands to `runBridgeCli(process.argv.slice(3))`.
-            _ => ExitCode::from(stackhour_bridge::installer::run_bridge_cli(&tail) as u8),
-        },
         #[cfg(feature = "control")]
         "control" => {
             if tail.first().map(String::as_str) == Some("install") {
@@ -411,96 +336,9 @@ fn main() -> ExitCode {
     }
 }
 
-/// Resolve the bridge runtime dir for a daemon verb.
-///
-/// `--runtime-dir <dir>` comes from argv so it is the caller's job, exactly as
-/// in cli.mjs; everything below it is [`BridgePaths::resolve`]'s.
-#[cfg(feature = "bridge")]
-fn runtime_dir_from(args: &[String]) -> Result<std::path::PathBuf, String> {
-    let mut it = args.iter();
-    while let Some(arg) = it.next() {
-        if arg == "--runtime-dir" {
-            return match it.next() {
-                Some(v) if !v.trim().is_empty() => Ok(std::path::PathBuf::from(v)),
-                _ => Err("--runtime-dir needs a directory".to_string()),
-            };
-        }
-    }
-    let home = std::env::var("HOME")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_default();
-    Ok(stackhour_bridge::BridgePaths::resolve(&|k| std::env::var(k).ok(), &home).runtime_dir)
-}
-
-/// The first positional argument, skipping the `--runtime-dir <dir>` pair.
-///
-/// `return.mjs` reads a bare `argv[2]`; the Rust verb additionally accepts the
-/// runtime-dir flag either side of the id.
-#[cfg(feature = "bridge")]
-fn positional_after(args: &[String]) -> Option<String> {
-    let mut it = args.iter();
-    while let Some(arg) = it.next() {
-        if arg == "--runtime-dir" {
-            let _ = it.next();
-            continue;
-        }
-        if arg.starts_with("--") {
-            continue;
-        }
-        return Some(arg.clone());
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::HELP;
-    // Split out from the `HELP` import so the pinned help-body test stays
-    // ungated: these two helpers only exist in a bridge build.
-    #[cfg(feature = "bridge")]
-    use super::{positional_after, runtime_dir_from};
-
-    #[cfg(feature = "bridge")]
-    fn argv(parts: &[&str]) -> Vec<String> {
-        parts.iter().map(|s| s.to_string()).collect()
-    }
-
-    #[cfg(feature = "bridge")]
-    #[test]
-    fn the_return_id_is_found_around_the_runtime_dir_flag() {
-        assert_eq!(positional_after(&argv(&["abc"])).as_deref(), Some("abc"));
-        assert_eq!(
-            positional_after(&argv(&["--runtime-dir", "/tmp/rt", "abc"])).as_deref(),
-            Some("abc")
-        );
-        assert_eq!(
-            positional_after(&argv(&["abc", "--runtime-dir", "/tmp/rt"])).as_deref(),
-            Some("abc")
-        );
-        assert_eq!(positional_after(&argv(&["--runtime-dir", "/tmp/rt"])), None);
-        assert_eq!(positional_after(&argv(&[])), None);
-    }
-
-    #[cfg(feature = "bridge")]
-    #[test]
-    fn an_explicit_runtime_dir_beats_the_environment() {
-        let args: Vec<String> = ["--runtime-dir", "/tmp/rt"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
-        assert_eq!(runtime_dir_from(&args).unwrap(), std::path::Path::new("/tmp/rt"));
-    }
-
-    /// A bare `--runtime-dir` must not silently resolve to the default and
-    /// point a daemon at the wrong jobs directory.
-    #[cfg(feature = "bridge")]
-    #[test]
-    fn a_runtime_dir_flag_without_a_value_is_an_error() {
-        let args = vec!["--runtime-dir".to_string()];
-        assert!(runtime_dir_from(&args).is_err());
-        let args = vec!["--runtime-dir".to_string(), "  ".to_string()];
-        assert!(runtime_dir_from(&args).is_err());
-    }
 
     /// The usage banner is a user-visible contract shared with the Node CLI.
     /// `tests-fixtures/help.txt` is a capture of `node bin/stackhour` with a
@@ -521,19 +359,13 @@ mod tests {
         let set = super::compiled_modules();
         assert_eq!(set.tracker, cfg!(feature = "tracker"));
         assert_eq!(set.agent, cfg!(feature = "agent"));
-        assert_eq!(set.bridge, cfg!(feature = "bridge"));
         assert_eq!(set.control, cfg!(feature = "control"));
     }
 
     /// The prime constraint, stated as a test: a default build has every
     /// module compiled in, so Layer 1 never refuses anything and the binary
     /// behaves exactly as it did before features existed.
-    #[cfg(all(
-        feature = "tracker",
-        feature = "agent",
-        feature = "bridge",
-        feature = "control"
-    ))]
+    #[cfg(all(feature = "tracker", feature = "agent", feature = "control"))]
     #[test]
     fn a_default_build_compiles_in_every_module() {
         assert_eq!(super::compiled_modules(), stackhour_core::modules::ModuleSet::ALL);

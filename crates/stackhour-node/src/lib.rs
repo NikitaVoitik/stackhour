@@ -38,6 +38,7 @@
 mod backoff;
 mod config;
 mod engine;
+mod process;
 
 use futures_util::{SinkExt, StreamExt};
 use stackhour_core::{Error, Result};
@@ -49,6 +50,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 pub use config::{shutdown, NodeConfig, ShutdownHandle, ShutdownSignal};
 pub use engine::{CliEngine, CliEngineConfig, Engine, EngineOutbox, StubEngine};
+pub use process::{spawn_engine, RunRequest, RunResult, RunningJob};
 
 use engine::Outgoing;
 
@@ -70,9 +72,10 @@ pub async fn run_with_engine(
     shutdown: ShutdownSignal,
 ) -> Result<()> {
     let mut attempt: u32 = 0;
+    let outbox = EngineOutbox::persistent(config.node_id.clone());
 
     loop {
-        match connect_once(&config, &engine, &shutdown).await {
+        match connect_once(&config, &engine, &outbox, &shutdown).await {
             SessionEnd::Shutdown => return Ok(()),
             SessionEnd::Rejected(err) => {
                 return Err(Error::msg(format!("hub rejected node connection: {err}")));
@@ -110,6 +113,7 @@ enum SessionEnd {
 async fn connect_once(
     config: &NodeConfig,
     engine: &Arc<dyn Engine>,
+    outbox: &EngineOutbox,
     shutdown: &ShutdownSignal,
 ) -> SessionEnd {
     let ws = tokio::select! {
@@ -161,12 +165,16 @@ async fn connect_once(
     // Handshake accepted — stand up the steady-state session.
     let (out_tx, out_rx) = mpsc::channel::<Outgoing>(64);
     let writer = tokio::spawn(writer_task(write, out_rx));
-    let heartbeat = tokio::spawn(heartbeat_task(out_tx.clone(), config.heartbeat_interval));
-    let outbox = EngineOutbox::new(out_tx.clone(), config.node_id.clone());
+    let heartbeat = tokio::spawn(heartbeat_task(
+        out_tx.clone(),
+        outbox.clone(),
+        config.heartbeat_interval,
+    ));
+    outbox.attach(out_tx.clone()).await;
 
     let end = tokio::select! {
         () = shutdown.cancelled() => SessionEnd::Shutdown,
-        () = receive_loop(read, engine.clone(), outbox, out_tx.clone(), config.heartbeat_timeout) => {
+        () = receive_loop(read, engine.clone(), outbox.clone(), out_tx.clone(), config.heartbeat_timeout) => {
             SessionEnd::Disconnected { established: true }
         }
     };
@@ -174,6 +182,7 @@ async fn connect_once(
     // Tear the session down: drop the last sender so the writer drains, then
     // stop the helpers. In-flight engine streams see their sends fail and stop.
     heartbeat.abort();
+    outbox.detach();
     drop(out_tx);
     writer.abort();
     end
@@ -200,7 +209,7 @@ where
 }
 
 /// Emit a `Heartbeat` on the configured interval until the link closes.
-async fn heartbeat_task(tx: mpsc::Sender<Outgoing>, interval: std::time::Duration) {
+async fn heartbeat_task(tx: mpsc::Sender<Outgoing>, outbox: EngineOutbox, interval: std::time::Duration) {
     let mut ticker = tokio::time::interval(interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // The first tick fires immediately; consume it so heartbeats start one full
@@ -217,6 +226,7 @@ async fn heartbeat_task(tx: mpsc::Sender<Outgoing>, interval: std::time::Duratio
         {
             break;
         }
+        outbox.resend_pending().await;
     }
 }
 
@@ -282,6 +292,7 @@ fn handle_hub_message(msg: HubToNode, engine: &Arc<dyn Engine>, outbox: &EngineO
             engine.dispatch(command_id, work, outbox.clone());
         }
         HubToNode::CancelCommand { command_id } => engine.cancel(command_id, outbox.clone()),
+        HubToNode::EventAck { event_id } => outbox.acknowledge_event(event_id),
         // STUB: the stub engine gates no approvals, so a decision is a no-op in
         // Phase 1. The ACP adapter will verify and answer the pending request.
         HubToNode::ApprovalDecision { .. } | HubToNode::Heartbeat => {} // Inbound heartbeats only need to reset the staleness timer, which the

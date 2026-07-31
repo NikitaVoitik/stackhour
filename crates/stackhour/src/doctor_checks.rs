@@ -55,7 +55,7 @@ fn runtime_check() -> Check {
 ///
 /// Gated on the two modules that actually link rusqlite: the tracker (via
 /// stackhour-store) and the agent (its own Zed `threads.db` snapshot).
-/// Reporting "sqlite available" from a bridge-only binary that has no SQLite
+/// Reporting "sqlite available" from a control-only binary that has no SQLite
 /// in it would be a lie, so the check is absent there instead.
 #[cfg(any(feature = "tracker", feature = "agent"))]
 fn sqlite_check() -> Check {
@@ -494,7 +494,7 @@ fn services_check(out: &mut Vec<Check>) {
 /// what keeps `check_order_matches_the_node_inventory` green untouched.
 ///
 /// Status is always `Ok`: a deliberate operator choice is not a fault, and an
-/// `Error` here would make a healthy bridge-only box start exiting 1. The
+/// `Error` here would make a healthy control-only box start exiting 1. The
 /// lines exist so nobody debugs a deliberately absent `database` check as a
 /// broken install.
 ///
@@ -1033,7 +1033,7 @@ mod tests {
     /// build missing ANY feature appends (Layer 1 is off, so doctor says so).
     /// The attribute is the only change — the vector is byte-identical to the
     /// pre-feature version.
-    #[cfg(all(feature = "tracker", feature = "agent", feature = "bridge"))]
+    #[cfg(all(feature = "tracker", feature = "agent", feature = "control"))]
     #[test]
     fn check_order_matches_the_documented_inventory() {
         let tmp = TempDir::new().unwrap();
@@ -1101,11 +1101,11 @@ mod tests {
             &mut out,
         );
         assert_eq!(out.len(), 1);
-        assert_eq!(out[0].name, "module-bridge");
+        assert_eq!(out[0].name, "module-control");
         assert_eq!(out[0].status, StatusOk);
         assert_eq!(
             out[0].message,
-            "disabled by \"modules.bridge\": false in /home/u/.config/stackhour/config.json"
+            "disabled by \"modules.control\": false in /home/u/.config/stackhour/config.json"
         );
     }
 
@@ -1122,10 +1122,10 @@ mod tests {
             &mut out,
         );
         assert_eq!(out.len(), 1);
-        assert_eq!(out[0].name, "module-bridge");
+        assert_eq!(out[0].name, "module-control");
         assert_eq!(
             out[0].message,
-            "not compiled into this binary (rebuild with --features bridge)"
+            "not compiled into this binary (rebuild with --features control)"
         );
         assert!(!out[0].message.contains("config.json"));
     }
@@ -1136,7 +1136,7 @@ mod tests {
     fn module_lines_are_appended_after_every_existing_check() {
         let tmp = TempDir::new().unwrap();
         let opts = opts_for(&tmp);
-        let cfg = config_at(&opts.config_path, r#"{ "modules": { "bridge": false } }"#);
+        let cfg = config_at(&opts.config_path, r#"{ "modules": { "control": false } }"#);
         let with = all_checks(Result::Ok(&cfg), &opts);
         let plain = config_at(&opts.config_path, "{}");
         let without = all_checks(Result::Ok(&plain), &opts);
@@ -1155,26 +1155,26 @@ mod tests {
         // Every module line sits at the very tail, below every real check.
         let first = with.iter().position(|c| c.name.starts_with("module-")).unwrap();
         assert!(with[first..].iter().all(|c| c.name.starts_with("module-")));
-        // Turning bridge off in the CONFIG is what put a bridge line there —
-        // unless this build has no bridge compiled in, in which case Layer 1
+        // Turning control off in the CONFIG is what put a control line there —
+        // unless this build has no control compiled in, in which case Layer 1
         // had already claimed the line and wins.
-        let bridge = with
+        let control = with
             .iter()
-            .find(|c| c.name == "module-bridge")
-            .expect("bridge is off");
-        if crate::compiled_modules().bridge {
+            .find(|c| c.name == "module-control")
+            .expect("control is off");
+        if crate::compiled_modules().control {
             assert!(
-                bridge.message.starts_with("disabled by \"modules.bridge\""),
-                "{bridge:?}"
+                control.message.starts_with("disabled by \"modules.control\""),
+                "{control:?}"
             );
-            assert!(!without.iter().any(|c| c.name == "module-bridge"));
+            assert!(!without.iter().any(|c| c.name == "module-control"));
         } else {
-            assert!(bridge.message.starts_with("not compiled"), "{bridge:?}");
+            assert!(control.message.starts_with("not compiled"), "{control:?}");
         }
     }
 
     /// A deliberate operator choice is not a fault. If these were `Error`,
-    /// every healthy bridge-only leader would start exiting 1.
+    /// every healthy control-only leader would start exiting 1.
     #[test]
     fn module_lines_never_change_the_exit_code() {
         let mut out = Vec::new();
@@ -1221,7 +1221,7 @@ mod tests {
         );
         assert_eq!(
             module_line_names(&out),
-            vec!["module-tracker".to_string(), "module-bridge".to_string()]
+            vec!["module-tracker".to_string(), "module-control".to_string()]
         );
         for m in Module::ALL {
             assert_eq!(format!("module-{}", m.name()).split('-').count(), 2);

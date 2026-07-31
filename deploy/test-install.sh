@@ -19,12 +19,7 @@ run_download_case() {
   system_name=$1
   machine_name=$2
   expected_target=$3
-  flavor=${4:-full}
-  if [ "$flavor" = bridge ]; then
-    expected_asset="stackhour-bridge-$expected_target.tar.gz"
-  else
-    expected_asset="stackhour-$expected_target.tar.gz"
-  fi
+  expected_asset="stackhour-$expected_target.tar.gz"
   case_dir="$test_dir/$expected_target"
   fake_bin="$case_dir/bin"
   install_dir="$case_dir/install"
@@ -83,7 +78,6 @@ run_download_case() {
   TEST_EXPECTED_ASSET=$expected_asset \
   TEST_CURL_LOG=$case_dir/curl-log \
   STACKHOUR_INSTALL_DIR=$install_dir \
-  STACKHOUR_RELEASE_FLAVOR=$flavor \
   PATH="$fake_bin:/usr/bin:/bin" \
     sh "$case_dir/install.sh" >"$case_dir/output"
 
@@ -99,7 +93,6 @@ run_download_case() {
 run_download_case Linux x86_64 x86_64-unknown-linux-musl
 run_download_case Linux aarch64 aarch64-unknown-linux-musl
 run_download_case Darwin arm64 aarch64-apple-darwin
-run_download_case Linux x86_64 x86_64-unknown-linux-musl bridge
 
 unsupported_dir="$test_dir/unsupported-intel-macos"
 mkdir -p "$unsupported_dir/bin"

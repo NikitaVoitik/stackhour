@@ -60,6 +60,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::process::Command;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio::sync::{broadcast, mpsc};
@@ -69,8 +70,8 @@ use tokio::time::{interval_at, Duration, Instant};
 use chrono::Utc;
 use stackhour_core::{Error, Result};
 use stackhour_domain::{
-    AppendOutcome, ClientCommand, EntityWrite, Event, EventDraft, EventKind, Hub, HubToClient, HubToNode,
-    HubWelcome, NodeHello, NodeId, NodeToHub, NodeWork, ProtocolError, RunId, Subscribe, TaskId,
+    AppendOutcome, AssistantWake, ClientCommand, EntityWrite, Event, EventDraft, EventKind, Hub, HubToClient,
+    HubToNode, HubWelcome, NodeHello, NodeId, NodeToHub, NodeWork, ProtocolError, RunId, Subscribe, TaskId,
 };
 use stackhour_domain::{CommandId, ConnectionStatus, EventId, Node, Run, RunStatus, Task, TaskStatus};
 
@@ -121,6 +122,11 @@ struct Routing {
     task: HashMap<TaskId, NodeId>,
 }
 
+struct NodeConnection {
+    id: u64,
+    sender: mpsc::UnboundedSender<HubToNode>,
+}
+
 /// The shared, durable state of one hub: the guarded event log, the node
 /// secret, the live-event bus, the connected-node sender registry, and the
 /// ephemeral run→node routing. Cloneable only behind an [`Arc`]; construct with
@@ -138,7 +144,13 @@ pub struct HubState {
     /// Live bus of newly-appended events, fanned out to subscribed clients.
     events: broadcast::Sender<Event>,
     /// Senders into each connected node's write loop, keyed by node id.
-    nodes: Mutex<HashMap<NodeId, mpsc::UnboundedSender<HubToNode>>>,
+    nodes: Mutex<HashMap<NodeId, NodeConnection>>,
+    next_node_connection_id: AtomicU64,
+    /// Serializes node registration/removal with the short worker scheduling
+    /// critical section. A node may disconnect immediately after dispatch,
+    /// but it cannot disappear between eligibility selection and the durable
+    /// command bundle being queued for replay.
+    execution_gate: Mutex<()>,
     /// Ephemeral run→node routing.
     routing: Mutex<Routing>,
 }
@@ -171,7 +183,6 @@ pub struct AssistantSettings {
     pub claude_model: Option<String>,
     pub codex_model: Option<String>,
     pub reasoning_effort: String,
-    pub node_id: String,
     pub workspace: Option<String>,
     pub memory_enabled: bool,
     pub memory_command: Option<String>,
@@ -221,7 +232,6 @@ impl Default for AssistantSettings {
             claude_model: None,
             codex_model: None,
             reasoning_effort: "high".to_string(),
-            node_id: "local".to_string(),
             workspace: None,
             memory_enabled: false,
             memory_command: None,
@@ -248,7 +258,6 @@ impl AssistantSettings {
         if !matches!(self.reasoning_effort.as_str(), "low" | "medium" | "high") {
             return Err("reasoning_effort must be low, medium, or high".to_string());
         }
-        validate_identifier("node_id", &self.node_id)?;
         for (label, value) in [
             ("claude_model", self.claude_model.as_deref()),
             ("codex_model", self.codex_model.as_deref()),
@@ -303,6 +312,14 @@ pub struct AssistantSession {
     pub task_id: TaskId,
     pub run_id: Option<RunId>,
     pub engine: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_wake_event_id: Option<EventId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_follow_up: Option<String>,
+    #[serde(default)]
+    pub action_follow_up_in_progress: bool,
 }
 
 impl HubState {
@@ -358,6 +375,8 @@ impl HubState {
             client_secret,
             events,
             nodes: Mutex::new(HashMap::new()),
+            next_node_connection_id: AtomicU64::new(1),
+            execution_gate: Mutex::new(()),
             routing: Mutex::new(Routing::default()),
         })
     }
@@ -424,8 +443,9 @@ impl HubState {
         let senders = self.nodes.lock().unwrap_or_else(|poison| poison.into_inner());
         senders
             .values()
-            .filter(|sender| {
-                sender
+            .filter(|connection| {
+                connection
+                    .sender
                     .send(HubToNode::DispatchCommand {
                         command_id: CommandId::new(),
                         expires_at: Some(expires_at),
@@ -456,9 +476,134 @@ impl HubState {
         self.with_hub(|hub| hub.put_setting(&key, &serde_json::to_value(session)?))
     }
 
+    pub fn active_assistant_channel(&self) -> Result<Option<String>> {
+        self.with_hub(|hub| {
+            Ok(hub
+                .get_setting("assistant.active_channel")?
+                .and_then(|value| value.as_str().map(str::to_string))
+                .filter(|value| !value.trim().is_empty()))
+        })
+    }
+
+    pub fn set_active_assistant_channel(&self, channel: &str) -> Result<()> {
+        validate_identifier("assistant channel", channel).map_err(Error::msg)?;
+        self.with_hub(|hub| hub.put_setting("assistant.active_channel", &Value::String(channel.to_string())))
+    }
+
     pub fn clear_assistant_session(&self, channel: &str) -> Result<()> {
         let key = format!("assistant.session.{channel}");
         self.with_hub(|hub| hub.put_setting(&key, &Value::Null))
+    }
+
+    pub fn pending_assistant_wakes(&self, channel: &str) -> Result<Vec<AssistantWake>> {
+        self.with_hub(|hub| hub.pending_assistant_wakes(channel))
+    }
+
+    pub fn complete_assistant_wake(&self, event_id: &EventId) -> Result<bool> {
+        self.with_hub(|hub| hub.complete_assistant_wake(event_id))
+    }
+
+    pub fn defer_assistant_wake(&self, event_id: &EventId, error: &str) -> Result<bool> {
+        self.with_hub(|hub| hub.defer_assistant_wake(event_id, error))
+    }
+
+    pub fn track_assistant_worker(&self, channel: &str, task_id: TaskId, run_id: RunId) -> Result<()> {
+        let Some((node_id, bound_task)) = self.run_binding(&run_id) else {
+            return Err(Error::msg("cannot track an unknown worker run"));
+        };
+        if bound_task != task_id || node_id == hub_node() {
+            return Err(Error::msg(
+                "assistant worker must be a node-owned run for this task",
+            ));
+        }
+        self.with_hub(|hub| hub.register_assistant_worker(channel, task_id))
+    }
+
+    /// Start Claire's provider run inside the hub process. This deliberately
+    /// bypasses node dispatch: the hub is the only legal execution location
+    /// for the persistent assistant.
+    pub fn start_hub_assistant_run(
+        &self,
+        task_id: TaskId,
+        engine: &str,
+        model: Option<String>,
+        reasoning_effort: Option<String>,
+        system_prompt: String,
+        workspace_path: Option<String>,
+    ) -> Result<RunId> {
+        validate_run_configuration(
+            engine,
+            model.as_deref(),
+            reasoning_effort.as_deref(),
+            Some(&system_prompt),
+            workspace_path.as_deref(),
+        )
+        .map_err(Error::msg)?;
+        let run_id = RunId::new();
+        let run = Run {
+            id: run_id,
+            task_id,
+            node_id: hub_node(),
+            engine: engine.to_string(),
+            model: model.clone(),
+            reasoning_effort: reasoning_effort.clone(),
+            system_prompt: Some(system_prompt),
+            access_policy: stackhour_domain::AccessPolicy::Supervised,
+            workspace_path: workspace_path.clone(),
+            status: RunStatus::Started,
+            started_at: Utc::now(),
+        };
+        let draft = EventDraft::new(EventKind::RunStarted, task_id, hub_node())
+            .with_run(run_id)
+            .with_payload(json!({
+                "engine": engine,
+                "model": model,
+                "reasoning_effort": reasoning_effort,
+                "access_policy": stackhour_domain::AccessPolicy::Supervised,
+                "workspace_path": workspace_path,
+                "hub_local_assistant": true,
+            }));
+        self.append_and_broadcast_command(CommandId::new(), draft, EntityWrite::Run(run), None)?;
+        Ok(run_id)
+    }
+
+    /// Persist a user message addressed to Claire without routing it onto the
+    /// node link.
+    pub fn append_hub_assistant_message(&self, task_id: TaskId, run_id: RunId, text: &str) -> Result<()> {
+        let mut draft = EventDraft::new(EventKind::MessageUser, task_id, hub_node()).with_payload(json!({
+            "text": text,
+            "client_message_id": CommandId::new().to_string(),
+        }));
+        draft.run_id = Some(run_id);
+        self.append_and_broadcast_command(CommandId::new(), draft, EntityWrite::None, None)?;
+        Ok(())
+    }
+
+    /// Persist one terminal/output event produced by Claire's hub-local
+    /// provider process.
+    pub fn append_hub_assistant_event(
+        &self,
+        kind: EventKind,
+        task_id: TaskId,
+        run_id: RunId,
+        provider_session_id: Option<String>,
+        payload: Value,
+    ) -> Result<()> {
+        if !matches!(
+            kind,
+            EventKind::MessageAssistantCompleted
+                | EventKind::RunCompleted
+                | EventKind::RunFailed
+                | EventKind::RunInterrupted
+        ) {
+            return Err(Error::msg("unsupported hub-assistant event kind"));
+        }
+        let mut draft = EventDraft::new(kind, task_id, hub_node())
+            .with_run(run_id)
+            .with_payload(payload);
+        draft.provider_session_id = provider_session_id;
+        self.append_and_broadcast_node_event(EventId::new(), draft)?;
+        Ok(())
     }
 
     /// Append a client command and, iff it created a new event, persist any
@@ -519,12 +664,12 @@ impl HubState {
         self.events_after(after)
     }
 
+    pub fn read_recent_events(&self, limit: usize) -> Result<Vec<Event>> {
+        self.with_hub(|hub| hub.recent_events(limit))
+    }
+
     pub fn task_events(&self, task_id: TaskId) -> Result<Vec<Event>> {
-        Ok(self
-            .events_after(0)?
-            .into_iter()
-            .filter(|event| event.task_id == task_id)
-            .collect())
+        self.with_hub(|hub| hub.task_events_tail(&task_id, 200))
     }
 
     /// Apply and route one command from an in-process client.
@@ -561,6 +706,165 @@ impl HubState {
         })
     }
 
+    /// Select a currently connected node that advertises `engine` and has not
+    /// opted out of task dispatch. A preferred target is an eligibility
+    /// constraint, not a hint: the hub never silently sends explicitly
+    /// targeted work somewhere else.
+    fn eligible_execution_node(
+        &self,
+        engine: &str,
+        preferred: Option<&NodeId>,
+    ) -> std::result::Result<NodeId, ProtocolError> {
+        let connected = self.nodes.lock().unwrap_or_else(|p| p.into_inner());
+        let nodes = self
+            .with_hub(|hub| hub.list_nodes())
+            .map_err(|_| ProtocolError::InvalidRequest {
+                message: "cannot read execution-node registry".to_string(),
+            })?;
+        nodes
+            .into_iter()
+            .find(|node| {
+                preferred.is_none_or(|wanted| wanted == &node.id)
+                    && connected.contains_key(&node.id)
+                    && node_accepts_engine(&node.capabilities, engine)
+            })
+            .map(|node| node.id)
+            .ok_or_else(|| ProtocolError::NoEligibleNode {
+                engine: engine.to_string(),
+                node_id: preferred.cloned(),
+            })
+    }
+
+    /// Resolve a worker target through the same active/capability scheduler
+    /// enforced by [`ClientCommand::StartRun`]. In-process hub clients such as
+    /// Claire use this before creating a task so an unschedulable request does
+    /// not leave an orphan open task.
+    pub fn schedule_execution_node(&self, engine: &str, preferred: Option<&NodeId>) -> Result<NodeId> {
+        self.eligible_execution_node(engine, preferred)
+            .map_err(|error| Error::msg(error.to_string()))
+    }
+
+    /// Create, start, and prompt a worker while node membership is stable.
+    ///
+    /// The durable node dispatches remain replayable if the socket dies after
+    /// this critical section. Holding the same gate used by register/remove
+    /// closes the former check-then-act window that could create an open task
+    /// and then reject its run solely because the selected node disappeared.
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_worker_task(
+        &self,
+        title: String,
+        prompt: String,
+        assistant_channel: Option<String>,
+        preferred_node: Option<NodeId>,
+        engine: String,
+        model: Option<String>,
+        reasoning_effort: Option<String>,
+        workspace_path: Option<String>,
+    ) -> Result<(TaskId, RunId)> {
+        validate_run_configuration(
+            &engine,
+            model.as_deref(),
+            reasoning_effort.as_deref(),
+            None,
+            workspace_path.as_deref(),
+        )
+        .map_err(Error::msg)?;
+        let _gate = self.execution_gate.lock().unwrap_or_else(|p| p.into_inner());
+        let node_id = self
+            .eligible_execution_node(&engine, preferred_node.as_ref())
+            .map_err(|error| Error::msg(error.to_string()))?;
+
+        let created = self.apply_command_inner(
+            ClientCommand::CreateTask {
+                command_id: CommandId::new(),
+                title,
+            },
+            None,
+        );
+        let task_event = self.event_from_effect(created)?;
+        let task_id = task_event.task_id;
+        if let Some(channel) = assistant_channel.as_deref() {
+            self.with_hub(|hub| hub.register_assistant_worker(channel, task_id))?;
+        }
+
+        let started = self.apply_command_inner(
+            ClientCommand::StartRun {
+                command_id: CommandId::new(),
+                task_id,
+                node_id: Some(node_id.clone()),
+                engine,
+                model,
+                reasoning_effort,
+                system_prompt: None,
+                access_policy: stackhour_domain::AccessPolicy::Supervised,
+                workspace_path,
+            },
+            Some(node_id),
+        );
+        let run_event = self.event_from_effect_without_routing(&started)?;
+        let run_id = run_event
+            .run_id
+            .ok_or_else(|| Error::msg("hub did not assign a worker run"))?;
+        self.route_effect(started)?;
+
+        let prompted = self.apply_command_inner(
+            ClientCommand::SendUserMessage {
+                command_id: CommandId::new(),
+                task_id,
+                run_id: Some(run_id),
+                text: prompt,
+                client_message_id: CommandId::new().to_string(),
+            },
+            None,
+        );
+        self.route_effect(prompted)?;
+        Ok((task_id, run_id))
+    }
+
+    fn event_from_effect(&self, effect: CommandEffect) -> Result<Event> {
+        let sequence = self.route_effect(effect)?;
+        self.read_events_after(sequence - 1)?
+            .into_iter()
+            .find(|event| event.sequence == sequence)
+            .ok_or_else(|| Error::msg("accepted command event is missing"))
+    }
+
+    fn event_from_effect_without_routing(&self, effect: &CommandEffect) -> Result<Event> {
+        let sequence = match &effect.receipt {
+            HubToClient::CommandReceipt {
+                accepted: true,
+                assigned_sequence: Some(sequence),
+                ..
+            } => *sequence,
+            HubToClient::CommandReceipt { error, .. } => {
+                return Err(Error::msg(format!("hub rejected command: {error:?}")));
+            }
+            _ => return Err(Error::msg("hub returned an invalid command receipt")),
+        };
+        self.read_events_after(sequence - 1)?
+            .into_iter()
+            .find(|event| event.sequence == sequence)
+            .ok_or_else(|| Error::msg("accepted command event is missing"))
+    }
+
+    fn route_effect(&self, effect: CommandEffect) -> Result<i64> {
+        if let Some((node_id, work)) = effect.dispatch {
+            self.route_to_node(&node_id, work);
+        }
+        match effect.receipt {
+            HubToClient::CommandReceipt {
+                accepted: true,
+                assigned_sequence: Some(sequence),
+                ..
+            } => Ok(sequence),
+            HubToClient::CommandReceipt { error, .. } => {
+                Err(Error::msg(format!("hub rejected command: {error:?}")))
+            }
+            _ => Err(Error::msg("hub returned an invalid command receipt")),
+        }
+    }
+
     /// The current head sequence and the ascending catch-up tail after `after`.
     fn snapshot(&self, after: i64) -> Result<(i64, Vec<Event>)> {
         self.with_hub(|hub| {
@@ -580,7 +884,19 @@ impl HubState {
     /// returns the original receipt and dispatches nothing, so a client retry is
     /// a true no-op beyond re-acknowledgement.
     fn apply_command(&self, cmd: ClientCommand) -> CommandEffect {
+        let _gate = matches!(cmd, ClientCommand::StartRun { .. })
+            .then(|| self.execution_gate.lock().unwrap_or_else(|p| p.into_inner()));
+        self.apply_command_inner(cmd, None)
+    }
+
+    fn apply_command_inner(&self, cmd: ClientCommand, reserved_node: Option<NodeId>) -> CommandEffect {
         let command_id = cmd.command_id();
+        if let Ok(Some(outcome)) = self.with_hub(|hub| hub.command_outcome(&command_id)) {
+            return CommandEffect {
+                receipt: HubToClient::accepted(command_id, outcome.sequence, outcome.event_id),
+                dispatch: None,
+            };
+        }
         match cmd {
             ClientCommand::CreateTask { title, .. } => {
                 // Mint the task id up front so the durable `Task` row and the
@@ -608,6 +924,19 @@ impl HubState {
                 let node = run_id
                     .and_then(|r| self.node_for_run(&r))
                     .or_else(|| self.node_for_task(&task_id));
+                if node.as_ref().is_some_and(|node| node == &hub_node()) {
+                    return CommandEffect {
+                        receipt: HubToClient::rejected(
+                            command_id,
+                            ProtocolError::InvalidRequest {
+                                message:
+                                    "hub-local assistant messages must be submitted by their owning supervisor"
+                                        .to_string(),
+                            },
+                        ),
+                        dispatch: None,
+                    };
+                }
                 let dispatch = match (node.clone(), run_id) {
                     (Some(n), Some(r)) => Some((
                         n,
@@ -654,6 +983,18 @@ impl HubState {
                         dispatch: None,
                     };
                 }
+                let node_id = match reserved_node
+                    .map(Ok)
+                    .unwrap_or_else(|| self.eligible_execution_node(&engine, node_id.as_ref()))
+                {
+                    Ok(node_id) => node_id,
+                    Err(error) => {
+                        return CommandEffect {
+                            receipt: HubToClient::rejected(command_id, error),
+                            dispatch: None,
+                        };
+                    }
+                };
                 let run_id = RunId::new();
                 // The durable `Run` row shares the id the hub stamps on the
                 // `run.started` event and dispatches to the node.
@@ -706,6 +1047,19 @@ impl HubState {
 
             ClientCommand::InterruptRun { run_id, .. } => {
                 let binding = self.run_binding(&run_id);
+                if binding.as_ref().is_some_and(|(node, _)| node == &hub_node()) {
+                    return CommandEffect {
+                        receipt: HubToClient::rejected(
+                            command_id,
+                            ProtocolError::InvalidRequest {
+                                message:
+                                    "hub-local assistant runs must be stopped by their owning supervisor"
+                                        .to_string(),
+                            },
+                        ),
+                        dispatch: None,
+                    };
+                }
                 let (node, task_id) = match binding {
                     Some((n, t)) => (Some(n), t),
                     None => (None, system_task()),
@@ -831,18 +1185,29 @@ impl HubState {
 
     // --- node registry + routing ------------------------------------------
 
-    fn register_node(&self, node_id: NodeId, tx: mpsc::UnboundedSender<HubToNode>) {
-        self.nodes
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .insert(node_id, tx);
+    fn register_node(&self, node_id: NodeId, tx: mpsc::UnboundedSender<HubToNode>) -> u64 {
+        let _gate = self.execution_gate.lock().unwrap_or_else(|p| p.into_inner());
+        let connection_id = self.next_node_connection_id.fetch_add(1, Ordering::Relaxed);
+        self.nodes.lock().unwrap_or_else(|p| p.into_inner()).insert(
+            node_id,
+            NodeConnection {
+                id: connection_id,
+                sender: tx,
+            },
+        );
+        connection_id
     }
 
-    fn unregister_node(&self, node_id: &NodeId) {
-        self.nodes
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .remove(node_id);
+    fn unregister_node(&self, node_id: &NodeId, connection_id: u64) -> bool {
+        let _gate = self.execution_gate.lock().unwrap_or_else(|p| p.into_inner());
+        let mut nodes = self.nodes.lock().unwrap_or_else(|p| p.into_inner());
+        let owns_slot = nodes
+            .get(node_id)
+            .is_some_and(|current| current.id == connection_id);
+        if owns_slot {
+            nodes.remove(node_id);
+        }
+        owns_slot
     }
 
     /// Route a hub→node message to the named node's write loop. Returns whether
@@ -851,7 +1216,7 @@ impl HubState {
     fn route_to_node(&self, node_id: &NodeId, msg: HubToNode) -> bool {
         let guard = self.nodes.lock().unwrap_or_else(|p| p.into_inner());
         match guard.get(node_id) {
-            Some(tx) => tx.send(msg).is_ok(),
+            Some(connection) => connection.sender.send(msg).is_ok(),
             None => false,
         }
     }
@@ -865,8 +1230,8 @@ impl HubState {
         }
     }
 
-    fn acknowledge_dispatch(&self, command_id: &CommandId) {
-        let _ = self.with_hub(|hub| hub.acknowledge_dispatch(command_id));
+    fn acknowledge_dispatch_from(&self, node_id: &NodeId, command_id: &CommandId) {
+        let _ = self.with_hub(|hub| hub.acknowledge_dispatch_from(command_id, node_id));
     }
 
     fn remember_run(&self, run_id: RunId, node_id: NodeId, task_id: TaskId) {
@@ -876,6 +1241,10 @@ impl HubState {
     }
 
     fn run_binding(&self, run_id: &RunId) -> Option<(NodeId, TaskId)> {
+        self.run_binding_checked(run_id).ok().flatten()
+    }
+
+    fn run_binding_checked(&self, run_id: &RunId) -> Result<Option<(NodeId, TaskId)>> {
         let cached = self
             .routing
             .lock()
@@ -884,12 +1253,14 @@ impl HubState {
             .get(run_id)
             .cloned();
         if cached.is_some() {
-            return cached;
+            return Ok(cached);
         }
-        let run = self.with_hub(|hub| hub.get_run(run_id)).ok().flatten()?;
+        let Some(run) = self.with_hub(|hub| hub.get_run(run_id))? else {
+            return Ok(None);
+        };
         let binding = (run.node_id.clone(), run.task_id);
         self.remember_run(run.id, run.node_id, run.task_id);
-        Some(binding)
+        Ok(Some(binding))
     }
 
     fn node_for_run(&self, run_id: &RunId) -> Option<NodeId> {
@@ -903,6 +1274,18 @@ impl HubState {
             .task
             .get(task_id)
             .cloned()
+    }
+
+    fn accepts_node_event(&self, authenticated_node: &NodeId, draft: &EventDraft) -> Result<bool> {
+        if &draft.node_id != authenticated_node {
+            return Ok(false);
+        }
+        let Some(run_id) = draft.run_id else {
+            return Ok(false);
+        };
+        Ok(self
+            .run_binding_checked(&run_id)?
+            .is_some_and(|(node_id, task_id)| node_id == *authenticated_node && task_id == draft.task_id))
     }
 
     // --- node lifecycle events --------------------------------------------
@@ -984,6 +1367,17 @@ fn validate_run_configuration(
     Ok(())
 }
 
+fn node_accepts_engine(capabilities: &Value, engine: &str) -> bool {
+    if capabilities.get("accepts_tasks").and_then(Value::as_bool) == Some(false) {
+        return false;
+    }
+    capabilities
+        .get("engines")
+        .and_then(Value::as_array)
+        .is_some_and(|engines| engines.iter().any(|value| value.as_str() == Some(engine)))
+        || capabilities.get(engine).and_then(Value::as_bool) == Some(true)
+}
+
 /// The result of applying one [`ClientCommand`]: the receipt to return to the
 /// issuing client, and any hub→node work to route. The resulting event, when
 /// new, has already been broadcast to all subscribers.
@@ -1011,6 +1405,7 @@ pub fn router(state: Arc<HubState>) -> Router {
         .route("/", get(control_panel))
         .route("/health", get(health))
         .route("/v1/nodes", get(list_nodes))
+        .route("/v1/tasks/start", post(start_task))
         .route(
             "/v1/settings/assistant",
             get(get_assistant_settings).put(put_assistant_settings),
@@ -1024,6 +1419,44 @@ pub fn router(state: Arc<HubState>) -> Router {
         .route("/v1/node/connect", get(node_connect))
         .route("/v1/client/connect", get(client_connect))
         .with_state(state)
+}
+
+#[derive(Debug, Deserialize)]
+struct StartTaskRequest {
+    title: String,
+    prompt: String,
+    node_id: Option<NodeId>,
+    engine: String,
+    model: Option<String>,
+    reasoning_effort: Option<String>,
+    workspace_path: Option<String>,
+}
+
+async fn start_task(
+    State(state): State<Arc<HubState>>,
+    headers: HeaderMap,
+    Json(request): Json<StartTaskRequest>,
+) -> Response {
+    if !state.accepts_client(bearer(&headers)) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": "invalid client token"})),
+        )
+            .into_response();
+    }
+    match state.create_worker_task(
+        request.title,
+        request.prompt,
+        state.active_assistant_channel().ok().flatten(),
+        request.node_id,
+        request.engine,
+        request.model,
+        request.reasoning_effort,
+        request.workspace_path,
+    ) {
+        Ok((task_id, run_id)) => Json(json!({"task_id": task_id, "run_id": run_id})).into_response(),
+        Err(error) => (StatusCode::CONFLICT, Json(json!({"error": error.message()}))).into_response(),
+    }
 }
 
 async fn get_assistant_settings(State(state): State<Arc<HubState>>, headers: HeaderMap) -> Response {
@@ -1667,7 +2100,7 @@ async fn handle_node(socket: WebSocket, state: Arc<HubState>) {
 
     let node_id = hello.node_id.clone();
     let (tx, mut node_rx) = mpsc::unbounded_channel::<HubToNode>();
-    state.register_node(node_id.clone(), tx);
+    let connection_id = state.register_node(node_id.clone(), tx);
     state.on_node_connected(&hello);
     state.replay_pending(&node_id);
 
@@ -1686,10 +2119,37 @@ async fn handle_node(socket: WebSocket, state: Arc<HubState>) {
                         if let Some(from_node) = parse_text::<NodeToHub>(&msg) {
                             match from_node {
                                 NodeToHub::NodeEvent { event_id, draft } => {
-                                    let _ = state.append_and_broadcast_node_event(event_id, draft);
+                                    match state.accepts_node_event(&node_id, &draft) {
+                                        Ok(false) => {
+                                            eprintln!(
+                                                "control hub rejected invalid event {event_id} from {node_id}"
+                                            );
+                                            state.route_to_node(
+                                                &node_id,
+                                                HubToNode::EventAck { event_id },
+                                            );
+                                        }
+                                        Ok(true) => {
+                                            if state
+                                                .append_and_broadcast_node_event(event_id, draft)
+                                                .is_ok()
+                                            {
+                                                state.route_to_node(
+                                                    &node_id,
+                                                    HubToNode::EventAck { event_id },
+                                                );
+                                            }
+                                        }
+                                        Err(error) => {
+                                            eprintln!(
+                                                "control hub could not validate event {event_id} from {node_id}: {}",
+                                                error.message()
+                                            );
+                                        }
+                                    }
                                 }
                                 NodeToHub::CommandAck { command_id } => {
-                                    state.acknowledge_dispatch(&command_id);
+                                    state.acknowledge_dispatch_from(&node_id, &command_id);
                                 }
                                 NodeToHub::Heartbeat => {}
                             }
@@ -1719,8 +2179,9 @@ async fn handle_node(socket: WebSocket, state: Arc<HubState>) {
         }
     }
 
-    state.unregister_node(&node_id);
-    state.on_node_disconnected(&node_id);
+    if state.unregister_node(&node_id, connection_id) {
+        state.on_node_disconnected(&node_id);
+    }
 }
 
 #[cfg(test)]
@@ -1779,6 +2240,19 @@ mod tests {
         }
     }
 
+    fn connect_test_node(
+        state: &HubState,
+        node: &str,
+        capabilities: Value,
+    ) -> mpsc::UnboundedReceiver<HubToNode> {
+        let mut hello = hello(node, "s3cret", WIRE_PROTOCOL_VERSION);
+        hello.capabilities = capabilities;
+        let (sender, receiver) = mpsc::unbounded_channel();
+        state.register_node(hello.node_id.clone(), sender);
+        state.on_node_connected(&hello);
+        receiver
+    }
+
     // --- command application ----------------------------------------------
 
     #[test]
@@ -1834,14 +2308,72 @@ mod tests {
     }
 
     #[test]
+    fn replaying_start_run_does_not_recheck_ephemeral_node_eligibility() {
+        let state = state();
+        let node_id = NodeId::from("laptop");
+        let hello = NodeHello {
+            node_id: node_id.clone(),
+            token: "s3cret".to_string(),
+            software_version: "test".to_string(),
+            protocol_version: WIRE_PROTOCOL_VERSION,
+            capabilities: json!({"engines": ["claude"]}),
+            resume_after_sequence: None,
+        };
+        let (sender, _receiver) = mpsc::unbounded_channel();
+        let connection_id = state.register_node(node_id.clone(), sender);
+        state.on_node_connected(&hello);
+        let command_id = CommandId::new();
+        let command = || ClientCommand::StartRun {
+            command_id,
+            task_id: TaskId::new(),
+            node_id: Some(node_id.clone()),
+            engine: "claude".to_string(),
+            model: None,
+            reasoning_effort: None,
+            system_prompt: None,
+            access_policy: AccessPolicy::Supervised,
+            workspace_path: None,
+        };
+
+        let first = state.apply_command(command());
+        assert!(first.dispatch.is_some());
+        assert!(state.unregister_node(&node_id, connection_id));
+        let replay = state.apply_command(command());
+
+        assert!(replay.dispatch.is_none());
+        assert!(matches!(
+            replay.receipt,
+            HubToClient::CommandReceipt {
+                accepted: true,
+                assigned_sequence: Some(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn stale_socket_cannot_unregister_a_newer_connection() {
+        let state = state();
+        let node_id = NodeId::from("laptop");
+        let (old_sender, _old_receiver) = mpsc::unbounded_channel();
+        let (new_sender, _new_receiver) = mpsc::unbounded_channel();
+        let old_connection = state.register_node(node_id.clone(), old_sender);
+        state.register_node(node_id.clone(), new_sender);
+
+        assert!(!state.unregister_node(&node_id, old_connection));
+        assert!(state.nodes.lock().unwrap().contains_key(&node_id));
+    }
+
+    #[test]
     fn start_run_routes_work_and_remembers_the_binding() {
         let s = state();
         let node = NodeId::from("laptop");
+        let _node_rx = connect_test_node(&s, "laptop", json!({"engines": ["acp"]}));
         let task = TaskId::new();
         let effect = s.apply_command(ClientCommand::StartRun {
             command_id: CommandId::new(),
             task_id: task,
-            node_id: node.clone(),
+            node_id: Some(node.clone()),
             engine: "acp".to_string(),
             model: None,
             reasoning_effort: None,
@@ -1862,6 +2394,137 @@ mod tests {
         // …and the run→node binding is remembered for later interrupts.
         assert_eq!(s.node_for_run(&run_id), Some(node.clone()));
         assert_eq!(s.node_for_task(&task), Some(node));
+    }
+
+    #[test]
+    fn start_run_without_a_target_selects_an_eligible_active_node() {
+        let state = state();
+        let _alpha = connect_test_node(
+            &state,
+            "alpha",
+            json!({"engines": ["claude"], "accepts_tasks": false}),
+        );
+        let _beta = connect_test_node(&state, "beta", json!({"engines": ["codex", "claude"]}));
+        let _gamma = connect_test_node(&state, "gamma", json!({"engines": ["claude"]}));
+
+        let effect = state.apply_command(ClientCommand::StartRun {
+            command_id: CommandId::new(),
+            task_id: TaskId::new(),
+            node_id: None,
+            engine: "claude".to_string(),
+            model: None,
+            reasoning_effort: None,
+            system_prompt: None,
+            access_policy: AccessPolicy::Automatic,
+            workspace_path: None,
+        });
+
+        let (node, _) = effect.dispatch.expect("an eligible node receives the run");
+        assert_eq!(node, NodeId::from("beta"));
+    }
+
+    #[test]
+    fn hub_local_run_rejects_generic_interrupt_without_recording_a_false_stop() {
+        let state = state();
+        let task_id = TaskId::new();
+        let run_id = state
+            .start_hub_assistant_run(
+                task_id,
+                "claude",
+                None,
+                Some("high".to_string()),
+                "system".to_string(),
+                None,
+            )
+            .unwrap();
+        let before = state.read_events_after(0).unwrap().len();
+
+        let effect = state.apply_command(ClientCommand::InterruptRun {
+            command_id: CommandId::new(),
+            run_id,
+        });
+
+        assert!(matches!(
+            effect.receipt,
+            HubToClient::CommandReceipt {
+                accepted: false,
+                error: Some(ProtocolError::InvalidRequest { .. }),
+                ..
+            }
+        ));
+        assert_eq!(state.read_events_after(0).unwrap().len(), before);
+    }
+
+    #[test]
+    fn node_events_must_match_the_authenticated_node_and_durable_run_binding() {
+        let state = state();
+        let _receiver = connect_test_node(&state, "alpha", json!({"engines": ["claude"]}));
+        let task_id = TaskId::new();
+        let effect = state.apply_command(ClientCommand::StartRun {
+            command_id: CommandId::new(),
+            task_id,
+            node_id: Some(NodeId::from("alpha")),
+            engine: "claude".to_string(),
+            model: None,
+            reasoning_effort: None,
+            system_prompt: None,
+            access_policy: AccessPolicy::Supervised,
+            workspace_path: None,
+        });
+        let run_id = match effect.dispatch.unwrap().1 {
+            HubToNode::DispatchCommand {
+                work: NodeWork::StartRun { run_id, .. },
+                ..
+            } => run_id,
+            other => panic!("unexpected dispatch: {other:?}"),
+        };
+        let valid = EventDraft::new(EventKind::RunCompleted, task_id, NodeId::from("alpha")).with_run(run_id);
+        let wrong_connection = EventDraft {
+            node_id: NodeId::from("beta"),
+            ..valid.clone()
+        };
+        let wrong_task = EventDraft {
+            task_id: TaskId::new(),
+            ..valid.clone()
+        };
+
+        assert!(state.accepts_node_event(&NodeId::from("alpha"), &valid).unwrap());
+        assert!(!state
+            .accepts_node_event(&NodeId::from("alpha"), &wrong_connection)
+            .unwrap());
+        assert!(!state
+            .accepts_node_event(&NodeId::from("alpha"), &wrong_task)
+            .unwrap());
+    }
+
+    #[test]
+    fn start_run_rejects_offline_or_incompatible_targets_without_an_event() {
+        let state = state();
+        let _node = connect_test_node(&state, "online", json!({"engines": ["codex"]}));
+        for node_id in [NodeId::from("offline"), NodeId::from("online")] {
+            let before = state.read_events_after(0).unwrap().len();
+            let effect = state.apply_command(ClientCommand::StartRun {
+                command_id: CommandId::new(),
+                task_id: TaskId::new(),
+                node_id: Some(node_id.clone()),
+                engine: "claude".to_string(),
+                model: None,
+                reasoning_effort: None,
+                system_prompt: None,
+                access_policy: AccessPolicy::Automatic,
+                workspace_path: None,
+            });
+            assert!(effect.dispatch.is_none());
+            assert!(matches!(
+                effect.receipt,
+                HubToClient::CommandReceipt {
+                    accepted: false,
+                    error: Some(ProtocolError::NoEligibleNode { .. }),
+                    ..
+                }
+            ));
+            assert_eq!(state.read_events_after(0).unwrap().len(), before);
+        }
     }
 
     #[test]
@@ -1918,11 +2581,12 @@ mod tests {
     fn start_run_persists_a_durable_run_row() {
         let s = state();
         let node = NodeId::from("laptop");
+        let _node_rx = connect_test_node(&s, "laptop", json!({"engines": ["acp"]}));
         let task = TaskId::new();
         let effect = s.apply_command(ClientCommand::StartRun {
             command_id: CommandId::new(),
             task_id: task,
-            node_id: node.clone(),
+            node_id: Some(node.clone()),
             engine: "acp".to_string(),
             model: Some("m".to_string()),
             reasoning_effort: Some("high".to_string()),
@@ -1958,6 +2622,10 @@ mod tests {
             task_id: TaskId::new(),
             run_id: Some(RunId::new()),
             engine: "codex".to_string(),
+            provider_session_id: Some("provider-thread".to_string()),
+            pending_wake_event_id: None,
+            pending_follow_up: None,
+            action_follow_up_in_progress: false,
         };
         {
             let state = HubState::open(&path, "secret").unwrap();
@@ -2030,7 +2698,7 @@ mod tests {
         let effect = state.apply_command(ClientCommand::StartRun {
             command_id: CommandId::new(),
             task_id: TaskId::new(),
-            node_id: NodeId::from("local"),
+            node_id: Some(NodeId::from("local")),
             engine: "codex".to_string(),
             model: Some("luna;bad".to_string()),
             reasoning_effort: Some("extreme".to_string()),
@@ -2144,6 +2812,8 @@ mod tests {
         assert!(CONTROL_PANEL.contains("Add a machine"));
         assert!(CONTROL_PANEL.contains("/v1/admin/install"));
         assert!(CONTROL_PANEL.contains("/v1/nodes"));
+        assert!(CONTROL_PANEL.contains("Claire always runs on this hub"));
+        assert!(!CONTROL_PANEL.contains("assistant-node"));
         assert!(!CONTROL_PANEL.contains("https://"));
         assert!(!CONTROL_PANEL.contains("<script src="));
     }
@@ -2243,6 +2913,48 @@ mod tests {
             state.assistant_settings().unwrap().codex_model.as_deref(),
             Some("gpt-5.6-luna")
         );
+    }
+
+    #[tokio::test]
+    async fn control_panel_tasks_wake_the_active_hub_assistant() {
+        let state = HubState::in_memory_secured("node", "client").unwrap();
+        state.set_active_assistant_channel("telegram.1").unwrap();
+        let mut work = connect_test_node(&state, "worker", json!({"engines": ["codex"]}));
+        let response = router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v1/tasks/start")
+                    .header("content-type", "application/json")
+                    .header("authorization", "Bearer client")
+                    .body(Body::from(
+                        serde_json::to_vec(&json!({
+                            "title": "Panel task",
+                            "prompt": "Do it",
+                            "engine": "codex"
+                        }))
+                        .unwrap(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let (task_id, run_id) = match work.recv().await.unwrap() {
+            HubToNode::DispatchCommand {
+                work: NodeWork::StartRun { task_id, run_id, .. },
+                ..
+            } => (task_id, run_id),
+            other => panic!("wrong work: {other:?}"),
+        };
+        state
+            .append_and_broadcast_node_event(
+                EventId::new(),
+                EventDraft::new(EventKind::RunCompleted, task_id, NodeId::from("worker")).with_run(run_id),
+            )
+            .unwrap();
+
+        assert_eq!(state.pending_assistant_wakes("telegram.1").unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -2350,15 +3062,16 @@ mod tests {
     }
 
     #[test]
-    fn disconnected_node_work_is_queued() {
+    fn unacknowledged_node_work_is_durable() {
         let state = state();
         let command = CommandId::new();
         let task = TaskId::new();
         let node = NodeId::from("offline");
+        let _node_rx = connect_test_node(&state, "offline", json!({"engines": ["claude"]}));
         state.submit_command(ClientCommand::StartRun {
             command_id: command,
             task_id: task,
-            node_id: node.clone(),
+            node_id: Some(node.clone()),
             engine: "claude".to_string(),
             model: None,
             reasoning_effort: None,
@@ -2376,10 +3089,11 @@ mod tests {
         let state = state();
         let command = CommandId::new();
         let node = NodeId::from("offline");
+        let _node_rx = connect_test_node(&state, "offline", json!({"engines": ["claude"]}));
         state.submit_command(ClientCommand::StartRun {
             command_id: command,
             task_id: TaskId::new(),
-            node_id: node.clone(),
+            node_id: Some(node.clone()),
             engine: "claude".to_string(),
             model: None,
             reasoning_effort: None,
@@ -2387,7 +3101,13 @@ mod tests {
             access_policy: AccessPolicy::Automatic,
             workspace_path: None,
         });
-        state.acknowledge_dispatch(&command);
+        state.acknowledge_dispatch_from(&NodeId::from("other"), &command);
+        assert_eq!(
+            state.with_hub(|hub| hub.pending_dispatches(&node)).unwrap().len(),
+            1,
+            "another authenticated node cannot retire this dispatch"
+        );
+        state.acknowledge_dispatch_from(&node, &command);
         assert!(state
             .with_hub(|hub| hub.pending_dispatches(&node))
             .unwrap()
@@ -2400,10 +3120,11 @@ mod tests {
         let path = dir.path().join("hub.db");
         let run_id = {
             let state = HubState::open(&path, "secret").unwrap();
+            let _node_rx = connect_test_node(&state, "laptop", json!({"engines": ["codex"]}));
             state.submit_command(ClientCommand::StartRun {
                 command_id: CommandId::new(),
                 task_id: TaskId::new(),
-                node_id: NodeId::from("laptop"),
+                node_id: Some(NodeId::from("laptop")),
                 engine: "codex".to_string(),
                 model: None,
                 reasoning_effort: None,

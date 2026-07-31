@@ -211,8 +211,9 @@ impl Watcher for FilesWatcher {
                 rows.push(json!({
                     "time": mtime,
                     "source": "editor-files",
-                    "project": stackhour_core::project::resolve_project(
+                    "project": stackhour_core::project::resolve_project_within(
                         &project_dir.to_string_lossy(),
+                        root_path,
                         &cfg.agent.project_aliases,
                         None,
                     ),

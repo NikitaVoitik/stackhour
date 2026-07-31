@@ -1,19 +1,14 @@
 //! EngineDef: how to spawn a coding engine and parse its stream, as pure data.
 //!
-//! Two embedded built-ins, `claude` and `codex`, reproduce today's argv
-//! BYTE-FOR-BYTE (including the coordinator-vs-worker
-//! `--include-partial-messages` asymmetry via `partial_messages_flag`, applied
-//! only when live_status = true, and codex's subcommand-style resume with the
-//! sessionId inserted before the `-` stdin sentinel). `kind` selects one of
-//! exactly three shipped stream parsers — new stream protocols still require
-//! code (deliberate scope boundary).
+//! Two embedded built-ins, `claude` and `codex`, define the process contract
+//! used by control nodes. `kind` selects one of the shipped stream parsers;
+//! new stream protocols still require code.
 //!
 //! Argv templates use dumb `{{placeholder}}` substitution: `{{session_id}}`,
 //! `{{model}}`, `{{permission_mode}}`, `{{system_prompt}}`. Unknown
 //! placeholders are left verbatim (same rule as PromptStore).
 //!
-//! Argv assembly semantics (reference implementation: [`EngineDef::assemble_argv`],
-//! which the bridge's `build_argv` should delegate to):
+//! Argv assembly semantics are implemented by [`EngineDef::assemble_argv`]:
 //!
 //! 1. Start from `args` with placeholders substituted.
 //! 2. The splice point is just before a trailing `-` stdin sentinel when the
@@ -74,26 +69,6 @@ pub enum StreamKind {
     PlainLines,
 }
 
-impl StreamKind {
-    /// The TOML spelling of this kind (`kind = "…"` in engines/<name>.toml).
-    pub fn as_toml_str(self) -> &'static str {
-        match self {
-            StreamKind::ClaudeStreamJson => "claude-stream-json",
-            StreamKind::CodexJsonl => "codex-jsonl",
-            StreamKind::PlainLines => "plain-lines",
-        }
-    }
-
-    fn from_toml_str(s: &str) -> Option<Self> {
-        match s {
-            "claude-stream-json" => Some(StreamKind::ClaudeStreamJson),
-            "codex-jsonl" => Some(StreamKind::CodexJsonl),
-            "plain-lines" => Some(StreamKind::PlainLines),
-            _ => None,
-        }
-    }
-}
-
 /// How a previous session is resumed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResumeStyle {
@@ -112,15 +87,14 @@ pub enum PromptDelivery {
     LastArg,
 }
 
-/// A declarative engine definition (built-in or engines/<name>.toml).
+/// A coding-engine process definition.
 #[derive(Debug, Clone)]
 pub struct EngineDef {
     pub name: String,
     pub label: String,
     pub emoji: String,
     /// Binary path or bare name resolved on PATH at spawn. For the built-ins
-    /// this is the bare name; the bridge target config's claudeBin/codexBin
-    /// override it at spawn time (integration concern, not encoded here).
+    /// this is the bare name; node configuration can override it at spawn.
     pub bin: String,
     pub kind: StreamKind,
     /// Base argv (after the binary), `{{placeholder}}` templated.
@@ -138,7 +112,7 @@ pub struct EngineDef {
     pub prompt_delivery: PromptDelivery,
     /// Extra env for the child, merged over the target's extraPath.
     pub env: IndexMap<String, String>,
-    /// Applied ONLY on the live-status (coordinator) lane.
+    /// Applied only when live status updates are requested.
     pub partial_messages_flag: Option<String>,
     /// e.g. `["--reasoning-effort", "{{effort}}"]`. Spliced only when the
     /// agent sets `effort`; `None` means this engine has no notion of effort
@@ -308,37 +282,7 @@ impl EngineDef {
         template.iter().map(|a| subst(a, &vars)).collect()
     }
 
-    /// Assemble the full argv (after the binary) for one spawn — the argv
-    /// byte-parity surface. See the module docs for the exact semantics.
-    /// Why this engine cannot enforce `policy`, if it cannot.
-    ///
-    /// `effort` is safe to ignore when an engine has no flag for it — the run
-    /// is merely less tuned. A `deny` list is NOT: silently dropping it hands
-    /// the agent back a tool the user explicitly took away, which is a
-    /// security-shaped failure that no error message ever surfaces. Callers
-    /// must refuse the run instead.
-    ///
-    /// An `allow` list is treated the same way: it is a whitelist, so losing
-    /// it also widens access.
-    #[must_use]
-    pub fn unenforceable_policy(&self, policy: &super::agent_def::ToolPolicy) -> Option<String> {
-        if !policy.deny.is_empty() && self.disallowed_tools_args.is_none() {
-            return Some(format!(
-                "engine '{}' has no way to deny tools, but this agent denies: {}",
-                self.name,
-                policy.deny.join(", ")
-            ));
-        }
-        if !policy.allow.is_empty() && self.allowed_tools_args.is_none() {
-            return Some(format!(
-                "engine '{}' has no way to restrict tools, but this agent allows only: {}",
-                self.name,
-                policy.allow.join(", ")
-            ));
-        }
-        None
-    }
-
+    /// Assemble the full argv (after the binary) for one spawn.
     pub fn assemble_argv(&self, vars: &ArgvVars<'_>) -> Vec<String> {
         let mut out: Vec<String> = self.args.iter().map(|a| subst(a, vars)).collect();
 
@@ -406,155 +350,6 @@ impl EngineDef {
             }
         }
         out
-    }
-
-    /// Parse an `engines/<name>.toml` document. Errors are exact-string
-    /// validation messages collected into `Registry::errors`.
-    pub fn from_toml(name: &str, v: &toml::Value) -> Result<Self, String> {
-        let table = v
-            .as_table()
-            .ok_or_else(|| "engine file must be a TOML table".to_string())?;
-
-        fn opt_string(
-            table: &toml::map::Map<String, toml::Value>,
-            key: &str,
-        ) -> Result<Option<String>, String> {
-            match table.get(key) {
-                None => Ok(None),
-                Some(toml::Value::String(s)) => Ok(Some(s.clone())),
-                Some(_) => Err(format!("{key} must be a string")),
-            }
-        }
-
-        fn opt_string_array(
-            table: &toml::map::Map<String, toml::Value>,
-            key: &str,
-        ) -> Result<Option<Vec<String>>, String> {
-            match table.get(key) {
-                None => Ok(None),
-                Some(toml::Value::Array(items)) => {
-                    let mut out = Vec::with_capacity(items.len());
-                    for item in items {
-                        match item {
-                            toml::Value::String(s) => out.push(s.clone()),
-                            _ => return Err(format!("{key} must be an array of strings")),
-                        }
-                    }
-                    Ok(Some(out))
-                }
-                Some(_) => Err(format!("{key} must be an array of strings")),
-            }
-        }
-
-        let bin = match opt_string(table, "bin")? {
-            Some(s) if !s.trim().is_empty() => s,
-            _ => return Err("bin is required and must be a non-empty string".to_string()),
-        };
-
-        let label = match opt_string(table, "label")? {
-            Some(s) if !s.trim().is_empty() => s,
-            Some(_) => return Err("label must be a non-empty string".to_string()),
-            None => name.to_string(),
-        };
-
-        let emoji = opt_string(table, "emoji")?.unwrap_or_default();
-
-        let kind = match opt_string(table, "kind")? {
-            None => StreamKind::PlainLines,
-            Some(s) => StreamKind::from_toml_str(&s).ok_or_else(|| {
-                "kind must be \"claude-stream-json\", \"codex-jsonl\", or \"plain-lines\"".to_string()
-            })?,
-        };
-
-        let args = opt_string_array(table, "args")?.unwrap_or_default();
-
-        let resume = match table.get("resume") {
-            None => ResumeStyle::Flag { args: Vec::new() },
-            Some(toml::Value::Table(r)) => {
-                let has_flag = r.contains_key("flag");
-                let has_sub = r.contains_key("subcommand");
-                if has_flag == has_sub {
-                    return Err(
-                        "resume must be a table with exactly one of flag = [args] or subcommand = \"name\""
-                            .to_string(),
-                    );
-                }
-                if has_flag {
-                    let flag_args = opt_string_array(r, "flag")?
-                        .ok_or_else(|| "resume.flag must be an array of strings".to_string())?;
-                    ResumeStyle::Flag { args: flag_args }
-                } else {
-                    match r.get("subcommand") {
-                        Some(toml::Value::String(s)) if !s.trim().is_empty() => {
-                            ResumeStyle::Subcommand { insert: s.clone() }
-                        }
-                        _ => return Err("resume.subcommand must be a non-empty string".to_string()),
-                    }
-                }
-            }
-            Some(_) => {
-                return Err(
-                    "resume must be a table with exactly one of flag = [args] or subcommand = \"name\""
-                        .to_string(),
-                )
-            }
-        };
-
-        let model_args = opt_string_array(table, "model_args")?;
-        let permission_args = opt_string_array(table, "permission_args")?;
-        let system_prompt_args = opt_string_array(table, "system_prompt_args")?;
-        let effort_args = opt_string_array(table, "effort_args")?;
-        let allowed_tools_args = opt_string_array(table, "allowed_tools_args")?;
-        let disallowed_tools_args = opt_string_array(table, "disallowed_tools_args")?;
-
-        let prompt_delivery = match opt_string(table, "prompt")? {
-            None => PromptDelivery::Stdin,
-            Some(s) if s == "stdin" => PromptDelivery::Stdin,
-            Some(s) if s == "last-arg" => PromptDelivery::LastArg,
-            Some(_) => return Err("prompt must be \"stdin\" or \"last-arg\"".to_string()),
-        };
-
-        let env = match table.get("env") {
-            None => IndexMap::new(),
-            Some(toml::Value::Table(e)) => {
-                let mut out = IndexMap::new();
-                for (k, val) in e {
-                    match val {
-                        toml::Value::String(s) => {
-                            out.insert(k.clone(), s.clone());
-                        }
-                        _ => return Err("env must be a table of string values".to_string()),
-                    }
-                }
-                out
-            }
-            Some(_) => return Err("env must be a table of string values".to_string()),
-        };
-
-        let partial_messages_flag = match opt_string(table, "partial_messages_flag")? {
-            None => None,
-            Some(s) if !s.trim().is_empty() => Some(s),
-            Some(_) => return Err("partial_messages_flag must be a non-empty string".to_string()),
-        };
-
-        Ok(EngineDef {
-            name: name.to_string(),
-            label,
-            emoji,
-            bin,
-            kind,
-            args,
-            resume,
-            model_args,
-            permission_args,
-            system_prompt_args,
-            prompt_delivery,
-            env,
-            partial_messages_flag,
-            effort_args,
-            allowed_tools_args,
-            disallowed_tools_args,
-        })
     }
 }
 
@@ -839,207 +634,14 @@ mod tests {
         assert!(!plain.iter().any(|a| a == "--append-system-prompt"));
     }
 
-    // ---- from_toml ----
-
-    fn parse(name: &str, doc: &str) -> Result<EngineDef, String> {
-        let v: toml::Value = doc.parse().expect("test TOML must parse");
-        EngineDef::from_toml(name, &v)
-    }
-
-    #[test]
-    fn from_toml_full_roundtrip() {
-        let def = parse(
-            "aider",
-            r#"
-label = "Aider"
-emoji = "🚀"
-bin = "/usr/local/bin/aider"
-kind = "plain-lines"
-args = ["--yes", "--message-file", "-"]
-model_args = ["--model", "{{model}}"]
-permission_args = ["--auto-commits"]
-system_prompt_args = ["--system", "{{system_prompt}}"]
-prompt = "last-arg"
-partial_messages_flag = "--stream"
-
-[resume]
-flag = ["--restore-chat-history"]
-
-[env]
-AIDER_DARK_MODE = "true"
-"#,
-        )
-        .expect("valid engine toml");
-        assert_eq!(def.name, "aider");
-        assert_eq!(def.label, "Aider");
-        assert_eq!(def.emoji, "🚀");
-        assert_eq!(def.bin, "/usr/local/bin/aider");
-        assert_eq!(def.kind, StreamKind::PlainLines);
-        assert_eq!(def.args, vec!["--yes", "--message-file", "-"]);
-        assert_eq!(
-            def.resume,
-            ResumeStyle::Flag {
-                args: vec!["--restore-chat-history".to_string()]
-            }
-        );
-        assert_eq!(
-            def.model_args.as_deref(),
-            Some(&["--model".to_string(), "{{model}}".to_string()][..])
-        );
-        assert_eq!(def.prompt_delivery, PromptDelivery::LastArg);
-        assert_eq!(def.env.get("AIDER_DARK_MODE").map(String::as_str), Some("true"));
-        assert_eq!(def.partial_messages_flag.as_deref(), Some("--stream"));
-    }
-
-    #[test]
-    fn from_toml_minimal_defaults() {
-        let def = parse("mytool", "bin = \"mytool\"\n").expect("minimal engine");
-        assert_eq!(def.label, "mytool");
-        assert_eq!(def.emoji, "");
-        assert_eq!(def.kind, StreamKind::PlainLines);
-        assert!(def.args.is_empty());
-        assert_eq!(def.resume, ResumeStyle::Flag { args: Vec::new() });
-        assert_eq!(def.model_args, None);
-        assert_eq!(def.permission_args, None);
-        assert_eq!(def.system_prompt_args, None);
-        assert_eq!(def.prompt_delivery, PromptDelivery::Stdin);
-        assert!(def.env.is_empty());
-        assert_eq!(def.partial_messages_flag, None);
-        // No resume args -> resume request changes nothing.
-        let with_session = def.assemble_argv(&ArgvVars {
-            session_id: Some("s"),
-            ..ArgvVars::default()
-        });
-        assert!(with_session.is_empty());
-    }
-
-    #[test]
-    fn from_toml_subcommand_resume() {
-        let def = parse(
-            "codexish",
-            "bin = \"codex\"\nkind = \"codex-jsonl\"\nargs = [\"exec\", \"-\"]\n[resume]\nsubcommand = \"resume\"\n",
-        )
-        .expect("subcommand resume");
-        assert_eq!(
-            def.resume,
-            ResumeStyle::Subcommand {
-                insert: "resume".to_string()
-            }
-        );
-        assert_eq!(
-            def.assemble_argv(&ArgvVars {
-                session_id: Some("sid"),
-                ..ArgvVars::default()
-            }),
-            vec!["exec", "resume", "sid", "-"]
-        );
-    }
-
-    #[test]
-    fn from_toml_errors() {
-        assert_eq!(
-            parse("x", "label = \"X\"\n").unwrap_err(),
-            "bin is required and must be a non-empty string"
-        );
-        assert_eq!(
-            parse("x", "bin = \"  \"\n").unwrap_err(),
-            "bin is required and must be a non-empty string"
-        );
-        assert_eq!(
-            parse("x", "bin = \"x\"\nkind = \"magic\"\n").unwrap_err(),
-            "kind must be \"claude-stream-json\", \"codex-jsonl\", or \"plain-lines\""
-        );
-        assert_eq!(
-            parse("x", "bin = \"x\"\nargs = [1, 2]\n").unwrap_err(),
-            "args must be an array of strings"
-        );
-        assert_eq!(
-            parse("x", "bin = \"x\"\nresume = \"nope\"\n").unwrap_err(),
-            "resume must be a table with exactly one of flag = [args] or subcommand = \"name\""
-        );
-        assert_eq!(
-            parse(
-                "x",
-                "bin = \"x\"\n[resume]\nflag = [\"-r\"]\nsubcommand = \"resume\"\n"
-            )
-            .unwrap_err(),
-            "resume must be a table with exactly one of flag = [args] or subcommand = \"name\""
-        );
-        assert_eq!(
-            parse("x", "bin = \"x\"\n[resume]\nsubcommand = \"\"\n").unwrap_err(),
-            "resume.subcommand must be a non-empty string"
-        );
-        assert_eq!(
-            parse("x", "bin = \"x\"\nprompt = \"pipe\"\n").unwrap_err(),
-            "prompt must be \"stdin\" or \"last-arg\""
-        );
-        assert_eq!(
-            parse("x", "bin = \"x\"\n[env]\nN = 1\n").unwrap_err(),
-            "env must be a table of string values"
-        );
-        assert_eq!(
-            parse("x", "bin = \"x\"\npartial_messages_flag = \"\"\n").unwrap_err(),
-            "partial_messages_flag must be a non-empty string"
-        );
-        let v = toml::Value::String("no".to_string());
-        assert_eq!(
-            EngineDef::from_toml("x", &v).unwrap_err(),
-            "engine file must be a TOML table"
-        );
-    }
-
-    #[test]
-    fn from_toml_builtin_override_shape() {
-        // A user file can redefine 'claude' (e.g. different bin) and the
-        // assembled argv still follows the same rules.
-        let def = parse(
-            "claude",
-            r#"
-bin = "/opt/claude/bin/claude"
-kind = "claude-stream-json"
-args = ["-p", "--output-format", "stream-json", "--verbose"]
-permission_args = ["--permission-mode", "{{permission_mode}}"]
-model_args = ["--model", "{{model}}"]
-partial_messages_flag = "--include-partial-messages"
-
-[resume]
-flag = ["--resume", "{{session_id}}"]
-"#,
-        )
-        .expect("override");
-        let builtin = builtin_claude();
-        let vars = ArgvVars {
-            session_id: Some("s"),
-            model: Some("m"),
-            live_status: true,
-            ..ArgvVars::default()
-        };
-        assert_eq!(def.assemble_argv(&vars), builtin.assemble_argv(&vars));
-    }
-
     // ---- effort_args (agents' `effort`, spliced only when the engine opts in) ----
 
     fn effort_engine() -> EngineDef {
-        EngineDef::from_toml(
-            "ollama",
-            &r#"
-bin = "ollama"
-kind = "plain-lines"
-args = ["run", "-"]
-effort_args = ["--reasoning-effort", "{{effort}}"]
-"#
-            .parse::<toml::Value>()
-            .unwrap(),
-        )
-        .expect("engine")
-    }
-
-    #[test]
-    fn effort_args_parse_from_toml() {
-        assert_eq!(
-            effort_engine().effort_args,
-            Some(vec!["--reasoning-effort".to_string(), "{{effort}}".to_string()])
-        );
+        let mut def = builtin_codex();
+        def.args = vec!["run".to_string(), "-".to_string()];
+        def.permission_args = None;
+        def.effort_args = Some(vec!["--reasoning-effort".to_string(), "{{effort}}".to_string()]);
+        def
     }
 
     #[test]
@@ -1085,21 +687,5 @@ effort_args = ["--reasoning-effort", "{{effort}}"]
         assert!(argv
             .windows(2)
             .any(|pair| { pair == ["-c".to_string(), "model_reasoning_effort=\"high\"".to_string(),] }));
-    }
-
-    #[test]
-    fn effort_args_default_to_none_when_absent_from_toml() {
-        let def = EngineDef::from_toml("x", &"bin = \"x\"\n".parse::<toml::Value>().unwrap()).unwrap();
-        assert_eq!(def.effort_args, None);
-    }
-
-    #[test]
-    fn effort_args_must_be_an_array_of_strings() {
-        let err = EngineDef::from_toml(
-            "x",
-            &"bin = \"x\"\neffort_args = 3\n".parse::<toml::Value>().unwrap(),
-        )
-        .unwrap_err();
-        assert!(err.contains("effort_args"), "got: {err}");
     }
 }

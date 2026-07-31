@@ -5,9 +5,8 @@
 - Supersedes: `t3code-ui-functionality-study.md` and
   `remote-agent-control-plane-and-acp.md`, both folded into this document
 
-This is the single architecture reference for Stackhour's control plane: turning
-the existing tracker and Telegram bridge into a multi-client control plane for
-remotely executed coding agents.
+This is the single architecture reference for Stackhour's multi-client control
+plane for remotely executed coding agents.
 
 It consolidates three source-level studies:
 
@@ -172,9 +171,8 @@ terminal callbacks are inherently workspace-local, so routing raw ACP between
 the hub and an arbitrary client would put the security boundary in the wrong
 place.
 
-The existing filesystem/SSH pull worker is valuable migration material, but a
-responsive multi-client UI needs a long-lived authenticated node protocol with
-heartbeats, multiplexed events, cancellation, and reconnect/replay.
+A responsive multi-client UI needs a long-lived authenticated node protocol
+with heartbeats, multiplexed events, cancellation, and reconnect/replay.
 
 ## What each reference contributes
 
@@ -1025,11 +1023,6 @@ Keep protocol types in `stackhour-domain` and ACP inside `stackhour-node` until
 another consumer or adapter proves a real extraction boundary. Keep Telegram
 inside the hub while it is one small client projection.
 
-The existing config-driven `stackhour-bridge` engine runner can remain during
-the migration. It is a useful compatibility adapter, but its current
-completion-oriented `RunResult` and filesystem queue are not rich enough to
-become the shared interactive task protocol.
-
 The React UI can remain one application organized by feature. Generated
 TypeScript contracts and a shared client runtime become justified when the
 Tauri shell or another rich client actually consumes them.
@@ -1058,7 +1051,7 @@ durable tool approval handling remain future work.
 
 - Add the five initial entities and the append-only SQLite event table.
 - Assign one sequence at the hub and deduplicate commands and events by UUID.
-- Project the current Telegram bridge through the task/run model.
+- Project Telegram through the task/run model.
 - Add an authenticated outbound laptop-node connection with reconnect,
   `after_sequence` catch-up, heartbeat, and interrupt.
 - Use the official ACP SDK around one explicitly configured agent.
@@ -1175,9 +1168,8 @@ T3 Code's source moves faster than some of its documentation:
   contracts and in both desktop and web UI code.
 
 This is not a criticism of an early, fast-moving project; it is a warning.
-Stackhour hit the same failure during the Rust port: the README claimed the
-bridge was unimplemented in Rust and that the config registry was unreachable
-at runtime, long after both had shipped and grown tests asserting the opposite.
+Stackhour hit the same failure during the Rust port: documentation lagged
+behind shipped behavior and its tests.
 
 Maintain a generated capability matrix from the Rust registry and protocol, and
 distinguish `implemented`, `tested`, `exposed`, and `operationally proven`.
@@ -1210,7 +1202,6 @@ Those states must not be conflated.
 - `remote/RemoteSessionManager.ts`
 - `remote/SessionsWebSocket.ts`
 - `remote/sdkMessageAdapter.ts`
-- `remote/remotePermissionBridge.ts`
 - `services/api/sessionIngress.ts`
 - `utils/teleport/api.ts`
 

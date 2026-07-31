@@ -274,7 +274,11 @@ pub fn normalize_git_remote(remote: &str) -> Option<String> {
 /// no repository, no readable config, or no usable remote.
 pub fn git_remote(location: &str) -> Option<String> {
     let root = repository_root_s(location)?;
-    let git_dir = git_dir_for_s(&root)?;
+    git_remote_for_root_s(&root)
+}
+
+fn git_remote_for_root_s(root: &str) -> Option<String> {
+    let git_dir = git_dir_for_s(root)?;
     let config = read_text(&format!("{}/config", common_git_dir_s(&git_dir)))?;
     normalize_git_remote(&remote_from_config(&config)?)
 }
@@ -302,14 +306,14 @@ fn alias_for(aliases: &IndexMap<String, String>, candidates: &[Option<String>]) 
 /// value, repository root, full normalized remote, `owner/repo`, name.
 /// Final fallback chain: alias || `owner/repo` || fallback || basename ||
 /// `"unknown"`. The filesystem is only walked for ABSOLUTE locations.
-pub fn resolve_project(location: &str, aliases: &IndexMap<String, String>, fallback: Option<&str>) -> String {
+fn resolve_project_with_root(
+    location: &str,
+    aliases: &IndexMap<String, String>,
+    fallback: Option<&str>,
+    root: Option<String>,
+) -> String {
     let value = location.trim();
-    let root = if !value.is_empty() && value.starts_with('/') {
-        repository_root_s(value)
-    } else {
-        None
-    };
-    let remote = root.as_deref().and_then(git_remote);
+    let remote = root.as_deref().and_then(git_remote_for_root_s);
     // JS: remote?.split('/').slice(-2).join('/') — the last two segments.
     let remote_project = remote.as_deref().map(|r| {
         let segments: Vec<&str> = r.split('/').collect();
@@ -341,6 +345,38 @@ pub fn resolve_project(location: &str, aliases: &IndexMap<String, String>, fallb
         .filter(|a| !a.is_empty())
         .or(remote_project)
         .unwrap_or(name)
+}
+
+pub fn resolve_project(location: &str, aliases: &IndexMap<String, String>, fallback: Option<&str>) -> String {
+    let value = location.trim();
+    let root = if !value.is_empty() && value.starts_with('/') {
+        repository_root_s(value)
+    } else {
+        None
+    };
+    resolve_project_with_root(location, aliases, fallback, root)
+}
+
+/// Resolve a project without allowing repository discovery to escape
+/// `boundary`.
+///
+/// Activity roots are ownership boundaries: an unrelated `.git` directory
+/// above a configured root must not relabel every non-repository child as that
+/// enclosing repository. Repositories at or below the boundary still receive
+/// their canonical remote identity and all normal aliases still apply.
+pub fn resolve_project_within(
+    location: &str,
+    boundary: &Path,
+    aliases: &IndexMap<String, String>,
+    fallback: Option<&str>,
+) -> String {
+    let value = location.trim();
+    let root = if !value.is_empty() && value.starts_with('/') {
+        repository_root_s(value).filter(|root| Path::new(root).starts_with(boundary))
+    } else {
+        None
+    };
+    resolve_project_with_root(location, aliases, fallback, root)
 }
 
 /// Current branch of the repository whose root is `project_dir` (`.git`
@@ -616,6 +652,47 @@ mod tests {
             "explicit-fallback"
         );
         assert_eq!(resolve_project("", &IndexMap::new(), None), "unknown");
+    }
+
+    #[test]
+    fn bounded_resolution_ignores_an_unrelated_enclosing_repository() {
+        let dir = tempfile::tempdir().unwrap();
+        write_repository(dir.path(), &[("origin", "https://github.com/outer/wrong.git")]);
+        let boundary = dir.path().join("configured-root");
+        let project = boundary.join("alpha");
+        fs::create_dir_all(&project).unwrap();
+
+        assert_eq!(
+            resolve_project(&project.to_string_lossy(), &IndexMap::new(), None),
+            "outer/wrong"
+        );
+        assert_eq!(
+            resolve_project_within(&project.to_string_lossy(), &boundary, &IndexMap::new(), None,),
+            "alpha"
+        );
+    }
+
+    #[test]
+    fn bounded_resolution_keeps_repositories_and_aliases_inside_the_boundary() {
+        let dir = tempfile::tempdir().unwrap();
+        let boundary = dir.path().join("configured-root");
+        let project = boundary.join("checkout");
+        write_repository(&project, &[("origin", "https://github.com/inner/right.git")]);
+        let project_text = project.to_string_lossy().into_owned();
+
+        assert_eq!(
+            resolve_project_within(&project_text, &boundary, &IndexMap::new(), None),
+            "inner/right"
+        );
+        assert_eq!(
+            resolve_project_within(
+                &project_text,
+                &boundary,
+                &aliases(&[(&project_text, "friendly")]),
+                None,
+            ),
+            "friendly"
+        );
     }
 
     #[test]

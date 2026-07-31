@@ -1022,18 +1022,18 @@ mod tests {
     #[test]
     fn a_user_modules_block_lands_in_raw_verbatim_and_last() {
         let dir = tempfile::tempdir().unwrap();
-        let cfg = load_str(&dir, Some(r#"{ "modules": { "bridge": false } }"#)).unwrap();
+        let cfg = load_str(&dir, Some(r#"{ "modules": { "control": false } }"#)).unwrap();
         let keys: Vec<&String> = cfg.raw.as_object().unwrap().keys().collect();
         assert_eq!(keys.last().unwrap().as_str(), "modules");
-        assert_eq!(cfg.raw["modules"], json!({ "bridge": false }));
+        assert_eq!(cfg.raw["modules"], json!({ "control": false }));
     }
 
     #[test]
     fn a_disabled_module_reaches_the_typed_view() {
         let dir = tempfile::tempdir().unwrap();
-        let cfg = load_str(&dir, Some(r#"{ "modules": { "bridge": false } }"#)).unwrap();
+        let cfg = load_str(&dir, Some(r#"{ "modules": { "control": false } }"#)).unwrap();
         assert_eq!(cfg.modules, crate::modules::ModuleSet::new(true, true, false));
-        assert!(!cfg.modules.contains(crate::modules::Module::Bridge));
+        assert!(!cfg.modules.contains(crate::modules::Module::Control));
         // A malformed block still fails open.
         let cfg = load_str(&dir, Some(r#"{ "modules": 3 }"#)).unwrap();
         assert_eq!(cfg.modules, crate::modules::ModuleSet::ALL);

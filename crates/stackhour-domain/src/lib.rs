@@ -35,7 +35,7 @@ pub use protocol::{
     ClientCommand, HubToClient, HubToNode, HubWelcome, NodeHello, NodeToHub, NodeWork, ProtocolError,
     Subscribe, WIRE_PROTOCOL_VERSION,
 };
-pub use store::{AppendOutcome, EntityWrite, Hub, PendingDispatch, LATEST_HUB_SCHEMA_VERSION};
+pub use store::{AppendOutcome, AssistantWake, EntityWrite, Hub, PendingDispatch, LATEST_HUB_SCHEMA_VERSION};
 
 #[cfg(test)]
 mod tests {
@@ -220,6 +220,49 @@ mod tests {
         // Node events carry no command id.
         assert!(events[0].command_id.is_none());
         assert_eq!(events[0].kind, EventKind::NodeConnected);
+    }
+
+    #[test]
+    fn worker_terminal_event_atomically_creates_one_durable_assistant_wake() {
+        let mut hub = Hub::open_in_memory().unwrap();
+        let task = hub.create_task("worker").unwrap();
+        let run = hub
+            .start_run(
+                &task.id,
+                &NodeId::from("worker"),
+                "claude",
+                AccessPolicy::Supervised,
+            )
+            .unwrap();
+        hub.register_assistant_worker("telegram.42", task.id).unwrap();
+        let event_id = EventId::new();
+        let terminal = draft(task.id, "worker", EventKind::RunCompleted).with_run(run.id);
+
+        hub.append_node_event(event_id, terminal.clone()).unwrap();
+        hub.append_node_event(event_id, terminal).unwrap();
+
+        let pending = hub.pending_assistant_wakes("telegram.42").unwrap();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].event_id, event_id);
+        assert_eq!(pending[0].task_id, task.id);
+        assert_eq!(pending[0].run_id, run.id);
+        assert_eq!(pending[0].kind, EventKind::RunCompleted);
+        assert_eq!(pending[0].attempt_count, 0);
+        assert_eq!(
+            hub.get_task(&task.id).unwrap().unwrap().status,
+            TaskStatus::Completed
+        );
+        assert_eq!(
+            hub.get_run(&run.id).unwrap().unwrap().status,
+            RunStatus::Completed
+        );
+        assert!(hub
+            .defer_assistant_wake(&event_id, "temporary provider failure")
+            .unwrap());
+        assert!(hub.pending_assistant_wakes("telegram.42").unwrap().is_empty());
+        assert!(hub.complete_assistant_wake(&event_id).unwrap());
+        assert!(!hub.complete_assistant_wake(&event_id).unwrap());
+        assert!(hub.pending_assistant_wakes("telegram.42").unwrap().is_empty());
     }
 
     #[test]

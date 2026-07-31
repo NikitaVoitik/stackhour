@@ -23,17 +23,11 @@ cargo build --release          # -> target/release/stackhour
 
 Every command in this README is written as `./target/release/stackhour …`.
 Copy or symlink the binary onto your `PATH` if you would rather type
-`stackhour`; `install` and `bridge install` both deploy whichever binary you
-invoked them with, so installing from a stable location is worth doing.
+`stackhour`; installers deploy the binary they are invoked with, so installing
+from a stable location is worth doing.
 
-> Stackhour was originally a Node application and was ported to Rust
-> behaviour-for-behaviour, including JavaScript's number and rounding
-> semantics. The Node implementation, its launcher, and its test suite have
-> been removed. The shipped services, including the Telegram bridge and its
-> remote workers, do not need a Node runtime. Frontend development uses Node
-> and pnpm as build tools. If you are upgrading a deployment that predates this
-> change, see
-> [docs/bridge-migration.md](docs/bridge-migration.md).
+> Stackhour's services are implemented in Rust and do not need a Node runtime.
+> Frontend development uses Node and pnpm as build tools.
 
 ## Quick start
 
@@ -290,103 +284,35 @@ Important tuning fields:
 - `summary.reattributeWindowSeconds`: file-save-to-agent-edit matching window;
 - `pricing`: per-model API pricing overrides in USD per million tokens.
 
-## Config registry
-
-A config-directory registry extends the Telegram bridge — custom engines,
-agents, skills, commands, and prompt overrides — with no code changes. It
-lives beside `config.json`, rooted at the config directory
-(`~/.config/stackhour/`, overridable with `STACKHOUR_CONFIG_DIR`):
-
-```
-engines/<name>.toml       extra CLI engines; claude and codex ship built in
-agents/<name>/agent.toml  + soul.md (+ overlays); supports `extends`
-skills/<name>/skill.toml  + skill.md
-commands/<name>.toml      one file per verb; the file stem is the verb
-prompts/<name>.md         override a shipped template, or define a new one
-```
-
-Precedence is built-ins < the `bridge` object in `config.json` < these files <
-environment (`STACKHOUR_AGENT`, `STACKHOUR_ENGINE`, `STACKHOUR_TARGET`). An
-override replaces the shipped entity of the same name wholesale; only an
-agent's `extends` merges. `start`, `help`, `menu`, and `stop` are reserved and
-cannot be shadowed. A file that fails to parse or validate is skipped, never
-fatal, and the reason is collected for callers to surface. Absent directories
-mean built-ins only. See
-`crates/stackhour-core/src/registry/defaults/README.md` for the full schema.
-
-The loader, validation, cycle detection, hot reload, engine selection, argv
-assembly, soul composition, skill loading, and process spawning are covered by
-integration tests, including one that adds a brand-new engine by config alone
-and spawns it. The running bridge coordinator and worker both read these
-directories, and `stackhour bridge doctor` reports each validation error as its
-own `✗ registry: …` line after the standard checks.
-
 ## Modules (compile-time and runtime)
 
-Stackhour is four products sharing one binary: a time **tracker**, a local
-**agent**, the legacy Telegram **bridge**, and the multi-client **control**
-plane. Not every machine wants all four, so
-each can be switched off at either of two layers.
+Stackhour has three modules sharing one binary: a time **tracker**, a local activity **agent**, and the multi-client **control** plane. Each can be switched off at compile time or in configuration.
 
 | Module | Verbs |
 |---|---|
 | `tracker` | `serve`, `status`, `token`, `data`, `backup`, `migrate tempo`, `import-wakatime`, `init server`, `install server` |
 | `agent` | `agent`, `init agent`, `install agent` |
-| `bridge` | `bridge *` |
-| `control` | `control hub`, `control node`, `control update` |
+| `control` | `control hub`, `control node`, `control fake-telegram`, `control install`, `control update` |
 
-`doctor` belongs to no module and is never gated — it is the diagnostic of
-last resort. `stackhour-core` (config, paths, tokens, the registries) is the
-shared spine and is never optional.
+`doctor` belongs to no module and is never gated. `stackhour-core` is the shared foundation and is never optional.
 
-### Runtime: the `modules` block
+### Runtime configuration
 
 ```json
-{ "modules": { "tracker": true, "agent": true, "bridge": false, "control": true } }
+{ "modules": { "tracker": true, "agent": true, "control": true } }
 ```
 
-The gate fails open. An absent `modules` key, an absent sub-key, `null`, or a
-malformed block (`3`, `[]`, a string) all mean **everything enabled** — a
-config written before this feature existed behaves exactly as it always did.
-Only an explicitly present, JS-falsy value disables: `false`, `0`, `""`.
+An absent or malformed `modules` block enables every compiled module. Only an explicitly present, false-like value disables one. Use the bare `false` literal; the string `"false"` is truthy.
 
-**`"bridge": "false"` ENABLES the bridge.** A non-empty string is truthy in
-JavaScript, and this config reads through the same coercion as every other
-toggle in it. Write the bare `false` literal, not a quoted one.
-
-### Compile time: build without a module
+### Compile-time selection
 
 ```sh
-cargo build -p stackhour --no-default-features --features bridge   # cheap leader VPS
-cargo build -p stackhour --no-default-features --features agent    # worker box
+cargo build -p stackhour --no-default-features --features tracker
+cargo build -p stackhour --no-default-features --features agent
+cargo build -p stackhour --no-default-features --features control
 ```
 
-A bridge-only build drops 20 crates from the dependency closure (134 → 114),
-including `axum`, `rusqlite`, `libsqlite3-sys`, and the bundled SQLite C
-amalgamation. **tokio is still linked** — the bridge needs
-`reqwest::blocking` for Telegram long-polling, which pulls tokio and hyper.
-An agent-only build still links `rusqlite` for the Zed `threads.db` snapshot;
-only a bridge-only build is SQLite-free. A plain `cargo build` turns
-everything on and is unchanged.
-
-### When a verb refuses
-
-```
-stackhour: bridge needs the bridge module, which was not compiled into this binary (rebuild with --features bridge)
-stackhour: serve needs the tracker module, which is disabled by "modules.tracker": false in /home/you/.config/stackhour/config.json
-```
-
-`not compiled into this binary` means **rebuild**; it never names a config
-key, because editing config cannot fix it. `disabled by "modules.X": false`
-means **edit that config file**, whose path the message spells out.
-
-Both exit **2** — which `bridge migrate` also uses for "destinations exist",
-`bridge return` for a missing job id, and `bridge tg-send` for an unreadable
-bridge config. Match on the message, not on the code.
-
-See [docs/modules.md](docs/modules.md) for the full model: the registry API,
-resolution order, the feature/crate matrix, and how `install server` handles
-a disabled agent module.
+A plain `cargo build` enables all three modules. A refused command exits 2 and explains whether the binary must be rebuilt or the configuration changed. See [docs/modules.md](docs/modules.md).
 
 ## Health and service operations
 
@@ -400,8 +326,8 @@ It also appends one `✓ module-<name>` line for each module that is off,
 naming either the config key to edit or the Cargo feature to rebuild with —
 and the `database` check is absent entirely from a build without the
 `tracker` feature, while the `sqlite` check is absent only when neither
-`tracker` nor `agent` is compiled in (i.e. a bridge-only build, which links
-no SQLite at all). An agent-only worker box still reports `sqlite`. Those
+`tracker` nor `agent` is compiled in. An agent-only machine still reports
+`sqlite`. Those
 absences are what the `module-*` lines are there to explain.
 
 ```sh
@@ -520,35 +446,12 @@ WAKATIME_API_KEY=waka_xxx ./target/release/stackhour import-wakatime --days=365
 Imported rows currently live in `wakatime_days`; they are exportable and
 prunable but are not yet merged into dashboard charts.
 
-## Telegram bridge
-
-Stackhour also ships a private Telegram control plane for Claude Code and
-Codex: a coordinator on the always-on Linux machine owns the Telegram
-connection, and a Mac worker polls it over outbound SSH — no open ports on the
-Mac, jobs queue while it sleeps.
-
-```sh
-./target/release/stackhour bridge install coordinator   # on the Linux machine
-./target/release/stackhour bridge install worker        # on the Mac
-./target/release/stackhour bridge doctor coordinator    # end-to-end health check
-```
-
-`bridge install` copies the binary it was invoked with into the runtime
-directory, and a worker reaches its coordinator by running
-`<remoteDir>/stackhour bridge claim` over SSH. Neither side needs an
-interpreter installed. A worker enrolled before this change still has a
-`remoteNode` key in its `worker-config.json`; it is ignored, and re-running
-`bridge install worker` drops it.
-
-See [docs/bridge.md](docs/bridge.md) for the full guide and
-[SECURITY.md](SECURITY.md) for the security model.
-
 ## Multi-client control plane
 
 The control plane has a durable coordinator, outbound execution nodes, a web
 control panel, the persistent Telegram assistant **Claire**, and real Claude
-and Codex command-line adapters. Commands for an offline node stay in SQLite
-and run after the node reconnects.
+and Codex command-line adapters. New runs target eligible active nodes;
+accepted commands remain in SQLite until their node acknowledges them.
 
 ```sh
 curl -fsSL https://github.com/NikitaVoitik/stackhour/releases/latest/download/install-stackhour.sh |
@@ -563,17 +466,22 @@ for setup. Normal node traffic uses an outbound WebSocket connection.
 
 Claire keeps a durable Telegram conversation and can create, follow up on, and
 stop Stackhour tasks. Use `/claude` or `/codex` to switch her engine without
-starting a new conversation. Her personality, active engine, per-engine model,
-reasoning effort, node, workspace, and optional
+starting a new conversation. Claire herself always runs on the control hub;
+worker tasks run only on eligible active nodes. Her personality, active engine,
+per-engine model, reasoning effort, hub-local workspace, and optional
 [OptMem](https://github.com/VictorTaelin/OptMem) executable are managed in the
-authenticated **Claire settings** panel.
+authenticated **Claire settings** panel. Worker terminal events create durable
+wake receipts, so Claire can assess results and resume follow-up after a hub
+restart instead of relying on an in-memory notification list. Only Claire's
+explicit notify/reply decision is projected to Telegram; raw worker and action
+output is never forwarded directly.
 
 The same panel contains checksum-verified **Stackhour updates**. Manual update
 checks and installation are authenticated; automatic updates are opt-in and
 can include all currently connected execution nodes.
 
 See [docs/control-plane.md](docs/control-plane.md) for installation, TLS, node
-setup, updates, security, Telegram migration, recovery, and current limits.
+setup, updates, security, Telegram, recovery, and current limits.
 
 [docs/architecture/remote-agent-control-plane.md](docs/architecture/remote-agent-control-plane.md)
 is the design: a source-level study of T3 Code, Zed, and Claude Code, the
@@ -603,11 +511,9 @@ installers for:
 - Linux ARM64 (static musl; smoke-tested on Debian 12 and Amazon Linux 2023)
 - macOS Apple Silicon
 
-Each platform has a full binary and a smaller bridge-only binary. Set
-`STACKHOUR_RELEASE_FLAVOR=bridge` when running the release installer on a
-coordinator that only needs `stackhour bridge`; the default flavor is `full`.
-The workflow creates the matching `v<version>` tag and GitHub release. It does
-not create a second release when the version already exists.
+Each platform has one complete binary. The workflow creates the matching
+`v<version>` tag and GitHub release. It does not create a second release when
+the version already exists.
 
 To migrate the old Tempo tracker database without losing committed WAL rows:
 
@@ -620,8 +526,8 @@ Stackhour database, migrates and verifies the copied schema and heartbeat
 count, and leaves the Tempo source untouched.
 
 The suite uses temporary configs, databases, queues, watcher fixtures, and
-ephemeral loopback ports. It never reads or writes the live Stackhour config,
-database, or `~/.claude-remote/` bridge queue.
+ephemeral loopback ports. It never reads or writes the live Stackhour config
+or database.
 
 Restarting the services picks up a rebuilt binary only if their units point at
 it; `stackhour install` writes units naming the binary that ran it.

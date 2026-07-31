@@ -8,7 +8,7 @@ repository.workspace = true
 readme.workspace = true
 keywords.workspace = true
 categories.workspace = true
-description = "stackhour shared core: JS-semantics helpers, paths, atomic fs, config, timeparse, pricing, project canonicalisation, tokens/enrollment, config-directory registry. NO sqlite, NO http."
+description = "stackhour shared core: config, paths, pricing, project identity, tokens, modules, and coding-engine process definitions. NO sqlite, NO http."
 
 [lib]
 name = "stackhour_core"
@@ -18,7 +18,6 @@ path = "src/lib.rs"
 serde.workspace = true
 serde_json.workspace = true
 indexmap.workspace = true
-toml.workspace = true
 url.workspace = true
 regex.workspace = true
 chrono.workspace = true

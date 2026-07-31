@@ -27,6 +27,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
+use serde_json::json;
 use tokio::task::JoinHandle;
 use tokio_tungstenite::tungstenite::Message as TMessage;
 
@@ -91,6 +92,7 @@ fn node_config(addr: SocketAddr) -> NodeConfig {
         NodeId::from(NODE_ID),
         SECRET,
     )
+    .with_capabilities(json!({"engines": ["stub"]}))
     .with_heartbeat(Duration::from_secs(30), Duration::from_secs(60))
     .with_backoff(Duration::from_millis(20), Duration::from_millis(80))
 }
@@ -215,7 +217,7 @@ fn start_run(task_id: TaskId) -> ClientCommand {
     ClientCommand::StartRun {
         command_id: CommandId::new(),
         task_id,
-        node_id: NodeId::from(NODE_ID),
+        node_id: Some(NodeId::from(NODE_ID)),
         engine: "stub".to_string(),
         model: None,
         reasoning_effort: None,

@@ -27,11 +27,7 @@ usage: stackhour <command>
   migrate tempo --from=FILE [--to=FILE]
                                    online-copy a Tempo SQLite database
   install <server|agent>           install and start user service(s)
-  bridge install <coordinator|worker> [--reconfigure] [--no-start]
-                                   set up the Telegram Claude/Codex bridge
-  bridge doctor|status|restart <coordinator|worker>
-                                   operate the bridge service
-  control <hub|node>               run the control plane
+  control <hub|node|fake-telegram> run the control plane or local Telegram simulator
   control install <hub|node|ssh>   configure and install a control service
 
 config: /home/nikita/.config/stackhour/config.json

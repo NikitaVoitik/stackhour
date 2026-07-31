@@ -75,6 +75,18 @@ pub struct PendingDispatch {
     pub created_at: DateTime<Utc>,
 }
 
+/// One durable obligation for Claire to assess a worker terminal event.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AssistantWake {
+    pub event_id: EventId,
+    pub sequence: i64,
+    pub channel: String,
+    pub task_id: TaskId,
+    pub run_id: RunId,
+    pub kind: EventKind,
+    pub attempt_count: i64,
+}
+
 /// The durable control-plane store.
 pub struct Hub {
     conn: Connection,
@@ -197,8 +209,32 @@ const RUN_CONFIGURATION_AND_SETTINGS: &str = "
     );
 ";
 
+const ASSISTANT_WORKER_WAKEUPS: &str = "
+    CREATE TABLE assistant_workers (
+      task_id    TEXT PRIMARY KEY,
+      channel    TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE assistant_wakes (
+      event_id     TEXT PRIMARY KEY,
+      sequence     INTEGER NOT NULL UNIQUE,
+      channel      TEXT NOT NULL,
+      task_id      TEXT NOT NULL,
+      run_id       TEXT NOT NULL,
+      kind         TEXT NOT NULL,
+      created_at   TEXT NOT NULL,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TEXT NOT NULL,
+      last_error   TEXT,
+      processed_at TEXT
+    );
+    CREATE INDEX assistant_wakes_pending
+      ON assistant_wakes (channel, processed_at, sequence);
+";
+
 /// Latest control-plane database schema understood by this binary.
-pub const LATEST_HUB_SCHEMA_VERSION: i64 = 2;
+pub const LATEST_HUB_SCHEMA_VERSION: i64 = 3;
 
 const MIGRATIONS_DDL: &str = "
     CREATE TABLE IF NOT EXISTS stackhour_hub_schema_migrations (
@@ -214,6 +250,11 @@ const MIGRATIONS: [(i64, &str, &str); LATEST_HUB_SCHEMA_VERSION as usize] = [
         2,
         "add run model configuration and control settings",
         RUN_CONFIGURATION_AND_SETTINGS,
+    ),
+    (
+        3,
+        "add durable assistant worker wakeups",
+        ASSISTANT_WORKER_WAKEUPS,
     ),
 ];
 
@@ -401,7 +442,14 @@ impl Hub {
         match &entity {
             EntityWrite::None => {}
             EntityWrite::Task(task) => insert_task_row(&tx, task)?,
-            EntityWrite::Run(run) => insert_run_row(&tx, run)?,
+            EntityWrite::Run(run) => {
+                insert_run_row(&tx, run)?;
+                tx.execute(
+                    "UPDATE tasks SET status = ?1 WHERE task_id = ?2",
+                    params![TaskStatus::Running.as_str(), run.task_id.to_string()],
+                )
+                .map_err(sql_err)?;
+            }
         }
         if let Some((node_id, message)) = dispatch {
             tx.execute(
@@ -469,6 +517,20 @@ impl Hub {
         Ok(changed == 1)
     }
 
+    /// Mark a dispatched command accepted only when it belongs to the
+    /// authenticated node sending the acknowledgement.
+    pub fn acknowledge_dispatch_from(&mut self, command_id: &CommandId, node_id: &NodeId) -> Result<bool> {
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE pending_dispatches SET acked_at = ?1
+                 WHERE command_id = ?2 AND node_id = ?3 AND acked_at IS NULL",
+                params![fmt_time(Utc::now()), command_id.to_string(), node_id.as_str()],
+            )
+            .map_err(sql_err)?;
+        Ok(changed == 1)
+    }
+
     /// The current head sequence: `MAX(sequence)` over the event log, or `0` when
     /// empty. A cheap single-row query so a subscribing client's catch-up scan
     /// reads only the tail it needs (`events_after(cursor)`), never the whole
@@ -478,6 +540,30 @@ impl Hub {
             .query_row("SELECT COALESCE(MAX(sequence), 0) FROM events", [], |r| {
                 r.get::<_, i64>(0)
             })
+            .map_err(sql_err)
+    }
+
+    /// Return the durable result of an already-applied client command.
+    ///
+    /// Callers use this before consulting ephemeral runtime state (for
+    /// example the active-node registry), so a retry remains idempotent even
+    /// when that runtime state changed after the original command committed.
+    pub fn command_outcome(&self, command_id: &CommandId) -> Result<Option<AppendOutcome>> {
+        self.conn
+            .query_row(
+                "SELECT sequence, event_id FROM command_receipts WHERE command_id = ?1",
+                params![command_id.to_string()],
+                |row| {
+                    let event_id = EventId::from_str(&row.get::<_, String>(1)?)
+                        .map_err(|error| conv_err(error.to_string()))?;
+                    Ok(AppendOutcome {
+                        sequence: row.get(0)?,
+                        event_id,
+                        created: false,
+                    })
+                },
+            )
+            .optional()
             .map_err(sql_err)
     }
 
@@ -509,6 +595,7 @@ impl Hub {
 
         let sequence = next_sequence(&tx)?;
         insert_event(&tx, sequence, event_id, None, &draft, received_at)?;
+        apply_terminal_lifecycle_and_wake(&tx, event_id, sequence, &draft, received_at)?;
         tx.commit().map_err(sql_err)?;
         Ok(AppendOutcome {
             sequence,
@@ -536,6 +623,52 @@ impl Hub {
             out.push(r.map_err(sql_err)?);
         }
         Ok(out)
+    }
+
+    /// Most recent durable events, returned in ascending sequence order.
+    pub fn recent_events(&self, limit: usize) -> Result<Vec<Event>> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT sequence, event_id, command_id, kind, task_id, run_id,
+                        provider_session_id, node_id, protocol_version,
+                        occurred_at, hub_received_at, payload
+                 FROM events ORDER BY sequence DESC LIMIT ?1",
+            )
+            .map_err(sql_err)?;
+        let rows = statement
+            .query_map(params![i64::try_from(limit).unwrap_or(i64::MAX)], row_to_event)
+            .map_err(sql_err)?;
+        let mut events = rows
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(sql_err)?;
+        events.reverse();
+        Ok(events)
+    }
+
+    /// Tail of one task's timeline, returned in ascending sequence order.
+    pub fn task_events_tail(&self, task_id: &TaskId, limit: usize) -> Result<Vec<Event>> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT sequence, event_id, command_id, kind, task_id, run_id,
+                        provider_session_id, node_id, protocol_version,
+                        occurred_at, hub_received_at, payload
+                 FROM events WHERE task_id = ?1
+                 ORDER BY sequence DESC LIMIT ?2",
+            )
+            .map_err(sql_err)?;
+        let rows = statement
+            .query_map(
+                params![task_id.to_string(), i64::try_from(limit).unwrap_or(i64::MAX)],
+                row_to_event,
+            )
+            .map_err(sql_err)?;
+        let mut events = rows
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(sql_err)?;
+        events.reverse();
+        Ok(events)
     }
 
     // --- task / run helpers ----------------------------------------------
@@ -656,6 +789,97 @@ impl Hub {
             )
             .map_err(sql_err)?;
         Ok(())
+    }
+
+    /// Register a worker task as owned by one durable assistant channel.
+    pub fn register_assistant_worker(&mut self, channel: &str, task_id: TaskId) -> Result<()> {
+        self.conn
+            .execute(
+                "INSERT INTO assistant_workers (task_id, channel, created_at)
+                 VALUES (?1, ?2, ?3)
+                 ON CONFLICT(task_id) DO UPDATE SET channel = excluded.channel",
+                params![task_id.to_string(), channel, fmt_time(Utc::now())],
+            )
+            .map_err(sql_err)?;
+        Ok(())
+    }
+
+    /// Pending terminal assessments for an assistant channel, oldest first.
+    pub fn pending_assistant_wakes(&self, channel: &str) -> Result<Vec<AssistantWake>> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT event_id, sequence, channel, task_id, run_id, kind, attempt_count
+                 FROM assistant_wakes
+                 WHERE channel = ?1 AND processed_at IS NULL
+                   AND next_attempt_at <= ?2
+                 ORDER BY sequence ASC",
+            )
+            .map_err(sql_err)?;
+        let rows = statement
+            .query_map(params![channel, fmt_time(Utc::now())], |row| {
+                let kind = EventKind::from_dotted(&row.get::<_, String>(5)?)
+                    .ok_or_else(|| conv_err("bad assistant wake kind".to_string()))?;
+                Ok(AssistantWake {
+                    event_id: req_id::<EventId>(row.get(0)?)?,
+                    sequence: row.get(1)?,
+                    channel: row.get(2)?,
+                    task_id: req_id::<TaskId>(row.get(3)?)?,
+                    run_id: req_id::<RunId>(row.get(4)?)?,
+                    kind,
+                    attempt_count: row.get(6)?,
+                })
+            })
+            .map_err(sql_err)?;
+        rows.collect::<std::result::Result<Vec<_>, _>>().map_err(sql_err)
+    }
+
+    /// Mark one wake assessment complete. Idempotent for retries.
+    pub fn complete_assistant_wake(&mut self, event_id: &EventId) -> Result<bool> {
+        let changed = self
+            .conn
+            .execute(
+                "UPDATE assistant_wakes SET processed_at = ?1
+                 WHERE event_id = ?2 AND processed_at IS NULL",
+                params![fmt_time(Utc::now()), event_id.to_string()],
+            )
+            .map_err(sql_err)?;
+        Ok(changed == 1)
+    }
+
+    /// Defer a failed assessment with durable, capped exponential backoff.
+    /// Receipts remain retryable until Claire successfully assesses them.
+    pub fn defer_assistant_wake(&mut self, event_id: &EventId, error: &str) -> Result<bool> {
+        let attempts: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT attempt_count FROM assistant_wakes
+                 WHERE event_id = ?1 AND processed_at IS NULL",
+                params![event_id.to_string()],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(sql_err)?;
+        let Some(attempts) = attempts else {
+            return Ok(false);
+        };
+        let next_attempt = attempts + 1;
+        let delay_seconds = 5_i64 * 2_i64.pow((next_attempt - 1).clamp(0, 8) as u32);
+        let next_at = Utc::now() + chrono::Duration::seconds(delay_seconds);
+        self.conn
+            .execute(
+                "UPDATE assistant_wakes
+                 SET attempt_count = ?1, next_attempt_at = ?2, last_error = ?3
+                 WHERE event_id = ?4 AND processed_at IS NULL",
+                params![
+                    next_attempt,
+                    fmt_time(next_at),
+                    error.chars().take(500).collect::<String>(),
+                    event_id.to_string()
+                ],
+            )
+            .map_err(sql_err)?;
+        Ok(true)
     }
 
     // --- approvals --------------------------------------------------------
@@ -868,6 +1092,64 @@ fn insert_event(
         ],
     )
     .map_err(sql_err)?;
+    Ok(())
+}
+
+fn apply_terminal_lifecycle_and_wake(
+    tx: &rusqlite::Transaction<'_>,
+    event_id: EventId,
+    sequence: i64,
+    draft: &EventDraft,
+    received_at: DateTime<Utc>,
+) -> Result<()> {
+    let (run_status, task_status, wakes_assistant) = match draft.kind {
+        EventKind::RunCompleted => (RunStatus::Completed, TaskStatus::Completed, true),
+        EventKind::RunFailed => (RunStatus::Failed, TaskStatus::Failed, true),
+        EventKind::RunInterrupted => (RunStatus::Interrupted, TaskStatus::Interrupted, false),
+        _ => return Ok(()),
+    };
+    let Some(run_id) = draft.run_id else {
+        return Ok(());
+    };
+    tx.execute(
+        "UPDATE runs SET status = ?1 WHERE run_id = ?2",
+        params![run_status.as_str(), run_id.to_string()],
+    )
+    .map_err(sql_err)?;
+    tx.execute(
+        "UPDATE tasks SET status = ?1 WHERE task_id = ?2",
+        params![task_status.as_str(), draft.task_id.to_string()],
+    )
+    .map_err(sql_err)?;
+    if !wakes_assistant {
+        return Ok(());
+    }
+    let channel: Option<String> = tx
+        .query_row(
+            "SELECT channel FROM assistant_workers WHERE task_id = ?1",
+            params![draft.task_id.to_string()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(sql_err)?;
+    if let Some(channel) = channel {
+        tx.execute(
+            "INSERT INTO assistant_wakes
+               (event_id, sequence, channel, task_id, run_id, kind, created_at,
+                attempt_count, next_attempt_at, last_error, processed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?7, NULL, NULL)",
+            params![
+                event_id.to_string(),
+                sequence,
+                channel,
+                draft.task_id.to_string(),
+                run_id.to_string(),
+                draft.kind.as_str(),
+                fmt_time(received_at)
+            ],
+        )
+        .map_err(sql_err)?;
+    }
     Ok(())
 }
 

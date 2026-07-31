@@ -678,8 +678,8 @@
           <div>
             <h2>Claire settings</h2>
             <p>
-              Configure Claire, her execution node, and the models used by
-              assistant and worker runs.
+              Claire always runs on this hub. Configure her models, workspace,
+              and memory here; worker placement is selected per task.
             </p>
           </div>
           <button
@@ -728,12 +728,8 @@
                 <option value="high">High</option>
               </select>
             </label>
-            <label for="assistant-node"
-              >Execution node
-              <input id="assistant-node" required placeholder="local" />
-            </label>
             <label class="full" for="assistant-workspace"
-              >Default workspace
+              >Hub-local workspace
               <input id="assistant-workspace" placeholder="/home/user/work" />
             </label>
             <label class="full" for="assistant-personality"
@@ -956,35 +952,23 @@
         byId("run").disabled = true;
         setNotice("task-notice", "Starting the task.");
         try {
-          const task = await applyCommand({
-            type: "create_task",
-            command_id: uuid(),
+          const started = await api("/v1/tasks/start", {
+            method: "POST",
+            body: JSON.stringify({
             title: prompt.slice(0, 120),
-          });
-          state.taskId = task.task_id;
-          const run = await applyCommand({
-            type: "start_run",
-            command_id: uuid(),
-            task_id: state.taskId,
             node_id: state.selectedNode,
             engine: byId("engine").value,
             model: taskModel(byId("engine").value),
             reasoning_effort: state.assistant
               ? state.assistant.reasoning_effort
               : undefined,
-            access_policy: "automatic",
             workspace_path: byId("workspace").value.trim() || undefined,
+              prompt,
+            }),
           });
-          state.runId = run.run_id;
+          state.taskId = started.task_id;
+          state.runId = started.run_id;
           byId("stop").disabled = false;
-          await applyCommand({
-            type: "send_user_message",
-            command_id: uuid(),
-            task_id: state.taskId,
-            run_id: state.runId,
-            text: prompt,
-            client_message_id: uuid(),
-          });
           setNotice("task-notice", "Task started.");
         } catch (error) {
           setNotice("task-notice", error.message, true);
@@ -1114,7 +1098,6 @@
         byId("assistant-claude-model").value = settings.claude_model || "";
         byId("assistant-codex-model").value = settings.codex_model || "";
         byId("assistant-effort").value = settings.reasoning_effort || "high";
-        byId("assistant-node").value = settings.node_id || "local";
         byId("assistant-workspace").value = settings.workspace || "";
         byId("assistant-personality").value = settings.personality || "";
         byId("assistant-memory-enabled").checked = Boolean(
@@ -1147,7 +1130,6 @@
           claude_model: byId("assistant-claude-model").value.trim() || null,
           codex_model: byId("assistant-codex-model").value.trim() || null,
           reasoning_effort: byId("assistant-effort").value,
-          node_id: byId("assistant-node").value.trim(),
           workspace: byId("assistant-workspace").value.trim() || null,
           memory_enabled: byId("assistant-memory-enabled").checked,
           memory_command: byId("assistant-memory-command").value.trim() || null,

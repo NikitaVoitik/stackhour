@@ -22,9 +22,20 @@
   },
   "summary": { "capSeconds": 120, "lastEventCreditSeconds": 60 },
   "wakatime": { "apiKey": "waka_xxx (only needed for import-wakatime)" },
-  "bridge": {
-    "defaultAgent": "reviewer",
-    "defaultEngine": "claude",
-    "defaultTarget": "gcp"
+  "control": {
+    "hub": {
+      "bind": "127.0.0.1:4050",
+      "nodeToken": "generate-a-long-random-string",
+      "clientToken": "generate-a-different-long-random-string"
+    },
+    "node": {
+      "id": "linux-server",
+      "hubUrl": "ws://127.0.0.1:4050/v1/node/connect",
+      "token": "use-the-hub-node-token",
+      "workspace": "/home/user/work"
+    },
+    "telegram": {
+      "enabled": false
+    }
   }
 }

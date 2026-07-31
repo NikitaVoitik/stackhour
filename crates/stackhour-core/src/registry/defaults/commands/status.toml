@@ -1,7 +1,0 @@
-# /status — a fixed-argv shell command. The argv is NEVER passed through a
-# shell, so there is no quoting to get wrong and no injection to worry about:
-# these strings are exec'd literally.
-
-description = "Show host load and disk"
-kind = "shell"
-argv = ["sh", "-c", "uptime; df -h /"]

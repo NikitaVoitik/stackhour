@@ -1,0 +1,9 @@
+1. Keep time tracking direct to the tracking server, separate from the hub, and make it independently disableable and size-conscious.
+2. Build the Rust-core foundation for an agentic IDE: durable chat threads; reopening and continuing chats with a chosen Claude or Codex instance; first-class provider sessions; and resumable runs.
+3. The control-plane API should let Claire create and schedule worker tasks on any eligible active execution node.
+4. Claire herself runs only on the hub machine. Telegram always communicates with that single hub-resident Claire and must not offer a machine selector or permit switching Claire to another node.
+5. Implement long-lived Claire conversations by adapting the memory and context-management approaches from OpenClaw or Hermes together with OptiMem—not OptiMem alone. Build a unified Claire context system with hub-authoritative raw events, rolling durable checkpoints, resumable provider-session bindings, relevant-history retrieval, and OptiMem as the long-term memory layer. The system must recover from a checkpoint plus recent history and relevant memory when a provider session cannot resume.
+6. Use Shadi SM for the design system of the control panel and overall product UI.
+7. When a worker task completes or fails, the hub should emit a durable event that wakes Claire. Claire should assess the result, choose the next action, and decide whether and how to notify the user in Telegram.
+8. Claire alone should decide which worker progress, task events, tool activity, questions, and results are communicated to the user in Telegram. Internal execution details must not be exposed through a setting or other user-controlled raw-detail visibility.
+9. Investigate [Herdr](https://github.com/ogulcancelik/herdr) for architecture, agent-coordination, terminal-multiplexer, and user-interface ideas Stackhour could adapt or reuse after license and fit review.

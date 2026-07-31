@@ -15,12 +15,12 @@
 //! ```
 //!
 //! plus the Rust-side addition `config_dir` = dirname(config_path) (root of
-//! the Layer-2 registry), overridable via `STACKHOUR_CONFIG_DIR`.
+//! auxiliary configuration), overridable via `STACKHOUR_CONFIG_DIR`.
 
 use std::path::{Path, PathBuf};
 
 /// All resolved storage locations. `config_dir` = dirname(config_path), the
-/// root of the Layer-2 declarative registry, overridable via
+/// auxiliary configuration root, overridable via
 /// `STACKHOUR_CONFIG_DIR`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoragePaths {
@@ -217,7 +217,7 @@ mod tests {
     fn config_dir_env_override() {
         let env = env_of(&[("STACKHOUR_CONFIG_DIR", "/etc/stackhour.d")]);
         let p = resolve_storage_paths(&env, Path::new("/home/u"));
-        // config_path unaffected; only the registry root moves.
+        // config_path unaffected; only the auxiliary root moves.
         assert_eq!(
             p.config_path,
             PathBuf::from("/home/u/.config/stackhour/config.json")

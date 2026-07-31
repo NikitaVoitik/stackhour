@@ -9,14 +9,14 @@
 //! deterministic, interruptible sequence of events that proves the durable
 //! connect / dispatch / ack / reconnect / resume loop end to end.
 
+use crate::process::{spawn_engine, RunRequest, RunningJob};
 use serde_json::json;
-use stackhour_bridge::engines::{spawn_engine, RunRequest, RunningJob};
 use stackhour_domain::entities::AccessPolicy;
 use stackhour_domain::event::EventDraft;
 use stackhour_domain::ids::{CommandId, EventId, NodeId, RunId, TaskId};
 use stackhour_domain::protocol::{NodeToHub, NodeWork};
 use stackhour_domain::EventKind;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -47,13 +47,85 @@ const STUB_STEP: Duration = Duration::from_millis(10);
 /// consumes those echoed sequences.
 #[derive(Clone)]
 pub struct EngineOutbox {
-    tx: mpsc::Sender<Outgoing>,
+    state: Arc<Mutex<OutboxState>>,
     node_id: NodeId,
 }
 
+#[derive(Default)]
+struct OutboxState {
+    tx: Option<mpsc::Sender<Outgoing>>,
+    pending_events: VecDeque<(EventId, NodeToHub)>,
+}
+
 impl EngineOutbox {
+    #[cfg(test)]
     pub(crate) fn new(tx: mpsc::Sender<Outgoing>, node_id: NodeId) -> Self {
-        EngineOutbox { tx, node_id }
+        EngineOutbox {
+            state: Arc::new(Mutex::new(OutboxState {
+                tx: Some(tx),
+                pending_events: VecDeque::new(),
+            })),
+            node_id,
+        }
+    }
+
+    pub(crate) fn persistent(node_id: NodeId) -> Self {
+        EngineOutbox {
+            state: Arc::new(Mutex::new(OutboxState::default())),
+            node_id,
+        }
+    }
+
+    pub(crate) async fn attach(&self, tx: mpsc::Sender<Outgoing>) {
+        let pending = {
+            let mut state = self.state.lock().unwrap();
+            state.tx = Some(tx.clone());
+            state
+                .pending_events
+                .iter()
+                .map(|(_, message)| message.clone())
+                .collect::<Vec<_>>()
+        };
+        for message in pending {
+            if tx.send(Outgoing::Protocol(message)).await.is_err() {
+                break;
+            }
+        }
+    }
+
+    pub(crate) fn detach(&self) {
+        self.state.lock().unwrap().tx = None;
+    }
+
+    pub(crate) async fn resend_pending(&self) {
+        let (tx, pending) = {
+            let state = self.state.lock().unwrap();
+            (
+                state.tx.clone(),
+                state
+                    .pending_events
+                    .iter()
+                    .map(|(_, message)| message.clone())
+                    .collect::<Vec<_>>(),
+            )
+        };
+        let Some(tx) = tx else { return };
+        for message in pending {
+            if tx.send(Outgoing::Protocol(message)).await.is_err() {
+                break;
+            }
+        }
+    }
+
+    pub(crate) fn acknowledge_event(&self, event_id: EventId) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(index) = state
+            .pending_events
+            .iter()
+            .position(|(pending, _)| *pending == event_id)
+        {
+            state.pending_events.remove(index);
+        }
     }
 
     /// Emit a fully-formed [`EventDraft`] as a fresh-id `NodeEvent`. Returns
@@ -64,7 +136,19 @@ impl EngineOutbox {
             event_id: EventId::new(),
             draft,
         };
-        self.tx.send(Outgoing::Protocol(msg)).await.is_ok()
+        let event_id = match &msg {
+            NodeToHub::NodeEvent { event_id, .. } => *event_id,
+            _ => unreachable!(),
+        };
+        let tx = {
+            let mut state = self.state.lock().unwrap();
+            state.pending_events.push_back((event_id, msg.clone()));
+            state.tx.clone()
+        };
+        match tx {
+            Some(tx) => tx.send(Outgoing::Protocol(msg)).await.is_ok(),
+            None => true,
+        }
     }
 
     /// Emit a node event for `kind` on `task_id` (optionally scoped to a run)
@@ -85,10 +169,14 @@ impl EngineOutbox {
 
     /// Acknowledge a dispatched command. Returns `false` if the link is gone.
     pub async fn ack(&self, command_id: CommandId) -> bool {
-        self.tx
-            .send(Outgoing::Protocol(NodeToHub::CommandAck { command_id }))
-            .await
-            .is_ok()
+        let tx = self.state.lock().unwrap().tx.clone();
+        match tx {
+            Some(tx) => tx
+                .send(Outgoing::Protocol(NodeToHub::CommandAck { command_id }))
+                .await
+                .is_ok(),
+            None => false,
+        }
     }
 }
 
@@ -123,6 +211,7 @@ struct CliState {
     jobs: HashMap<RunId, RunningJob>,
     command_runs: HashMap<CommandId, RunId>,
     seen: HashSet<CommandId>,
+    interrupted: HashSet<RunId>,
 }
 
 #[derive(Clone)]
@@ -152,7 +241,14 @@ impl CliEngine {
     }
 
     fn stop_run(&self, run_id: RunId) {
-        let job = self.state.lock().unwrap().jobs.get(&run_id).cloned();
+        let job = {
+            let mut state = self.state.lock().unwrap();
+            let job = state.jobs.get(&run_id).cloned();
+            if job.is_some() {
+                state.interrupted.insert(run_id);
+            }
+            job
+        };
         if let Some(job) = job {
             job.terminate();
         }
@@ -220,8 +316,8 @@ impl Engine for CliEngine {
                 };
 
                 let def = match spec.engine.as_str() {
-                    "claude" => stackhour_core::registry::engine::builtin_claude(),
-                    "codex" => stackhour_core::registry::engine::builtin_codex(),
+                    "claude" => stackhour_core::engine::builtin_claude(),
+                    "codex" => stackhour_core::engine::builtin_codex(),
                     other => {
                         let error = format!("unsupported engine: {other}");
                         tokio::spawn(async move {
@@ -257,9 +353,8 @@ impl Engine for CliEngine {
                     cwd: spec.workspace,
                     live_status: true,
                     bin,
-                    ..RunRequest::default()
                 };
-                let (job, handle) = spawn_engine(&def, req, None);
+                let (job, handle) = spawn_engine(&def, req);
                 {
                     let mut state = self.state.lock().unwrap();
                     state.jobs.insert(run_id, job);
@@ -272,13 +367,19 @@ impl Engine for CliEngine {
                         .await
                         .ok()
                         .and_then(std::result::Result::ok);
-                    {
+                    let interrupted = {
                         let mut state = engine.state.lock().unwrap();
                         state.jobs.remove(&run_id);
                         state.command_runs.remove(&command_id);
                         if let Some(session) = result.as_ref().and_then(|r| r.session_id.clone()) {
                             state.sessions.insert(run_id, session);
                         }
+                        state.interrupted.remove(&run_id)
+                    };
+                    if interrupted {
+                        out.emit(EventKind::RunInterrupted, spec.task_id, Some(run_id), json!({}))
+                            .await;
+                        return;
                     }
                     match result {
                         Some(result) if result.code == Some(0) && result.error.is_none() => {
@@ -630,6 +731,48 @@ async fn emit_interrupted(out: &EngineOutbox, task_id: TaskId, run_id: RunId) {
 mod tests {
     use super::*;
     use stackhour_domain::entities::AccessPolicy;
+
+    #[tokio::test]
+    async fn persistent_outbox_replays_events_until_hub_acknowledges_them() {
+        let outbox = EngineOutbox::persistent(NodeId::from("node"));
+        assert!(
+            outbox
+                .emit(
+                    EventKind::RunCompleted,
+                    TaskId::new(),
+                    Some(RunId::new()),
+                    json!({})
+                )
+                .await
+        );
+        let (first_tx, mut first_rx) = mpsc::channel(4);
+        outbox.attach(first_tx).await;
+        let event_id = match first_rx.recv().await.unwrap() {
+            Outgoing::Protocol(NodeToHub::NodeEvent { event_id, .. }) => event_id,
+            _ => panic!("expected node event"),
+        };
+        outbox.resend_pending().await;
+        assert!(matches!(
+            first_rx.recv().await,
+            Some(Outgoing::Protocol(NodeToHub::NodeEvent { .. }))
+        ));
+        outbox.detach();
+
+        let (second_tx, mut second_rx) = mpsc::channel(4);
+        outbox.attach(second_tx).await;
+        assert!(matches!(
+            second_rx.recv().await,
+            Some(Outgoing::Protocol(NodeToHub::NodeEvent { .. }))
+        ));
+        outbox.acknowledge_event(event_id);
+        outbox.detach();
+
+        let (third_tx, mut third_rx) = mpsc::channel(4);
+        outbox.attach(third_tx).await;
+        assert!(tokio::time::timeout(Duration::from_millis(20), third_rx.recv())
+            .await
+            .is_err());
+    }
 
     /// A redelivered `DispatchCommand` (same `command_id` — e.g. the hub missed
     /// the first ack and re-sent) must be acknowledged again, yet spawn no second

@@ -22,12 +22,12 @@ path = "src/lib.rs"
 [dependencies]
 stackhour-domain.workspace = true
 stackhour-core.workspace = true
-stackhour-bridge.workspace = true
 tokio = { workspace = true, features = ["sync", "time", "rt"] }
 tokio-tungstenite.workspace = true
 futures-util.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+rustix.workspace = true
 
 [dev-dependencies]
 # A FAKE hub stood up in-process for the integration tests: axum serves the

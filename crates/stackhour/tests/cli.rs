@@ -1,4 +1,4 @@
-#![cfg(all(feature = "tracker", feature = "agent", feature = "bridge"))]
+#![cfg(all(feature = "tracker", feature = "agent", feature = "control"))]
 // Every test here drives a verb that only exists when the module(s) named
 // above are compiled in. Without the file-level gate a reduced-feature
 // `cargo test` would run them against a binary that answers exit 2.
@@ -317,7 +317,7 @@ fn no_advertised_verb_panics() {
         // never return.
         &["agent", "--once"],
         &["import-wakatime"],
-        &["bridge"],
+        &["control"],
         &[],
     ];
     for args in verbs {

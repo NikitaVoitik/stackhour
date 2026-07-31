@@ -1,4 +1,4 @@
-#![cfg(all(feature = "tracker", feature = "agent", feature = "bridge"))]
+#![cfg(all(feature = "tracker", feature = "agent", feature = "control"))]
 // Every test here drives a verb that only exists when the module(s) named
 // above are compiled in. Without the file-level gate a reduced-feature
 // `cargo test` would run them against a binary that answers exit 2.
@@ -127,63 +127,33 @@ fn a_disabled_agent_refuses_the_agent_verb() {
 }
 
 #[test]
-fn a_disabled_bridge_refuses_every_bridge_subverb() {
+fn a_disabled_control_refuses_every_control_subverb() {
     let sb = Sandbox::new();
-    sb.write_config(r#"{ "modules": { "bridge": false } }"#);
+    sb.write_config(r#"{ "modules": { "control": false } }"#);
     for args in [
-        vec!["bridge"],
-        vec!["bridge", "status", "coordinator"],
-        vec!["bridge", "migrate"],
-        vec!["bridge", "return", "abc"],
+        vec!["control"],
+        vec!["control", "hub"],
+        vec!["control", "node"],
+        vec!["control", "install"],
     ] {
         let out = sb.run(&args);
         assert_eq!(code(&out), 2, "{args:?} stderr={}", stderr(&out));
         assert!(
-            stderr(&out).contains("bridge needs the bridge module"),
+            stderr(&out).contains("control needs the control module"),
             "{args:?} stderr={}",
             stderr(&out)
         );
-    }
-}
-
-/// `bridge claim` and `bridge return` resolve everything they touch from
-/// `--runtime-dir` and never read config.json themselves — but they are still
-/// bridge verbs, so the gate refuses them. This is the coupling that forces
-/// EVERY binary-spawning bridge test — `mac_worker_cli_wire_compat.rs`,
-/// `bridge_targeted_claim.rs`, `session_state_parity.rs` and
-/// `bridge_migrate_fixture.rs` — to spawn with `env_clear()` and a throwaway
-/// HOME: with an inherited environment they would test the developer's
-/// config.json instead of the runtime-dir protocol.
-#[test]
-fn a_disabled_bridge_refuses_the_runtime_dir_wire_verbs() {
-    let sb = Sandbox::new();
-    sb.write_config(r#"{ "modules": { "bridge": false } }"#);
-    let rt = TempDir::new().unwrap();
-    let rt = rt.path().to_str().unwrap();
-    for args in [
-        vec!["bridge", "claim", "--runtime-dir", rt],
-        vec!["bridge", "return", "abc", "--runtime-dir", rt],
-    ] {
-        let out = sb.run(&args);
-        assert_eq!(code(&out), 2, "{args:?} stderr={}", stderr(&out));
-        assert!(
-            stderr(&out).contains("bridge needs the bridge module"),
-            "{args:?} stderr={}",
-            stderr(&out)
-        );
-        // Refused before dispatch: the runtime dir is left completely alone.
-        assert_eq!(std::fs::read_dir(rt).unwrap().count(), 0, "{args:?}");
     }
 }
 
 #[test]
 fn a_gated_verb_writes_nothing_to_stdout() {
     let sb = Sandbox::new();
-    sb.write_config(r#"{ "modules": { "tracker": false, "agent": false, "bridge": false } }"#);
+    sb.write_config(r#"{ "modules": { "tracker": false, "agent": false, "control": false } }"#);
     for args in [
         vec!["serve"],
         vec!["agent"],
-        vec!["bridge"],
+        vec!["control"],
         vec!["data", "stats"],
     ] {
         let out = sb.run(&args);
@@ -214,7 +184,7 @@ fn a_gate_message_names_the_config_key_and_the_config_path() {
 #[test]
 fn doctor_still_runs_with_every_module_disabled() {
     let sb = Sandbox::new();
-    sb.write_config(r#"{ "modules": { "tracker": false, "agent": false, "bridge": false } }"#);
+    sb.write_config(r#"{ "modules": { "tracker": false, "agent": false, "control": false } }"#);
     let out = sb.run(&["doctor"]);
     assert!(
         code(&out) == 0 || code(&out) == 1,
@@ -262,7 +232,7 @@ fn an_all_true_modules_block_changes_nothing() {
     let mut with_block = cfg;
     with_block.as_object_mut().unwrap().insert(
         "modules".to_string(),
-        serde_json::json!({ "tracker": true, "agent": true, "bridge": true }),
+        serde_json::json!({ "tracker": true, "agent": true, "control": true }),
     );
     std::fs::write(sb.config_path(), serde_json::to_string(&with_block).unwrap()).unwrap();
 
@@ -278,10 +248,10 @@ fn an_all_true_modules_block_changes_nothing() {
 
 #[test]
 fn a_malformed_modules_block_gates_nothing() {
-    for block in ["3", "[]", "null", r#""bridge""#, "false"] {
+    for block in ["3", "[]", "null", r#""control""#, "false"] {
         let sb = Sandbox::new();
         sb.write_config(&format!(r#"{{ "modules": {block} }}"#));
-        for args in [vec!["data", "stats"], vec!["bridge"], vec!["agent", "--once"]] {
+        for args in [vec!["data", "stats"], vec!["control"], vec!["agent", "--once"]] {
             let out = sb.run(&args);
             assert_ne!(
                 code(&out),
@@ -418,7 +388,7 @@ fn every_integration_test_that_spawns_the_binary_clears_the_environment() {
         checked += 1;
     }
     assert!(
-        checked >= 5,
+        checked >= 4,
         "only {checked} spawning test files found; did the glob break?"
     );
 }
@@ -444,7 +414,7 @@ fn a_bare_init_with_no_role_still_prints_the_usage_error() {
 #[test]
 fn the_help_banner_gains_a_note_line_only_when_a_module_is_off() {
     let sb = Sandbox::new();
-    sb.write_config(r#"{ "modules": { "tracker": false, "bridge": false } }"#);
+    sb.write_config(r#"{ "modules": { "tracker": false, "control": false } }"#);
     let out = sb.run(&[]);
     assert_eq!(code(&out), 0, "stderr={}", stderr(&out));
     let text = stdout(&out);
@@ -457,7 +427,7 @@ fn the_help_banner_gains_a_note_line_only_when_a_module_is_off() {
     );
     assert!(
         text.contains(
-            "note: the bridge module is disabled by \"modules.bridge\": false; \
+            "note: the control module is disabled by \"modules.control\": false; \
              its commands above exit 2.\n"
         ),
         "stdout={text}"
@@ -465,9 +435,9 @@ fn the_help_banner_gains_a_note_line_only_when_a_module_is_off() {
     // Only the off ones, in Module::ALL order, after the pinned banner.
     assert!(!text.contains("note: the agent module"), "stdout={text}");
     let tracker = text.find("note: the tracker module").unwrap();
-    let bridge = text.find("note: the bridge module").unwrap();
+    let control = text.find("note: the control module").unwrap();
     let config = text.find("config: ").unwrap();
-    assert!(config < tracker && tracker < bridge, "stdout={text}");
+    assert!(config < tracker && tracker < control, "stdout={text}");
 }
 
 /// The prime constraint at the help surface: a default build reading a config
@@ -493,8 +463,8 @@ fn the_help_banner_is_byte_identical_when_every_module_is_enabled() {
     // An explicitly all-true block, and a JS-truthy `"false"` string, both
     // resolve to "nothing is off" and so must print the same bytes.
     for body in [
-        r#"{ "modules": { "tracker": true, "agent": true, "bridge": true } }"#,
-        r#"{ "modules": { "bridge": "false" } }"#,
+        r#"{ "modules": { "tracker": true, "agent": true, "control": true } }"#,
+        r#"{ "modules": { "control": "false" } }"#,
         r#"{ "modules": null }"#,
     ] {
         let sb = Sandbox::new();
@@ -511,7 +481,7 @@ fn the_help_banner_is_byte_identical_when_every_module_is_enabled() {
 #[test]
 fn the_help_path_keeps_stderr_clean_with_a_module_disabled() {
     let sb = Sandbox::new();
-    sb.write_config(r#"{ "modules": { "tracker": false, "agent": false, "bridge": false } }"#);
+    sb.write_config(r#"{ "modules": { "tracker": false, "agent": false, "control": false } }"#);
     let out = sb.run(&[]);
     assert_eq!(code(&out), 0, "stderr={}", stderr(&out));
     assert_eq!(stderr(&out), "", "the help path must never write to stderr");
@@ -523,18 +493,18 @@ fn the_help_path_keeps_stderr_clean_with_a_module_disabled() {
 #[test]
 fn doctor_reports_a_module_line_for_a_disabled_module() {
     let sb = Sandbox::new();
-    sb.write_config(r#"{ "modules": { "bridge": false } }"#);
+    sb.write_config(r#"{ "modules": { "control": false } }"#);
     let out = sb.run(&["doctor"]);
     let text = stdout(&out);
     assert!(
         text.contains(&format!(
-            "module-bridge: disabled by \"modules.bridge\": false in {}",
+            "module-control: disabled by \"modules.control\": false in {}",
             sb.config_path().display()
         )),
         "stdout={text}"
     );
     // Ok status, so the line renders with the tick and not the cross.
-    assert!(text.contains("✓ module-bridge:"), "stdout={text}");
+    assert!(text.contains("✓ module-control:"), "stdout={text}");
     // Nothing is said about the modules that are still on.
     assert!(!text.contains("module-tracker"), "stdout={text}");
     assert!(!text.contains("module-agent"), "stdout={text}");
@@ -546,7 +516,7 @@ fn doctor_reports_a_module_line_for_a_disabled_module() {
 #[test]
 fn doctor_json_keeps_its_three_top_level_keys_with_a_module_disabled() {
     let sb = Sandbox::new();
-    sb.write_config(r#"{ "modules": { "tracker": false, "bridge": false } }"#);
+    sb.write_config(r#"{ "modules": { "tracker": false, "control": false } }"#);
     let out = sb.run(&["doctor", "--json"]);
     let text = stdout(&out);
     let doc: serde_json::Value = serde_json::from_str(&text).expect("doctor --json is parsable");
@@ -573,7 +543,7 @@ fn doctor_exits_zero_or_one_but_never_two_with_modules_disabled() {
     for body in [
         r#"{ "modules": { "tracker": false } }"#,
         r#"{ "modules": { "agent": false } }"#,
-        r#"{ "modules": { "tracker": false, "agent": false, "bridge": false } }"#,
+        r#"{ "modules": { "tracker": false, "agent": false, "control": false } }"#,
     ] {
         let sb = Sandbox::new();
         sb.write_config(body);

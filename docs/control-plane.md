@@ -246,29 +246,63 @@ and restarts the remote node service.
 Linux releases are static musl binaries and are artifact-tested in Debian 12
 and Amazon Linux 2023 containers on both x86-64 and ARM64 release runners.
 
-## Telegram migration
+## Telegram
 
-Set `control.telegram.enabled` to `true` on the hub. Then stop the old bridge
-coordinator before you restart the hub. Two pollers with the same bot token can
-take updates from each other.
+Set `control.telegram.enabled` to `true` on the hub. Only one running service
+should poll a given bot token.
 
-The Telegram client is a persistent assistant named Claire. A normal message
-continues Claire's durable task and provider run instead of creating an
-unrelated task. Claire sees recent task activity and can use typed actions to:
+The Telegram client is a persistent assistant named Claire. Claire's provider
+process always runs inside `stackhour control hub`; it is never dispatched to
+an execution node and Telegram has no machine selector for her. A normal
+message continues Claire's durable task and provider run instead of creating
+an unrelated task. Claire sees recent task activity and can use typed actions
+to:
 
-- Create a worker task on a Stackhour node.
+- Create a worker task on a named eligible active node, or let the hub choose
+  any eligible active node.
 - Send a follow-up message to a known task and run.
 - Stop a known run.
 
 Worker tasks are separate from Claire's own conversation. Their completion or
-failure is reported back to Telegram.
+failure creates a durable pending wake receipt in the same transaction as the
+terminal event. Claire consumes that receipt, reviews the worker timeline,
+chooses any follow-up actions, and then decides what to report to Telegram.
+Pending receipts survive hub and Telegram restarts and are marked processed
+only after Claire's assessment completes. Failed assessments use durable,
+capped exponential backoff. The delay is capped, but the receipt stays eligible
+until Claire successfully assesses it, so a long provider or Telegram outage
+cannot silently discard a result or create a tight retry loop.
+
+Claire is the sole policy boundary for task information in Telegram. Her
+structured response includes an explicit `notify` decision; `notify: false`
+acknowledges a wake without posting. Worker output, action results, memory
+errors, and `/tasks` data are never projected directly by the app. `/tasks`
+asks Claire to review the durable activity and choose the useful summary.
+
+### Local fake Telegram
+
+For ordinary-user and end-to-end testing, run a loopback-only Bot API simulator:
+
+```sh
+stackhour control fake-telegram --bind=127.0.0.1:4060 --chat-id=1 --bot-token=fake-token
+```
+
+Open `http://127.0.0.1:4060/` for the chat UI and point
+`control.telegram.apiRoot` at `http://127.0.0.1:4060` and use the same fake
+token in `control.telegram.token`. The simulator implements
+the `getUpdates` and `sendMessage` calls used by Stackhour, plus
+`POST /fake/send` and cursor-aware `GET /fake/state?after=N` for automated user
+journeys. It long-polls and confirms updates like Telegram, bounds retained
+history, rejects non-loopback Host/Origin requests, refuses non-loopback binds,
+and does not alter hub or node authentication.
 
 Claire's Telegram commands are:
 
 - `/claude` and `/codex` switch the engine. The next message starts a provider
   run for that engine while preserving the same Claire task.
 - `/model` shows the current engine's model; `/model MODEL` changes it.
-- `/where` shows the active engine, model, effort, node, and memory state.
+- `/where` shows the active engine, model, effort, hub-local location, and
+  memory state.
 - `/tasks` shows recent task activity.
 - `/remember FACT` writes an explicit durable memory note when OptMem is
   enabled.
@@ -287,7 +321,7 @@ stored in the hub database and include:
 - Claire's name and personality prompt.
 - The active engine (`claude` or `codex`).
 - A model for each engine and the Codex reasoning effort.
-- The node ID and optional absolute workspace used for Claire's conversation.
+- The optional absolute hub-local workspace used for Claire's conversation.
 - Whether OptMem is enabled, its absolute executable path, and an optional
   absolute memory directory.
 
@@ -300,9 +334,10 @@ The Telegram config seeds these settings only the first time:
       "enabled": true,
       "token": "BOT_TOKEN",
       "chatId": 123456789,
-      "nodeId": "local",
       "engine": "claude",
       "workspace": "/home/user/work",
+      "claudeBin": "/optional/path/to/claude",
+      "codexBin": "/optional/path/to/codex",
       "claudeModel": "your-claude-model",
       "codexModel": "your-codex-model",
       "personality": "Warm, perceptive, direct, and quietly witty.",
@@ -313,8 +348,8 @@ The Telegram config seeds these settings only the first time:
 }
 ```
 
-After initialization, use the panel as the source of truth. Model, node, and
-path values are validated before Stackhour stores or launches them.
+After initialization, use the panel as the source of truth. Model and path
+values are validated before Stackhour stores or launches them.
 
 ### Optional OptMem memory
 
@@ -334,14 +369,13 @@ The typed action boundary deliberately excludes credential changes, software
 installation, deletion, backup restoration, administrative operations, and
 approval decisions.
 
-The old `stackhour bridge` commands remain available as a rollback path. Do not
-run the old coordinator and the control hub Telegram client at the same time.
-
 ## Delivery and recovery
 
-The hub stores each command before it sends the command to a node. If the node
-is offline, the hub sends pending commands after the node reconnects. A node
-acknowledgement removes the command from the pending list.
+The hub accepts a new run only when its explicit target is active and advertises
+the requested engine, or when the scheduler can select such a node. It stores
+each accepted command before sending it. If that node disconnects before
+acknowledging the command, the hub sends the pending command after it
+reconnects. A node acknowledgement removes the command from the pending list.
 
 Task creation, run creation, the event, the command receipt, and a related node
 dispatch use one SQLite transaction. A restart cannot leave an event without
@@ -359,14 +393,10 @@ The hub can remove duplicate events.
 - A node process crash after it accepts a running command can leave that run
   incomplete. The hub keeps commands that the node did not accept. The node
   does not have an on-disk engine outbox.
-- Claire's task/run binding survives a hub restart, but a node restart loses
-  the CLI process behind an active run. The failed run is cleared so the next
-  message can start a new provider run in the same Claire task.
+- Claire's task/run and last completed provider-session binding survive a hub
+  restart. A hub crash still loses an in-flight local CLI process; durable
+  terminal-event recovery is handled separately from provider resumption.
 - Claire's first typed-action boundary cannot perform approvals or privileged
   administration.
 
-Keep the old bridge until these limits are acceptable for the live workflow.
-`bridge install worker` removes it.
-
-See [bridge.md](bridge.md) for the old bridge guide. See
-[../SECURITY.md](../SECURITY.md) for the security model.
+See [../SECURITY.md](../SECURITY.md) for the security model.
