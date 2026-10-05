@@ -63,6 +63,11 @@ fn now_seconds() -> f64 {
 /// connection. A transport error while reading also surfaces as 413: it is
 /// indistinguishable through this API, and in that case the peer is already
 /// gone so the status is unobservable.
+///
+/// The `Err` variant is a ready-to-send `Response`, matching
+/// `principal_or_401` below. Boxing it would add an allocation only to unwrap
+/// the response immediately in each handler.
+#[allow(clippy::result_large_err)]
 async fn read_json(body: Body) -> std::result::Result<Value, Response> {
     let bytes = axum::body::to_bytes(body, BODY_LIMIT)
         .await
