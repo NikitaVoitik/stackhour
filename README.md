@@ -1,14 +1,62 @@
 # Stackhour
 
-Stackhour is a dependency-free, self-hosted coding time tracker for humans and
-coding agents. It replaces WakaTime with one application and a SQLite database
-you control.
+**Run Claude Code and Codex across your own machines, then measure the work done
+by humans and agents.**
 
-- `stackhour serve` runs the ingest API, SQLite storage, and web dashboard.
-- `stackhour agent` watches local activity and sends heartbeats to the server.
-- One agent can run on the server and additional agents can run on Linux or
-  macOS machines.
-- Offline agents queue heartbeats on disk and retry automatically.
+Stackhour is a self-hosted remote agent control plane and coding activity
+tracker packaged as one Rust binary. A durable hub coordinates work, execution
+nodes run coding agents inside their local workspaces, and an optional Telegram
+assistant named Claire can create, follow up on, and stop tasks. The tracker
+records human and agent activity separately in SQLite.
+
+[Control plane guide](docs/control-plane.md) ·
+[Architecture overview](docs/architecture/overview.md) ·
+[Roadmap](ROADMAP.md) ·
+[Security model](SECURITY.md) ·
+[Latest release](https://github.com/NikitaVoitik/stackhour/releases/latest)
+
+## What it does
+
+| Capability | What Stackhour provides |
+| --- | --- |
+| Remote execution | Run Claude Code or Codex on connected Linux or macOS machines without exposing an inbound agent port. |
+| Durable coordination | Keep tasks, runs, ordered events, command receipts, and reconnect state in SQLite. |
+| Web and Telegram control | Start and stop work from the browser, or let Claire coordinate worker tasks from a persistent Telegram conversation. |
+| Machine enrollment | Add the hub itself or install a node on another machine over SSH; normal task traffic then uses an outbound authenticated WebSocket. |
+| Activity tracking | Attribute editor, terminal, Claude, Codex, Zed, and WakaTime-compatible activity to humans or agents across machines. |
+| Self-hosted operations | Run the hub, nodes, tracker, dashboard, backups, and update flow without a hosted Stackhour account. |
+
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    U["Web control panel"] --> H["Stackhour hub<br/>tasks, events, routing"]
+    T["Telegram / Claire"] --> H
+    H <--> N1["Laptop node"]
+    H <--> N2["Remote devbox node"]
+    N1 --> E1["Claude Code / Codex"]
+    N2 --> E2["Claude Code / Codex"]
+
+    A1["Activity agent"] --> S["Tracker + SQLite<br/>dashboard and reports"]
+    A2["Activity agent"] --> S
+```
+
+Nodes make outbound authenticated connections and own their workspaces,
+terminals, Git checkouts, and engine processes. The hub owns task identity,
+routing, durable history, and client sessions. Tracking remains a separate
+module, so remote control and activity collection can be enabled independently.
+See the [architecture overview](docs/architecture/overview.md) for the trust
+boundaries and data flow.
+
+## Pick a starting point
+
+- To run agents across machines, start with the
+  [control plane guide](docs/control-plane.md).
+- To track human and agent coding time, continue with the tracker quick start
+  below.
+- To evaluate the project before installing it, read the
+  [current limits](docs/control-plane.md#current-limits) and
+  [roadmap](ROADMAP.md).
 
 ## Building
 
@@ -543,5 +591,7 @@ it; `stackhour install` writes units naming the binary that ran it.
   offline queue.
 - Zed thread rows currently lack reliable project attribution and are reported
   as `zed-agent`.
-- The dashboard and read APIs are unauthenticated. Keep the server behind
-  Tailscale, a VPN, or an authenticated reverse proxy.
+- A tokenless tracker keeps its dashboard and read APIs open for the documented
+  single-machine setup. Configuring a server token closes both reads and
+  writes. Keep the service behind Tailscale, a VPN, or an authenticated reverse
+  proxy whenever other machines can reach it.
